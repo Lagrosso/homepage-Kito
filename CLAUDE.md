@@ -105,9 +105,10 @@ Upstream (`gethomepage/homepage`) ist GPLv3 und **akzeptiert keine KI-generierte
 ## Roadmap: UI-gestützte Konfiguration
 
 1. **Meilenstein 1 (umgesetzt):** Sichere `services.yaml`-Bearbeitung über `/admin/config` — Raw-YAML-Editor + lesende strukturierte Vorschau, Validierung, Backup + atomic write, Gating per Env-Flag + Token. Card-Vorschau + Quick-Add ergänzt.
-2. **Meilenstein 2 (umgesetzt):** Gleiche Hybrid-UI für `bookmarks.yaml` über `/admin/bookmarks` (geteilte `ConfigEditor`-Shell, Writer-Whitelist erweitert). Footer-Link auf dem Dashboard, gegated über `GET /api/config/status`. Noch offen: `widgets.yaml`, `settings.yaml`.
-3. Strukturierte Bearbeitung (Formulare) mit kommentarerhaltendem YAML-Parser statt destruktivem Round-Trip.
-4. Echte Authentifizierung/Session statt Token, ggf. Audit-Log.
+2. **Meilenstein 2 (umgesetzt):** Gleiche Hybrid-UI für `bookmarks.yaml` über `/admin/bookmarks` (geteilte `ConfigEditor`-Shell, Writer-Whitelist erweitert). Footer-Link auf dem Dashboard, gegated über `GET /api/config/status`.
+3. **Meilenstein 3 (umgesetzt):** `widgets.yaml` über `/admin/widgets` als **secret-aware, preview-only** Editor — Redaction sensibler Felder in der Vorschau, `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}` bleiben sichtbar, **kein** Quick-Add (AddDialog in der Shell optional gemacht). Writer-Whitelist + Widgets-Nav-Tab ergänzt. Noch offen: `settings.yaml`.
+4. Strukturierte Bearbeitung (Formulare) mit kommentarerhaltendem YAML-Parser statt destruktivem Round-Trip.
+5. Echte Authentifizierung/Session statt Token, ggf. Audit-Log.
 
 ### Verifikationsstatus (manuelle Browser-Prüfung, 2026-05-30)
 
@@ -115,7 +116,10 @@ Per Playwright-Chromium gegen `pnpm dev` getrieben; alle Punkte **bestanden**:
 
 - **Services (`/admin/config`):** lädt `services.yaml` (Kommentare erhalten), Card-Vorschau pro Gruppe, Add-Service fügt gültiges YAML **nur in den Editor** ein (Disk unverändert; URL mit `#` korrekt gequotet), Validate meldet Zeile/Spalte bei kaputtem YAML, Save nur mit korrektem Token (ohne/falsch → abgelehnt), Backup unter `config/.backups/` angelegt (== Vorzustand), Dashboard zeigt Service nach Reload.
 - **Bookmarks (`/admin/bookmarks`):** lädt `bookmarks.yaml`, Card-Vorschau mit Abbr-Badge, Add-Bookmark erzeugt korrekt verschachteltes `- abbr/href/…`-YAML, Validate/Save/Backup wie oben, Dashboard zeigt Bookmark nach Reload.
+- **Widgets (`/admin/widgets`) — v1 secret-aware, PASS:** lädt die rohe `widgets.yaml` (Kommentare erhalten); Preview-Cards zeigen Widgets korrekt an; sensible Felder (`username`, `password`, `token`, `secret`, `apiKey`) erscheinen in der Vorschau als `[redacted]`; **echte Secret-Werte tauchen nicht im Preview-DOM auf** (inkl. `title`-Attribute); `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}`-Platzhalter bleiben sichtbar; der Raw-Editor enthält weiterhin den originalen YAML-Inhalt (YAML bleibt Quelle der Wahrheit); Validate, Save, Backup und Gating funktionieren; **preview-only** (kein Add-Button/-Dialog).
 - **Gating aus (`HOMEPAGE_CONFIG_EDIT` ungesetzt):** `/api/config/status` → `{enabled:false}`; Raw-Route GET/POST → 404 (auch mit gültigem Token); Editor-Seiten zeigen Disabled-Hinweis statt Editor; Footer-Link versteckt.
 - **Gating an:** Footer-Link sichtbar; Schreiben erfordert weiterhin `HOMEPAGE_CONFIG_EDIT_TOKEN`.
 
 Kleinere Beobachtung (kein Bug): Bookmark-Cards im 3-Spalten-Raster wirken auf breiten Screens schmal (Name/URL truncaten stark) — rein kosmetisch, read-only.
+
+**Hinweis für künftige Browser-Verifikationen:** Vor einem erneuten `pnpm dev`-Start immer sicherstellen, dass Port 3000 frei ist bzw. alte `next`-Prozesse beendet wurden (`pkill -f next`, dann Port prüfen). Sonst belegt ein alter Server den Port weiter, der neue Start scheitert mit `EADDRINUSE`, und Requests treffen weiterhin den alten Server mit anderen Env-Flags — das verfälscht insbesondere die Gating-Verifikation (z. B. `enabled:true` statt `false`).
