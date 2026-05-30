@@ -10,6 +10,7 @@ const CONFIG_TABS = [
   { file: "services.yaml", label: "Services", href: "/admin/config" },
   { file: "bookmarks.yaml", label: "Bookmarks", href: "/admin/bookmarks" },
   { file: "widgets.yaml", label: "Widgets", href: "/admin/widgets" },
+  { file: "settings.yaml", label: "Settings", href: "/admin/settings" },
 ];
 
 // Parse a YAML error into a readable line/column message. Shared by every

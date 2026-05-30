@@ -9,9 +9,9 @@ import createLogger from "utils/logger";
 const logger = createLogger("config-writer");
 
 // Only these files may be read/written through the admin config API.
-// Extended per roadmap step 2 to cover bookmarks.yaml and widgets.yaml; all
+// Covers services.yaml, bookmarks.yaml, widgets.yaml and settings.yaml; all
 // share the same read/validate/backup/atomic-write path.
-export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml", "widgets.yaml"];
+export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml"];
 
 const BACKUP_DIR = ".backups";
 

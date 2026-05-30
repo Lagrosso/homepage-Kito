@@ -41,7 +41,8 @@ describe("isEditableConfig", () => {
     expect(mod.isEditableConfig("services.yaml")).toBe(true);
     expect(mod.isEditableConfig("bookmarks.yaml")).toBe(true);
     expect(mod.isEditableConfig("widgets.yaml")).toBe(true);
-    expect(mod.isEditableConfig("settings.yaml")).toBe(false);
+    expect(mod.isEditableConfig("settings.yaml")).toBe(true);
+    expect(mod.isEditableConfig("docker.yaml")).toBe(false);
     expect(mod.isEditableConfig("../../etc/passwd")).toBe(false);
   });
 });
@@ -60,7 +61,7 @@ describe("readRawConfig", () => {
 
 describe("writeRawConfig", () => {
   it("refuses to write non-editable files", () => {
-    expect(() => mod.writeRawConfig("settings.yaml", "a: 1")).toThrow();
+    expect(() => mod.writeRawConfig("docker.yaml", "a: 1")).toThrow();
   });
 
   it("rejects invalid YAML without writing", () => {
