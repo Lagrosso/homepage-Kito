@@ -11,10 +11,12 @@ import { useTranslation } from "next-i18next";
 import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 import dynamic from "next/dynamic";
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import Script from "next/script";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { BiError } from "react-icons/bi";
+import { MdHome } from "react-icons/md";
 import useSWR, { SWRConfig } from "swr";
 import { ColorContext } from "utils/contexts/color";
 import { SettingsContext } from "utils/contexts/settings";
@@ -40,6 +42,10 @@ const Version = dynamic(() => import("components/version"), {
 });
 
 const ConfigEditorLink = dynamic(() => import("components/admin/config-editor-link"), {
+  ssr: false,
+});
+
+const AdminNavLink = dynamic(() => import("components/admin/admin-nav-link"), {
   ssr: false,
 });
 
@@ -453,6 +459,18 @@ function Home({ initialSettings }) {
           isOpen={searching}
           setSearching={setSearching}
         />
+        <div id="header-nav" className="flex flex-row justify-between items-center w-full mb-2 z-20">
+          <Link
+            href="/"
+            aria-label="Home"
+            title="Home"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-theme-700 dark:text-theme-200 hover:bg-theme-200/60 dark:hover:bg-theme-700/60 transition-colors"
+          >
+            <MdHome className="w-5 h-5" />
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+          <AdminNavLink />
+        </div>
         <div
           id="information-widgets"
           className={classNames(

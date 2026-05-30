@@ -3,6 +3,8 @@ import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/co
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
+import { MdDelete, MdEdit } from "react-icons/md";
+import { deleteServiceEntry, updateServiceEntry } from "utils/config/yaml-edit";
 import { insertService } from "utils/config/yaml-insert";
 
 // Parse services.yaml into groups of card props for the read-only preview.
@@ -39,7 +41,7 @@ function parseServices(content) {
 
 // Read-only card mirroring the dashboard service-card styling
 // (components/services/item.jsx) without its interactive/widget behavior.
-function ServiceCard({ entry }) {
+function ServiceCard({ entry, onEdit, onDelete }) {
   if (entry.isGroup) {
     return (
       <div className="mb-2 p-2 rounded-md text-sm font-medium text-theme-700 dark:text-theme-200 shadow-md shadow-theme-900/10 dark:shadow-theme-900/20 bg-theme-100/20 dark:bg-white/5">
@@ -79,23 +81,64 @@ function ServiceCard({ entry }) {
             </span>
           </div>
         )}
+        {(onEdit || onDelete) && (
+          <div className="shrink-0 self-start flex gap-1 m-1">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                title="Edit"
+                aria-label={`Edit ${entry.name}`}
+                className="rounded p-1 text-theme-500 hover:text-theme-700 dark:hover:text-theme-200 hover:bg-theme-300/40 dark:hover:bg-white/10"
+              >
+                <MdEdit className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                title="Delete"
+                aria-label={`Delete ${entry.name}`}
+                className="rounded p-1 text-theme-500 hover:text-red-600 hover:bg-theme-300/40 dark:hover:bg-white/10"
+              >
+                <MdDelete className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-const EMPTY_FORM = { group: "", name: "", href: "", icon: "", server: "" };
+const EMPTY_FORM = { group: "", name: "", href: "", icon: "", description: "", server: "" };
 
-// Modal that collects fields for a single service and hands the generated YAML
-// back to the editor. It never writes to disk — Save stays manual.
-function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
+// Modal that collects fields for a single service and hands the values back to
+// the editor. It never writes to disk — Save stays manual. Works in two modes:
+//   - "add":  group is free-text (datalist of existing groups), no description.
+//   - "edit": group is fixed/read-only (no moving in v1), description is editable.
+function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, group, existingGroups = [] }) {
+  const isEdit = mode === "edit";
   const [form, setForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
-    if (open) {
-      setForm(EMPTY_FORM);
+    if (!open) {
+      return;
     }
-  }, [open]);
+    setForm(
+      isEdit
+        ? {
+            group: group ?? "",
+            name: initial?.name ?? "",
+            href: initial?.href ?? "",
+            icon: initial?.icon ?? "",
+            description: initial?.description ?? "",
+            server: initial?.server ?? "",
+          }
+        : EMPTY_FORM,
+    );
+  }, [open, isEdit, initial, group]);
 
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const canSubmit = form.group.trim() && form.name.trim();
@@ -105,13 +148,16 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
     if (!canSubmit) {
       return;
     }
-    onAdd({
+    const base = {
       group: form.group.trim(),
       name: form.name.trim(),
       href: form.href.trim(),
       icon: form.icon.trim(),
       server: form.server.trim(),
-    });
+    };
+    // Description is only collected/sent in edit mode (insertService has no
+    // description support, so the add path keeps its existing behavior).
+    onSubmit(isEdit ? { ...base, description: form.description.trim() } : base);
   };
 
   return (
@@ -120,26 +166,34 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-lg bg-white dark:bg-theme-800 text-theme-800 dark:text-theme-200 shadow-xl">
           <form onSubmit={submit}>
-            <DialogTitle className="text-lg font-bold px-5 pt-5">Add Service</DialogTitle>
+            <DialogTitle className="text-lg font-bold px-5 pt-5">{isEdit ? "Edit Service" : "Add Service"}</DialogTitle>
             <p className="px-5 pt-1 text-xs text-theme-500">
-              Generates YAML and inserts it into the editor. You still need to click Save.
+              {isEdit
+                ? "Updates the YAML in the editor. You still need to click Save."
+                : "Generates YAML and inserts it into the editor. You still need to click Save."}
             </p>
             <div className="px-5 py-4 flex flex-col gap-3">
               <Field label="Group" required>
-                <input
-                  list="config-existing-groups"
-                  value={form.group}
-                  onChange={setField("group")}
-                  placeholder="Existing or new group"
-                  className={inputClass}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
-                  autoFocus
-                />
-                <datalist id="config-existing-groups">
-                  {existingGroups.map((g) => (
-                    <option key={g} value={g} />
-                  ))}
-                </datalist>
+                {isEdit ? (
+                  <input value={form.group} readOnly className={`${inputClass} opacity-60 cursor-not-allowed`} />
+                ) : (
+                  <>
+                    <input
+                      list="config-existing-groups"
+                      value={form.group}
+                      onChange={setField("group")}
+                      placeholder="Existing or new group"
+                      className={inputClass}
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
+                      autoFocus
+                    />
+                    <datalist id="config-existing-groups">
+                      {existingGroups.map((g) => (
+                        <option key={g} value={g} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </Field>
               <Field label="Service Name" required>
                 <input value={form.name} onChange={setField("name")} placeholder="Sonarr" className={inputClass} />
@@ -160,6 +214,16 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
                   className={inputClass}
                 />
               </Field>
+              {isEdit && (
+                <Field label="Description">
+                  <input
+                    value={form.description}
+                    onChange={setField("description")}
+                    placeholder="Short description"
+                    className={inputClass}
+                  />
+                </Field>
+              )}
               <Field label="Server (optional)">
                 <input
                   value={form.server}
@@ -182,7 +246,7 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
                 disabled={!canSubmit}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add to editor
+                {isEdit ? "Update editor" : "Add to editor"}
               </button>
             </div>
           </form>
@@ -190,6 +254,18 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
       </div>
     </Dialog>
   );
+}
+
+// Adapter preserving the shell's add contract (onAdd) on top of the shared form.
+function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
+  return (
+    <ServiceFormDialog mode="add" open={open} onClose={onClose} onSubmit={onAdd} existingGroups={existingGroups} />
+  );
+}
+
+// Adapter for the shell's edit contract (onSubmit/initial/group).
+function ServiceEditDialog(props) {
+  return <ServiceFormDialog mode="edit" {...props} />;
 }
 
 export default function AdminServicesConfig() {
@@ -201,6 +277,9 @@ export default function AdminServicesConfig() {
       AddDialog={ServiceAddDialog}
       insert={insertService}
       addLabel="Add Service"
+      EditDialog={ServiceEditDialog}
+      editEntry={updateServiceEntry}
+      deleteEntry={deleteServiceEntry}
     />
   );
 }

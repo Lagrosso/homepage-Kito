@@ -2,6 +2,7 @@ import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MdHome } from "react-icons/md";
 
 const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
 
@@ -48,7 +49,7 @@ export function Field({ label, required, children }) {
   );
 }
 
-function Preview({ content, parse, Card, gridClassName }) {
+function Preview({ content, parse, Card, gridClassName, onEdit, onDelete }) {
   const result = useMemo(() => {
     try {
       return { groups: parse(content), error: null };
@@ -73,7 +74,13 @@ function Preview({ content, parse, Card, gridClassName }) {
           </h3>
           <div className={gridClassName}>
             {group.entries.map((entry) => (
-              <Card key={entry.name} entry={entry} />
+              <Card
+                key={entry.name}
+                entry={entry}
+                group={group.name}
+                onEdit={onEdit ? () => onEdit(group.name, entry) : undefined}
+                onDelete={onDelete ? () => onDelete(group.name, entry) : undefined}
+              />
             ))}
           </div>
           {group.entries.length === 0 && <p className="text-sm text-theme-500">No entries.</p>}
@@ -95,15 +102,22 @@ export default function ConfigEditor({
   AddDialog = null,
   insert = null,
   addLabel = "Add",
+  EditDialog = null,
+  editEntry = null,
+  deleteEntry = null,
 }) {
   // Quick-add is optional: a config (e.g. widgets.yaml) may ship preview-only.
   const canAdd = Boolean(AddDialog && insert);
+  // Structured edit/delete are opt-in per config file (services.yaml first).
+  const canEdit = Boolean(EditDialog && editEntry);
+  const canDelete = Boolean(deleteEntry);
   const apiUrl = `/api/config/raw/${configFile}`;
   const [content, setContent] = useState("");
   const [token, setToken] = useState("");
   const [loadState, setLoadState] = useState("loading"); // loading | ready | disabled | error
   const [status, setStatus] = useState(null); // { type: "success"|"error"|"info", message }
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null); // { group, entry } | null
 
   useEffect(() => {
     setToken(localStorage.getItem(TOKEN_STORAGE_KEY) || "");
@@ -158,6 +172,43 @@ export default function ConfigEditor({
     [insert],
   );
 
+  // Structured edit: mutate the raw YAML text only (never disk); Save stays manual.
+  const onEditEntry = useCallback((group, entry) => setEditTarget({ group, entry }), []);
+
+  const onSubmitEdit = useCallback(
+    (values) => {
+      try {
+        const next = editEntry(content, { group: editTarget.group, name: editTarget.entry.name }, values);
+        setContent(next);
+        setStatus({
+          type: "info",
+          message: `Updated "${values.name || editTarget.entry.name}" in the editor — review and Save.`,
+        });
+        setEditTarget(null);
+      } catch (e) {
+        setStatus({ type: "error", message: `Edit failed — ${e.message}` });
+      }
+    },
+    [content, editEntry, editTarget],
+  );
+
+  const onDeleteEntry = useCallback(
+    (group, entry) => {
+      // eslint-disable-next-line no-alert
+      if (!window.confirm(`Remove "${entry.name}" from "${group}"? Review the editor, then Save to apply.`)) {
+        return;
+      }
+      try {
+        const next = deleteEntry(content, { group, name: entry.name });
+        setContent(next);
+        setStatus({ type: "info", message: `Removed "${entry.name}" from the editor — review and Save.` });
+      } catch (e) {
+        setStatus({ type: "error", message: `Delete failed — ${e.message}` });
+      }
+    },
+    [content, deleteEntry],
+  );
+
   const onSave = useCallback(async () => {
     // Validate client-side first for fast feedback; the server validates again.
     try {
@@ -204,6 +255,12 @@ export default function ConfigEditor({
       </Head>
       <div className="min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-800 dark:text-theme-200 p-6">
         <div className="mx-auto max-w-6xl">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-sm text-theme-500 hover:text-theme-700 dark:hover:text-theme-300 mb-3"
+          >
+            <MdHome className="w-4 h-4" /> Dashboard
+          </Link>
           <h1 className="text-xl font-bold mb-1">{title}</h1>
           <p className="text-sm text-theme-500 mb-3">Editing {configFile}</p>
 
@@ -279,7 +336,14 @@ export default function ConfigEditor({
                 <div>
                   <span className="block text-sm font-medium mb-1">Preview (read-only)</span>
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
-                    <Preview content={content} parse={parse} Card={Card} gridClassName={gridClassName} />
+                    <Preview
+                      content={content}
+                      parse={parse}
+                      Card={Card}
+                      gridClassName={gridClassName}
+                      onEdit={canEdit ? onEditEntry : undefined}
+                      onDelete={canDelete ? onDeleteEntry : undefined}
+                    />
                   </div>
                 </div>
               </div>
@@ -301,6 +365,17 @@ export default function ConfigEditor({
                   open={modalOpen}
                   onClose={() => setModalOpen(false)}
                   onAdd={onAdd}
+                  existingGroups={existingGroups}
+                />
+              )}
+
+              {canEdit && editTarget && (
+                <EditDialog
+                  open={Boolean(editTarget)}
+                  onClose={() => setEditTarget(null)}
+                  onSubmit={onSubmitEdit}
+                  initial={editTarget.entry}
+                  group={editTarget.group}
                   existingGroups={existingGroups}
                 />
               )}

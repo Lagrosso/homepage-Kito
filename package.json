@@ -44,7 +44,8 @@
     "urbackup-server-api": "^0.92.2",
     "winston": "^3.19.0",
     "ws": "^8.20.1",
-    "xml-js": "^1.6.11"
+    "xml-js": "^1.6.11",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.3",
