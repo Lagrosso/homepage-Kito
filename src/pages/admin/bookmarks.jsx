@@ -124,14 +124,26 @@ function BookmarkFormDialog({ mode = "add", open, onClose, onSubmit, initial, gr
     if (!canSubmit) {
       return;
     }
-    onSubmit({
-      group: form.group.trim(),
-      name: form.name.trim(),
-      href: form.href.trim(),
-      icon: form.icon.trim(),
-      abbr: form.abbr.trim(),
-      description: form.description.trim(),
+    if (!isEdit) {
+      onSubmit({
+        group: form.group.trim(),
+        name: form.name.trim(),
+        href: form.href.trim(),
+        icon: form.icon.trim(),
+        abbr: form.abbr.trim(),
+        description: form.description.trim(),
+      });
+      return;
+    }
+    // Edit mode: send name plus only changed fields so untouched fields stay
+    // byte-identical in the YAML.
+    const values = { name: form.name.trim() };
+    ["abbr", "href", "icon", "description"].forEach((field) => {
+      if (form[field].trim() !== String(initial?.[field] ?? "")) {
+        values[field] = form[field].trim();
+      }
     });
+    onSubmit(values);
   };
 
   return (

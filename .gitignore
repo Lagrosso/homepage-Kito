@@ -52,3 +52,6 @@ site*/
 
 # venv
 .venv/
+
+# local Claude Code preview launch config (may contain a dev write token)
+.claude/launch.json

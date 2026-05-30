@@ -3,6 +3,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MdHome } from "react-icons/md";
+import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
 
@@ -148,6 +149,12 @@ export default function ConfigEditor({
       return [];
     }
   }, [content, parse]);
+
+  // Structured edit/delete can't round-trip a file with bare unquoted
+  // {{HOMEPAGE_*}} placeholders, so disable those actions and explain why.
+  const placeholderBlocked = useMemo(() => hasBarePlaceholder(content), [content]);
+  const showEdit = canEdit && !placeholderBlocked;
+  const showDelete = canDelete && !placeholderBlocked;
 
   const onTokenChange = useCallback((value) => {
     setToken(value);
@@ -313,6 +320,14 @@ export default function ConfigEditor({
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
 
+              {(canEdit || canDelete) && placeholderBlocked && (
+                <div className="mb-3 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-3 text-xs">
+                  Structured edit/delete is disabled because this file contains an unquoted{" "}
+                  <code>{"{{HOMEPAGE_*}}"}</code> placeholder (it can&apos;t be round-tripped safely). Use the raw YAML
+                  editor below, or quote the placeholder.
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -345,8 +360,8 @@ export default function ConfigEditor({
                       parse={parse}
                       Card={Card}
                       gridClassName={gridClassName}
-                      onEdit={canEdit ? onEditEntry : undefined}
-                      onDelete={canDelete ? onDeleteEntry : undefined}
+                      onEdit={showEdit ? onEditEntry : undefined}
+                      onDelete={showDelete ? onDeleteEntry : undefined}
                     />
                   </div>
                 </div>

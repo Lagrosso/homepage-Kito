@@ -6,6 +6,7 @@ import {
   deleteServiceEntry,
   deleteSetting,
   deleteWidget,
+  hasBarePlaceholder,
   updateBookmarkEntry,
   updateServiceEntry,
   updateSetting,
@@ -97,6 +98,28 @@ describe("updateServiceEntry", () => {
   it("throws for an unknown group or service", () => {
     expect(() => updateServiceEntry(SRC, { group: "Nope", name: "S" }, { icon: "x" })).toThrow(/not found/i);
     expect(() => updateServiceEntry(SRC, { group: "My First Group", name: "Nope" }, { icon: "x" })).toThrow(/not found/i);
+  });
+
+  it("does not add a top-level server when it is not in values (widget.server preserved)", () => {
+    const src = "- G:\n    - S:\n        href: http://x\n        widget:\n          type: sonarr\n          server: my-docker\n";
+    const out = updateServiceEntry(src, { group: "G", name: "S" }, { name: "S", href: "http://y" });
+    expect(out).toContain("href: http://y");
+    expect(out).toContain("          server: my-docker"); // stays nested under widget
+    expect(out).not.toMatch(/\n {8}server:/); // no new top-level service `server:`
+  });
+});
+
+describe("hasBarePlaceholder", () => {
+  it("detects a bare unquoted placeholder in value position", () => {
+    expect(hasBarePlaceholder("key: {{HOMEPAGE_VAR_X}}")).toBe(true);
+    expect(hasBarePlaceholder("- {{HOMEPAGE_FILE_Y}}")).toBe(true);
+  });
+
+  it("ignores quoted, embedded and absent placeholders", () => {
+    expect(hasBarePlaceholder('key: "{{HOMEPAGE_VAR_X}}"')).toBe(false);
+    expect(hasBarePlaceholder("href: http://{{HOMEPAGE_VAR_HOST}}:8080")).toBe(false);
+    expect(hasBarePlaceholder("title: My Homepage")).toBe(false);
+    expect(hasBarePlaceholder("")).toBe(false);
   });
 });
 

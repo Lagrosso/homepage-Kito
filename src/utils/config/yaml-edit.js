@@ -31,13 +31,20 @@ function isSecretContainerKey(key) {
 // or at line start), i.e. an unquoted, non-embedded {{HOMEPAGE_*}}.
 const BARE_PLACEHOLDER = /(?:^|[:[,\-])[ \t]*\{\{HOMEPAGE_(?:VAR|FILE)_[^}\n]+\}\}/m;
 
+// True if the raw text contains a bare unquoted {{HOMEPAGE_*}} value. Such files
+// cannot be round-tripped safely, so the UI disables structured edit/delete for
+// them (the buttons are hidden) and points the user at the raw editor.
+export function hasBarePlaceholder(rawText) {
+  return BARE_PLACEHOLDER.test(rawText ?? "");
+}
+
 function parseConfigDoc(rawText) {
   const text = rawText ?? "";
   const doc = parseDocument(text);
   if (doc.errors.length > 0) {
     throw new Error(doc.errors[0].message);
   }
-  if (BARE_PLACEHOLDER.test(text)) {
+  if (hasBarePlaceholder(text)) {
     throw new Error(
       "Structured editing unavailable: this file contains an unquoted {{HOMEPAGE_*}} placeholder. Edit the raw YAML instead.",
     );

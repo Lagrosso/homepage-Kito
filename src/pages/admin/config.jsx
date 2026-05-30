@@ -148,16 +148,26 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     if (!canSubmit) {
       return;
     }
-    const base = {
-      group: form.group.trim(),
-      name: form.name.trim(),
-      href: form.href.trim(),
-      icon: form.icon.trim(),
-      server: form.server.trim(),
-    };
-    // Description is only collected/sent in edit mode (insertService has no
-    // description support, so the add path keeps its existing behavior).
-    onSubmit(isEdit ? { ...base, description: form.description.trim() } : base);
+    if (!isEdit) {
+      onSubmit({
+        group: form.group.trim(),
+        name: form.name.trim(),
+        href: form.href.trim(),
+        icon: form.icon.trim(),
+        server: form.server.trim(),
+      });
+      return;
+    }
+    // Edit mode: send the name plus only fields that actually changed, so
+    // untouched fields stay byte-identical and no derived value (e.g. a service's
+    // widget.server shown in `server`) is written back as a new top-level field.
+    const values = { name: form.name.trim() };
+    ["href", "icon", "description", "server"].forEach((field) => {
+      if (form[field].trim() !== String(initial?.[field] ?? "")) {
+        values[field] = form[field].trim();
+      }
+    });
+    onSubmit(values);
   };
 
   return (
