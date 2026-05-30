@@ -3,11 +3,11 @@ import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/co
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
-import { insertService } from "utils/config/yaml-insert";
+import { insertBookmark } from "utils/config/yaml-insert";
 
-// Parse services.yaml into groups of card props for the read-only preview.
-// Top-level shape: a list of { GroupName: [ { ServiceName: {...} } ] }.
-function parseServices(content) {
+// Parse bookmarks.yaml into groups of card props for the read-only preview.
+// Bookmarks nest one extra level: { Group: [ { Name: [ { abbr, href, ... } ] } ] }.
+function parseBookmarks(content) {
   const data = yaml.load(content);
   if (!Array.isArray(data)) {
     return [];
@@ -20,75 +20,52 @@ function parseServices(content) {
       const entries = items
         .filter((entry) => entry && typeof entry === "object")
         .map((entry) => {
-          const serviceName = Object.keys(entry)[0];
-          const value = entry[serviceName];
-          if (Array.isArray(value)) {
-            return { name: serviceName, isGroup: true };
-          }
+          const bookmarkName = Object.keys(entry)[0];
+          const value = entry[bookmarkName];
+          const props = Array.isArray(value) ? (value[0] ?? {}) : (value ?? {});
           return {
-            name: serviceName,
-            href: value?.href,
-            description: value?.description,
-            icon: value?.icon,
-            server: value?.server ?? value?.widget?.server,
+            name: bookmarkName,
+            abbr: props.abbr,
+            href: props.href,
+            icon: props.icon,
+            description: props.description,
           };
         });
       return { name, entries };
     });
 }
 
-// Read-only card mirroring the dashboard service-card styling
-// (components/services/item.jsx) without its interactive/widget behavior.
-function ServiceCard({ entry }) {
-  if (entry.isGroup) {
-    return (
-      <div className="mb-2 p-2 rounded-md text-sm font-medium text-theme-700 dark:text-theme-200 shadow-md shadow-theme-900/10 dark:shadow-theme-900/20 bg-theme-100/20 dark:bg-white/5">
-        <span className="font-semibold">{entry.name}</span>
-        <span className="ml-1 text-theme-500">(nested group)</span>
-      </div>
-    );
-  }
-
+// Read-only card mirroring the dashboard bookmark styling
+// (components/bookmarks/item.jsx) without navigation.
+function BookmarkCard({ entry }) {
   return (
-    <div className="mb-2 p-1 rounded-md font-medium text-theme-700 dark:text-theme-200 shadow-md shadow-theme-900/10 dark:shadow-theme-900/20 bg-theme-100/20 dark:bg-white/5">
+    <div className="mb-3 rounded-md font-medium text-theme-700 dark:text-theme-200 shadow-md shadow-theme-900/10 dark:shadow-theme-900/20 bg-theme-100/20 dark:bg-white/5">
       <div className="flex">
-        <div className="shrink-0 flex items-center justify-center w-12">
+        <div className="shrink-0 flex items-center justify-center w-11 bg-theme-500/10 dark:bg-theme-900/50 text-sm font-medium rounded-l-md">
           {entry.icon ? (
-            <ResolvedIcon icon={entry.icon} />
-          ) : (
-            <div className="w-8 h-8 rounded-md bg-theme-300/40 dark:bg-white/10 flex items-center justify-center text-xs text-theme-500">
-              {entry.name?.charAt(0)?.toUpperCase() || "?"}
+            <div className="shrink-0 w-5 h-5">
+              <ResolvedIcon icon={entry.icon} alt={entry.abbr} />
             </div>
+          ) : (
+            entry.abbr || entry.name?.slice(0, 2)?.toUpperCase()
           )}
         </div>
-        <div className="flex-1 min-w-0 px-2 py-2 text-left">
-          <div className="text-sm truncate">{entry.name}</div>
-          {entry.description && (
-            <p className="text-theme-500 dark:text-theme-300 text-xs font-light truncate">{entry.description}</p>
-          )}
-          {entry.href && (
-            <p className="text-theme-400 text-xs font-light truncate" title={entry.href}>
-              {shortenUrl(entry.href)}
-            </p>
-          )}
-        </div>
-        {entry.server && (
-          <div className="shrink-0 self-start m-1">
-            <span className="inline-block rounded bg-theme-300/40 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-theme-600 dark:text-theme-300">
-              {entry.server}
-            </span>
+        <div className="flex-1 min-w-0 flex items-center justify-between rounded-r-md">
+          <div className="pl-3 py-2 text-xs truncate">{entry.name}</div>
+          <div className="shrink truncate px-2 py-2 text-theme-500 dark:text-theme-300 text-xs" title={entry.href}>
+            {entry.description || shortenUrl(entry.href)}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
-const EMPTY_FORM = { group: "", name: "", href: "", icon: "", server: "" };
+const EMPTY_FORM = { group: "", name: "", href: "", icon: "", abbr: "", description: "" };
 
-// Modal that collects fields for a single service and hands the generated YAML
-// back to the editor. It never writes to disk — Save stays manual.
-function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
+// Modal that collects fields for a single bookmark and hands the generated
+// YAML back to the editor. It never writes to disk — Save stays manual.
+function BookmarkAddDialog({ open, onClose, onAdd, existingGroups }) {
   const [form, setForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
@@ -98,7 +75,7 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
   }, [open]);
 
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-  const canSubmit = form.group.trim() && form.name.trim();
+  const canSubmit = form.group.trim() && form.name.trim() && form.href.trim();
 
   const submit = (e) => {
     e.preventDefault();
@@ -110,7 +87,8 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
       name: form.name.trim(),
       href: form.href.trim(),
       icon: form.icon.trim(),
-      server: form.server.trim(),
+      abbr: form.abbr.trim(),
+      description: form.description.trim(),
     });
   };
 
@@ -120,7 +98,7 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-lg bg-white dark:bg-theme-800 text-theme-800 dark:text-theme-200 shadow-xl">
           <form onSubmit={submit}>
-            <DialogTitle className="text-lg font-bold px-5 pt-5">Add Service</DialogTitle>
+            <DialogTitle className="text-lg font-bold px-5 pt-5">Add Bookmark</DialogTitle>
             <p className="px-5 pt-1 text-xs text-theme-500">
               Generates YAML and inserts it into the editor. You still need to click Save.
             </p>
@@ -141,30 +119,33 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
                   ))}
                 </datalist>
               </Field>
-              <Field label="Service Name" required>
-                <input value={form.name} onChange={setField("name")} placeholder="Sonarr" className={inputClass} />
+              <Field label="Bookmark Name" required>
+                <input value={form.name} onChange={setField("name")} placeholder="Github" className={inputClass} />
               </Field>
-              <Field label="URL">
+              <Field label="URL" required>
                 <input
                   value={form.href}
                   onChange={setField("href")}
-                  placeholder="http://localhost:8989"
+                  placeholder="https://github.com/"
                   className={inputClass}
                 />
+              </Field>
+              <Field label="Abbreviation">
+                <input value={form.abbr} onChange={setField("abbr")} placeholder="GH" className={inputClass} />
               </Field>
               <Field label="Icon">
                 <input
                   value={form.icon}
                   onChange={setField("icon")}
-                  placeholder="sonarr.png / mdi-server / sh-sonarr"
+                  placeholder="github.png / mdi-github / sh-github"
                   className={inputClass}
                 />
               </Field>
-              <Field label="Server (optional)">
+              <Field label="Description">
                 <input
-                  value={form.server}
-                  onChange={setField("server")}
-                  placeholder="my-docker"
+                  value={form.description}
+                  onChange={setField("description")}
+                  placeholder="Code hosting"
                   className={inputClass}
                 />
               </Field>
@@ -192,15 +173,16 @@ function ServiceAddDialog({ open, onClose, onAdd, existingGroups }) {
   );
 }
 
-export default function AdminServicesConfig() {
+export default function AdminBookmarksConfig() {
   return (
     <ConfigEditor
-      configFile="services.yaml"
-      parse={parseServices}
-      Card={ServiceCard}
-      AddDialog={ServiceAddDialog}
-      insert={insertService}
-      addLabel="Add Service"
+      configFile="bookmarks.yaml"
+      parse={parseBookmarks}
+      Card={BookmarkCard}
+      gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3"
+      AddDialog={BookmarkAddDialog}
+      insert={insertBookmark}
+      addLabel="Add Bookmark"
     />
   );
 }

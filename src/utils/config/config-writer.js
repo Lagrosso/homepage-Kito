@@ -9,8 +9,9 @@ import createLogger from "utils/logger";
 const logger = createLogger("config-writer");
 
 // Only these files may be read/written through the admin config API.
-// Milestone 1 intentionally limits writes to services.yaml.
-export const EDITABLE_CONFIGS = ["services.yaml"];
+// Extended per roadmap step 2 to cover bookmarks.yaml; both share the same
+// read/validate/backup/atomic-write path.
+export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml"];
 
 const BACKUP_DIR = ".backups";
 

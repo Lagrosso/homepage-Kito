@@ -39,6 +39,10 @@ const Version = dynamic(() => import("components/version"), {
   ssr: false,
 });
 
+const ConfigEditorLink = dynamic(() => import("components/admin/config-editor-link"), {
+  ssr: false,
+});
+
 const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime"];
 
 // Normalize language codes so older config values like zh-CN still point to Crowdin-provided ones
@@ -503,7 +507,8 @@ function Home({ initialSettings }) {
             {!settings.theme && <ThemeToggle />}
           </div>
 
-          <div id="version" className="flex mt-4 w-full justify-end">
+          <div id="version" className="flex mt-4 w-full justify-end items-center gap-3">
+            <ConfigEditorLink />
             {!settings.hideVersion && <Version disableUpdateCheck={settings.disableUpdateCheck} />}
           </div>
         </div>
