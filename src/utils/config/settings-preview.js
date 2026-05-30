@@ -1,6 +1,6 @@
 import yaml from "js-yaml";
 
-import { maskValue, tokenizePlaceholders } from "./secret-mask";
+import { isPlaceholder, maskValue, tokenizePlaceholders } from "./secret-mask";
 
 // Secret-aware preview model for settings.yaml.
 //
@@ -25,9 +25,20 @@ const SETTINGS_GROUPS = [
   { name: "Provider / Integrationen", keys: ["providers", "cardBlur", "useEqualHeights"] },
 ];
 
+function valueTypeOf(raw) {
+  if (typeof raw === "boolean") return "boolean";
+  if (typeof raw === "number") return "number";
+  if (typeof raw === "string") return "string";
+  return "complex"; // object / array / null → edit raw only
+}
+
 function toEntry(key, raw, map) {
   const { value, redacted } = maskValue(key, raw, map);
-  return { name: key, key, value, redacted };
+  const valueType = valueTypeOf(raw);
+  // Only plain scalar, non-secret, non-placeholder values are safe to edit via a
+  // form; everything else stays raw-only so secrets and structure are preserved.
+  const editable = !redacted && valueType !== "complex" && !(valueType === "string" && isPlaceholder(value));
+  return { name: key, key, value, redacted, valueType, editable };
 }
 
 // Parse raw settings.yaml into the ConfigEditor preview model:

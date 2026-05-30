@@ -1,7 +1,16 @@
 import yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
-import { deleteServiceEntry, updateServiceEntry } from "./yaml-edit";
+import {
+  deleteBookmarkEntry,
+  deleteServiceEntry,
+  deleteSetting,
+  deleteWidget,
+  updateBookmarkEntry,
+  updateServiceEntry,
+  updateSetting,
+  updateWidgetOptions,
+} from "./yaml-edit";
 
 // Representative services.yaml: doc marker, header comment, blank lines, an
 // inline comment, an unknown field (ping), placeholders embedded in a URL and
@@ -110,5 +119,149 @@ describe("deleteServiceEntry", () => {
 
   it("throws for an unknown entry", () => {
     expect(() => deleteServiceEntry(SRC, { group: "My First Group", name: "Nope" })).toThrow(/not found/i);
+  });
+});
+
+// --- bookmarks ------------------------------------------------------------
+const BOOKMARKS = `---
+# bookmarks
+- Developer:
+    - Github:
+        - abbr: GH
+          href: https://github.com/ # code
+    - Docs:
+        - href: https://docs.example.com
+          icon: mdi-book
+`;
+
+describe("updateBookmarkEntry", () => {
+  it("edits the nested props and keeps the inline comment and siblings", () => {
+    const out = updateBookmarkEntry(BOOKMARKS, { group: "Developer", name: "Github" }, { abbr: "GHB" });
+    expect(out).toContain("abbr: GHB");
+    expect(out).toContain("href: https://github.com/ # code");
+    expect(out).toContain("- Docs:");
+    expect(() => yaml.load(out)).not.toThrow();
+  });
+
+  it("renames a bookmark", () => {
+    const out = updateBookmarkEntry(BOOKMARKS, { group: "Developer", name: "Docs" }, { name: "Documentation" });
+    expect(out).toContain("- Documentation:");
+    expect(out).not.toContain("- Docs:");
+  });
+});
+
+describe("deleteBookmarkEntry", () => {
+  it("removes only the target bookmark", () => {
+    const out = deleteBookmarkEntry(BOOKMARKS, { group: "Developer", name: "Github" });
+    expect(out).not.toContain("- Github:");
+    expect(out).toContain("- Docs:");
+    expect(out).toContain("# bookmarks");
+  });
+});
+
+// --- widgets (secret-aware) -----------------------------------------------
+const WIDGETS = `# info widgets
+- resources:
+    cpu: true
+    memory: true
+- search:
+    provider: google
+    target: _blank
+- unifi_console:
+    url: http://unifi
+    username: admin
+    password: super-secret
+`;
+
+describe("updateWidgetOptions", () => {
+  it("edits a plain option by index without touching others", () => {
+    const out = updateWidgetOptions(WIDGETS, { index: 1 }, { provider: "bing" });
+    expect(out).toContain("provider: bing");
+    expect(out).toContain("target: _blank");
+    expect(out).toContain("# info widgets");
+  });
+
+  it("leaves a secret untouched when it is not provided", () => {
+    const out = updateWidgetOptions(WIDGETS, { index: 2 }, { url: "http://unifi.local" });
+    expect(out).toContain("url: http://unifi.local");
+    expect(out).toContain("password: super-secret"); // secret preserved verbatim
+  });
+
+  it("replaces a secret only when a new value is given", () => {
+    const out = updateWidgetOptions(WIDGETS, { index: 2 }, { password: "new-secret" });
+    expect(out).toContain("password: new-secret");
+  });
+
+  it("never writes the redaction marker", () => {
+    const out = updateWidgetOptions(WIDGETS, { index: 2 }, { password: "[redacted]" });
+    expect(out).toContain("password: super-secret");
+    expect(out).not.toContain("[redacted]");
+  });
+});
+
+describe("deleteWidget", () => {
+  it("removes the widget at the given index", () => {
+    const out = deleteWidget(WIDGETS, { index: 0 });
+    expect(out).not.toContain("- resources:");
+    expect(out).toContain("- search:");
+    expect(out).toContain("- unifi_console:");
+  });
+
+  it("throws for an out-of-range index", () => {
+    expect(() => deleteWidget(WIDGETS, { index: 9 })).toThrow(/not found/i);
+  });
+});
+
+// --- settings (secret-aware) ----------------------------------------------
+const SETTINGS = `---
+# settings
+title: My Homepage
+theme: dark
+hideVersion: true
+maxGroupColumns: 4
+providers:
+  openweathermap: my-secret-key
+layout:
+  Developer:
+    style: row
+`;
+
+describe("updateSetting", () => {
+  it("edits a scalar string value", () => {
+    const out = updateSetting(SETTINGS, { key: "title" }, "New Title");
+    expect(out).toContain("title: New Title");
+    expect(out).toContain("# settings");
+  });
+
+  it("keeps boolean and number types", () => {
+    expect(updateSetting(SETTINGS, { key: "hideVersion" }, false)).toContain("hideVersion: false");
+    expect(updateSetting(SETTINGS, { key: "maxGroupColumns" }, 6)).toContain("maxGroupColumns: 6");
+  });
+
+  it("refuses secret containers and structured values", () => {
+    expect(() => updateSetting(SETTINGS, { key: "providers" }, "x")).toThrow(/secret/i);
+    expect(() => updateSetting(SETTINGS, { key: "layout" }, "x")).toThrow(/structured|raw/i);
+  });
+
+  it("refuses to write a redacted value", () => {
+    expect(() => updateSetting(SETTINGS, { key: "title" }, "[redacted]")).toThrow(/redacted/i);
+  });
+
+  it("does not disturb the providers secret", () => {
+    const out = updateSetting(SETTINGS, { key: "title" }, "X");
+    expect(out).toContain("openweathermap: my-secret-key");
+  });
+});
+
+describe("deleteSetting", () => {
+  it("removes a top-level key and preserves the rest", () => {
+    const out = deleteSetting(SETTINGS, { key: "theme" });
+    expect(out).not.toContain("theme: dark");
+    expect(out).toContain("title: My Homepage");
+    expect(out).toContain("providers:");
+  });
+
+  it("throws for an unknown key", () => {
+    expect(() => deleteSetting(SETTINGS, { key: "nope" })).toThrow(/not found/i);
   });
 });

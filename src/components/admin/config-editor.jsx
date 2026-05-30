@@ -178,7 +178,11 @@ export default function ConfigEditor({
   const onSubmitEdit = useCallback(
     (values) => {
       try {
-        const next = editEntry(content, { group: editTarget.group, name: editTarget.entry.name }, values);
+        const next = editEntry(
+          content,
+          { group: editTarget.group, name: editTarget.entry.name, entry: editTarget.entry },
+          values,
+        );
         setContent(next);
         setStatus({
           type: "info",
@@ -199,7 +203,7 @@ export default function ConfigEditor({
         return;
       }
       try {
-        const next = deleteEntry(content, { group, name: entry.name });
+        const next = deleteEntry(content, { group, name: entry.name, entry });
         setContent(next);
         setStatus({ type: "info", message: `Removed "${entry.name}" from the editor — review and Save.` });
       } catch (e) {

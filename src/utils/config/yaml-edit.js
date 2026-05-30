@@ -17,13 +17,21 @@
 
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
 
+import { REDACTED, SECRET_VALUE_CONTAINERS, isSensitiveKey } from "./secret-mask";
+
 export const EDITABLE_SERVICE_FIELDS = ["href", "icon", "description", "server"];
+export const EDITABLE_BOOKMARK_FIELDS = ["abbr", "href", "icon", "description"];
+
+const SECRET_CONTAINER_LOOKUP = new Set(SECRET_VALUE_CONTAINERS.map((f) => f.toLowerCase()));
+function isSecretContainerKey(key) {
+  return SECRET_CONTAINER_LOOKUP.has(String(key).toLowerCase());
+}
 
 // Matches a placeholder sitting directly in value position (after `:` `-` `[` `,`
 // or at line start), i.e. an unquoted, non-embedded {{HOMEPAGE_*}}.
 const BARE_PLACEHOLDER = /(?:^|[:[,\-])[ \t]*\{\{HOMEPAGE_(?:VAR|FILE)_[^}\n]+\}\}/m;
 
-function parseServicesDoc(rawText) {
+function parseConfigDoc(rawText) {
   const text = rawText ?? "";
   const doc = parseDocument(text);
   if (doc.errors.length > 0) {
@@ -54,13 +62,13 @@ function findGroupSeq(doc, groupName) {
   return null;
 }
 
-// Each service is a single-key map { ServiceName: {props} } inside the group seq.
-function findServiceEntry(groupSeq, serviceName) {
+// An entry is a single-key map { Name: value } inside a group sequence.
+function findEntryByName(groupSeq, name) {
   for (let i = 0; i < groupSeq.items.length; i += 1) {
     const item = groupSeq.items[i];
     if (isMap(item) && item.items.length > 0) {
       const pair = item.items[0];
-      if (String(pair.key) === serviceName) {
+      if (String(pair.key) === name) {
         return { item, pair, index: i };
       }
     }
@@ -73,18 +81,45 @@ function locate(doc, group, name) {
   if (!groupSeq) {
     throw new Error(`Group "${group}" not found`);
   }
-  const found = findServiceEntry(groupSeq, name);
+  const found = findEntryByName(groupSeq, name);
   if (!found) {
-    throw new Error(`Service "${name}" not found in "${group}"`);
+    throw new Error(`Entry "${name}" not found in "${group}"`);
   }
   return { groupSeq, ...found };
+}
+
+// Rename an entry by mutating its key scalar in place (keeps position + comments).
+function applyRename(pair, oldName, newRaw) {
+  const newName = typeof newRaw === "string" ? newRaw.trim() : "";
+  if (newName && newName !== oldName) {
+    pair.key.value = newName;
+  }
+}
+
+// Set/clear one scalar field on a map. `undefined` leaves it as-is; "" deletes it;
+// otherwise the value is set in place (keeps inline comments, re-quotes if needed).
+function applyScalarField(map, field, raw) {
+  if (raw === undefined) {
+    return;
+  }
+  const value = typeof raw === "string" ? raw.trim() : raw;
+  if (value === "") {
+    map.delete(field);
+    return;
+  }
+  const existing = map.get(field, true);
+  if (isScalar(existing)) {
+    existing.value = value;
+  } else {
+    map.set(field, value);
+  }
 }
 
 // Edit an existing service's fields and/or rename it. Only the keys present in
 // `values` are touched; an empty string removes that field; unknown/nested
 // fields (widget:, ping:, …) on the entry are left untouched. Returns new raw text.
 export function updateServiceEntry(rawText, { group, name }, values) {
-  const doc = parseServicesDoc(rawText);
+  const doc = parseConfigDoc(rawText);
   const { pair } = locate(doc, group, name);
 
   // A nested-group entry (value is a sequence) is not a simple, field-editable service.
@@ -93,30 +128,8 @@ export function updateServiceEntry(rawText, { group, name }, values) {
   }
   const propsMap = pair.value;
 
-  // Rename in place so the entry keeps its position and surrounding comments.
-  const newName = typeof values.name === "string" ? values.name.trim() : "";
-  if (newName && newName !== name) {
-    pair.key.value = newName;
-  }
-
-  EDITABLE_SERVICE_FIELDS.forEach((field) => {
-    const raw = values[field];
-    if (raw === undefined) {
-      return; // field not part of this form → leave as-is
-    }
-    const value = typeof raw === "string" ? raw.trim() : raw;
-    if (value === "") {
-      propsMap.delete(field);
-      return;
-    }
-    const existing = propsMap.get(field, true);
-    if (isScalar(existing)) {
-      // In-place keeps any inline comment and re-quotes the value if needed.
-      existing.value = value;
-    } else {
-      propsMap.set(field, value);
-    }
-  });
+  applyRename(pair, name, values.name);
+  EDITABLE_SERVICE_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
 
   return doc.toString();
 }
@@ -124,8 +137,136 @@ export function updateServiceEntry(rawText, { group, name }, values) {
 // Remove an existing service entry from its group. The group itself (even if it
 // becomes empty) and all other entries/comments are preserved. Returns new raw text.
 export function deleteServiceEntry(rawText, { group, name }) {
-  const doc = parseServicesDoc(rawText);
+  const doc = parseConfigDoc(rawText);
   const { groupSeq, index } = locate(doc, group, name);
   groupSeq.items.splice(index, 1);
+  return doc.toString();
+}
+
+// --- bookmarks.yaml -------------------------------------------------------
+// Bookmarks nest one level deeper than services: { Group: [ { Name: [ {props} ] } ] }.
+// The props live in a single-item list under the name (or, tolerantly, directly
+// as a map). Returns the props map node, or null if the entry is not editable.
+function bookmarkPropsMap(pair) {
+  if (isSeq(pair.value)) {
+    const first = pair.value.items[0];
+    return isMap(first) ? first : null;
+  }
+  return isMap(pair.value) ? pair.value : null;
+}
+
+export function updateBookmarkEntry(rawText, { group, name }, values) {
+  const doc = parseConfigDoc(rawText);
+  const { pair } = locate(doc, group, name);
+  const propsMap = bookmarkPropsMap(pair);
+  if (!propsMap) {
+    throw new Error(`"${name}" is not a simple bookmark entry`);
+  }
+
+  applyRename(pair, name, values.name);
+  EDITABLE_BOOKMARK_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
+
+  return doc.toString();
+}
+
+export function deleteBookmarkEntry(rawText, { group, name }) {
+  const doc = parseConfigDoc(rawText);
+  const { groupSeq, index } = locate(doc, group, name);
+  groupSeq.items.splice(index, 1);
+  return doc.toString();
+}
+
+// --- widgets.yaml (secret-aware) ------------------------------------------
+// widgets.yaml is a flat list of single-key maps { type: {options} }; entries are
+// addressed by their list index (types can repeat). Secret option values are never
+// supplied by the form, so they are left byte-identical here.
+function widgetOptionsMap(doc, index) {
+  const top = doc.contents;
+  if (!isSeq(top) || !top.items[index]) {
+    throw new Error(`Widget #${index} not found`);
+  }
+  const item = top.items[index];
+  if (!isMap(item) || item.items.length === 0) {
+    throw new Error(`Widget #${index} is not a valid widget`);
+  }
+  const optionsMap = item.items[0].value;
+  return isMap(optionsMap) ? optionsMap : null;
+}
+
+// Update only the option keys present in `values`. A secret marker is never
+// written; blanking a sensitive key keeps it (so secrets can't be wiped by accident),
+// blanking a non-secret key removes it. Returns new raw text.
+export function updateWidgetOptions(rawText, { index }, values) {
+  const doc = parseConfigDoc(rawText);
+  const optionsMap = widgetOptionsMap(doc, index);
+  if (!optionsMap) {
+    throw new Error(`Widget #${index} has no editable options`);
+  }
+
+  Object.entries(values).forEach(([key, raw]) => {
+    if (raw === undefined) {
+      return;
+    }
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (value === REDACTED) {
+      return; // never persist the redaction marker
+    }
+    if (value === "" && isSensitiveKey(key)) {
+      return; // keep an untouched secret rather than deleting it
+    }
+    applyScalarField(optionsMap, key, value);
+  });
+
+  return doc.toString();
+}
+
+export function deleteWidget(rawText, { index }) {
+  const doc = parseConfigDoc(rawText);
+  const top = doc.contents;
+  if (!isSeq(top) || !top.items[index]) {
+    throw new Error(`Widget #${index} not found`);
+  }
+  top.items.splice(index, 1);
+  return doc.toString();
+}
+
+// --- settings.yaml (secret-aware) -----------------------------------------
+// settings.yaml is a top-level map. Only scalar, non-secret values are editable;
+// complex (object/array) and secret/container values must be edited raw. Returns
+// new raw text.
+export function updateSetting(rawText, { key }, newValue) {
+  const doc = parseConfigDoc(rawText);
+  const map = doc.contents;
+  if (!isMap(map)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  if (isSensitiveKey(key) || isSecretContainerKey(key)) {
+    throw new Error(`"${key}" is a secret and must be edited in the raw YAML`);
+  }
+  const existing = map.get(key, true);
+  if (existing !== undefined && !isScalar(existing)) {
+    throw new Error(`"${key}" is a structured value and must be edited in the raw YAML`);
+  }
+  const value = typeof newValue === "string" ? newValue.trim() : newValue;
+  if (value === REDACTED) {
+    throw new Error("Refusing to write a redacted value");
+  }
+  // Set in place (keeps inline comment / re-quotes); empty stays empty rather
+  // than deleting — deletion is an explicit, separate action.
+  if (isScalar(existing)) {
+    existing.value = value;
+  } else {
+    map.set(key, value);
+  }
+  return doc.toString();
+}
+
+export function deleteSetting(rawText, { key }) {
+  const doc = parseConfigDoc(rawText);
+  const map = doc.contents;
+  if (!isMap(map) || map.get(key, true) === undefined) {
+    throw new Error(`Setting "${key}" not found`);
+  }
+  map.delete(key);
   return doc.toString();
 }

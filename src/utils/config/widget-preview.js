@@ -1,6 +1,6 @@
 import yaml from "js-yaml";
 
-import { maskValue, tokenizePlaceholders } from "./secret-mask";
+import { isPlaceholder, maskValue, tokenizePlaceholders } from "./secret-mask";
 
 // Secret-aware preview model for widgets.yaml.
 //
@@ -15,7 +15,13 @@ export function maskWidgetOptions(options, map = []) {
   if (!options || typeof options !== "object") {
     return [];
   }
-  return Object.entries(options).map(([key, raw]) => ({ key, ...maskValue(key, raw, map) }));
+  return Object.entries(options).map(([key, raw]) => {
+    const masked = maskValue(key, raw, map);
+    // Only plain (string) non-placeholder values are form-editable in v1; secret
+    // fields are editable via a dedicated "replace" input handled in the dialog.
+    const editable = !masked.redacted && typeof raw === "string" && !isPlaceholder(masked.value);
+    return { key, ...masked, editable };
+  });
 }
 
 // Parse raw widgets.yaml into the preview model expected by ConfigEditor:

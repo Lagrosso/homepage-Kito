@@ -36,9 +36,9 @@ describe("maskWidgetOptions", () => {
   it("redacts sensitive values and keeps safe ones", () => {
     const fields = maskWidgetOptions({ url: "http://x", username: "admin", password: "s3cr3t", provider: "google" });
     const byKey = Object.fromEntries(fields.map((f) => [f.key, f]));
-    expect(byKey.password).toEqual({ key: "password", value: REDACTED, redacted: true });
-    expect(byKey.username).toEqual({ key: "username", value: REDACTED, redacted: true });
-    expect(byKey.url).toEqual({ key: "url", value: "http://x", redacted: false });
+    expect(byKey.password).toEqual({ key: "password", value: REDACTED, redacted: true, editable: false });
+    expect(byKey.username).toEqual({ key: "username", value: REDACTED, redacted: true, editable: false });
+    expect(byKey.url).toEqual({ key: "url", value: "http://x", redacted: false, editable: true });
     expect(byKey.provider.value).toBe("google");
   });
 
@@ -50,14 +50,14 @@ describe("maskWidgetOptions", () => {
   it("keeps placeholders visible even for sensitive keys", () => {
     const fields = maskWidgetOptions({ key: "{{HOMEPAGE_VAR_API_KEY}}", password: "{{HOMEPAGE_FILE_PW}}" });
     const byKey = Object.fromEntries(fields.map((f) => [f.key, f]));
-    expect(byKey.key).toEqual({ key: "key", value: "{{HOMEPAGE_VAR_API_KEY}}", redacted: false });
+    expect(byKey.key).toEqual({ key: "key", value: "{{HOMEPAGE_VAR_API_KEY}}", redacted: false, editable: false });
     expect(byKey.password.value).toBe("{{HOMEPAGE_FILE_PW}}");
   });
 
   it("masks sensitive keys nested inside object values", () => {
     const fields = maskWidgetOptions({ headers: { Authorization: "Bearer abc" }, opts: { key: "DEEP_SECRET" } });
     const byKey = Object.fromEntries(fields.map((f) => [f.key, f]));
-    expect(byKey.headers).toEqual({ key: "headers", value: REDACTED, redacted: true });
+    expect(byKey.headers).toEqual({ key: "headers", value: REDACTED, redacted: true, editable: false });
     expect(byKey.opts.value).not.toContain("DEEP_SECRET");
     expect(byKey.opts.value).toContain(REDACTED);
   });
