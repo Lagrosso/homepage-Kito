@@ -9,6 +9,7 @@ const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
 const CONFIG_TABS = [
   { file: "services.yaml", label: "Services", href: "/admin/config" },
   { file: "bookmarks.yaml", label: "Bookmarks", href: "/admin/bookmarks" },
+  { file: "widgets.yaml", label: "Widgets", href: "/admin/widgets" },
 ];
 
 // Parse a YAML error into a readable line/column message. Shared by every
@@ -90,10 +91,12 @@ export default function ConfigEditor({
   parse,
   Card,
   gridClassName = "grid grid-cols-1 sm:grid-cols-2 gap-x-3",
-  AddDialog,
-  insert,
+  AddDialog = null,
+  insert = null,
   addLabel = "Add",
 }) {
+  // Quick-add is optional: a config (e.g. widgets.yaml) may ship preview-only.
+  const canAdd = Boolean(AddDialog && insert);
   const apiUrl = `/api/config/raw/${configFile}`;
   const [content, setContent] = useState("");
   const [token, setToken] = useState("");
@@ -254,13 +257,15 @@ export default function ConfigEditor({
                     <label htmlFor="yaml-editor" className="block text-sm font-medium">
                       YAML
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setModalOpen(true)}
-                      className="rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-1 text-xs font-medium hover:bg-theme-300 dark:hover:bg-theme-600"
-                    >
-                      + {addLabel}
-                    </button>
+                    {canAdd && (
+                      <button
+                        type="button"
+                        onClick={() => setModalOpen(true)}
+                        className="rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-1 text-xs font-medium hover:bg-theme-300 dark:hover:bg-theme-600"
+                      >
+                        + {addLabel}
+                      </button>
+                    )}
                   </div>
                   <textarea
                     id="yaml-editor"
@@ -290,12 +295,14 @@ export default function ConfigEditor({
                 <p className="mt-1 text-xs text-theme-400">Stored locally in your browser and sent only when saving.</p>
               </details>
 
-              <AddDialog
-                open={modalOpen}
-                onClose={() => setModalOpen(false)}
-                onAdd={onAdd}
-                existingGroups={existingGroups}
-              />
+              {canAdd && (
+                <AddDialog
+                  open={modalOpen}
+                  onClose={() => setModalOpen(false)}
+                  onAdd={onAdd}
+                  existingGroups={existingGroups}
+                />
+              )}
             </>
           )}
 

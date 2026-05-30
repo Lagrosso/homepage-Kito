@@ -39,6 +39,8 @@ describe("validateYaml", () => {
 describe("isEditableConfig", () => {
   it("allows whitelisted files and rejects others", () => {
     expect(mod.isEditableConfig("services.yaml")).toBe(true);
+    expect(mod.isEditableConfig("bookmarks.yaml")).toBe(true);
+    expect(mod.isEditableConfig("widgets.yaml")).toBe(true);
     expect(mod.isEditableConfig("settings.yaml")).toBe(false);
     expect(mod.isEditableConfig("../../etc/passwd")).toBe(false);
   });
