@@ -414,6 +414,11 @@ export function assignGroupToTab(rawText, { group, tab }) {
       return doc.toString(); // group has no entry and stays unassigned: nothing to do
     }
     if (!isSeq(layout) && !isMap(layout)) {
+      // A non-null scalar `layout:` is an unexpected shape — don't silently
+      // overwrite it; the raw editor stays the escape hatch.
+      if (isScalar(layout) && layout.value != null && layout.value !== "") {
+        throw new Error("`layout` is not a list/mapping — edit it in the raw editor.");
+      }
       layout = doc.createNode([]);
       layout.flow = false;
       root.set("layout", layout);
@@ -453,6 +458,7 @@ export function assignGroupToTab(rawText, { group, tab }) {
     if (isScalar(existing)) {
       existing.value = value;
     } else {
+      opts.flow = false; // an empty `{}` entry would otherwise stay inline flow
       opts.set("tab", value);
     }
   }

@@ -446,8 +446,27 @@ export default function ConfigEditor({
                 >
                   Save
                 </button>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-theme-500">Token</span>
+                  <input
+                    type="password"
+                    value={token}
+                    onChange={(e) => onTokenChange(e.target.value)}
+                    placeholder="HOMEPAGE_CONFIG_EDIT_TOKEN"
+                    aria-label="Config edit token"
+                    className={`w-56 rounded-md border bg-white dark:bg-theme-800 px-3 py-2 font-mono text-xs ${
+                      token ? "border-theme-300 dark:border-theme-700" : "border-amber-400"
+                    }`}
+                  />
+                </label>
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
+              {!token && (
+                <p className="-mt-1 mb-3 text-xs text-amber-600 dark:text-amber-400">
+                  Saving requires the <code>HOMEPAGE_CONFIG_EDIT_TOKEN</code>. It is stored locally in your browser and
+                  sent only when saving.
+                </p>
+              )}
 
               {(canEdit || canDelete || canMove) && placeholderBlocked && (
                 <div className="mb-3 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-3 text-xs">
@@ -502,18 +521,6 @@ export default function ConfigEditor({
                   </div>
                 </div>
               </div>
-
-              <details className="mt-4 text-sm">
-                <summary className="cursor-pointer text-theme-500">Edit token</summary>
-                <input
-                  type="password"
-                  value={token}
-                  onChange={(e) => onTokenChange(e.target.value)}
-                  placeholder="HOMEPAGE_CONFIG_EDIT_TOKEN"
-                  className="mt-2 w-full max-w-md rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 px-3 py-2 font-mono text-sm"
-                />
-                <p className="mt-1 text-xs text-theme-400">Stored locally in your browser and sent only when saving.</p>
-              </details>
 
               {canAdd && (
                 <AddDialog

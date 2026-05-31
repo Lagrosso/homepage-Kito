@@ -421,6 +421,16 @@ describe("assignGroupToTab", () => {
     const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
     expect(() => assignGroupToTab(bare, { group: "A", tab: "B" })).toThrow(/unquoted/i);
   });
+
+  it("writes block style when assigning onto an empty flow `{}` entry", () => {
+    const out = assignGroupToTab(`layout:\n  - Misc: {}\n`, { group: "Misc", tab: "Apps" });
+    expect(out).not.toMatch(/\{\s*tab/); // not inline flow
+    expect(yaml.load(out).layout[0].Misc.tab).toBe("Apps");
+  });
+
+  it("refuses to overwrite a non-null scalar `layout:`", () => {
+    expect(() => assignGroupToTab("layout: somestring\n", { group: "A", tab: "B" })).toThrow(/raw editor/i);
+  });
 });
 
 describe("renameTab", () => {
