@@ -4,9 +4,9 @@ Guidance for working in this repository.
 
 ## Projektkontext
 
-`homepage-Kito` ist ein **Fork von [gethomepage/homepage](https://github.com/gethomepage/homepage)** — einem self-hosted Dashboard für Services, Bookmarks und Widgets.
+`homepage-Kito` ist ein **eigenständiges Projekt** — ein self-hosted Dashboard für Services, Bookmarks und Widgets. Es basiert ursprünglich auf dem Code von [gethomepage/homepage](https://github.com/gethomepage/homepage) (GPLv3), wird aber **eigenständig weiterentwickelt** und nicht als Fork zur Rückführung an Upstream gepflegt.
 
-**Ziel dieses Forks:** Homepage **schrittweise** um eine **UI-gestützte Konfiguration** erweitern. Heute wird ausschließlich über YAML-Dateien konfiguriert; der Fork ergänzt eine Admin-/Config-UI, die diese Dateien sicher lesen und bearbeiten kann.
+**Ziel des Projekts:** Das Dashboard **schrittweise** um eine **UI-gestützte Konfiguration** erweitern. Heute wird ausschließlich über YAML-Dateien konfiguriert; das Projekt ergänzt eine Admin-/Config-UI, die diese Dateien sicher lesen und bearbeiten kann.
 
 **Leitplanken:**
 
@@ -55,20 +55,20 @@ src/
   pages/                  Next.js Pages + API-Routes
     index.jsx             Haupt-Dashboard (getStaticProps, SSG)
     _app.jsx, _document.jsx
-    admin/config.jsx      Admin-/Config-UI (Fork-Erweiterung)
+    admin/config.jsx      Admin-/Config-UI
     api/
       services/index.js   GET /api/services (read-only Aggregation)
       bookmarks.js, validate.js, ...
       config/[path].js     custom.css / custom.js (read-only)
-      config/raw/[file].js GET/POST Roh-Config lesen+schreiben (Fork-Erweiterung)
+      config/raw/[file].js GET/POST Roh-Config lesen+schreiben (Config-UI)
   components/             services/, bookmarks/, widgets/, toggles/
   utils/
     config/               Config-Loader (serverseitig, FS + YAML)
       config.js           CONF_DIR, checkAndCopyConfig, getSettings, substituteEnvironmentVars
       service-helpers.js  servicesFromConfig / parseServicesToGroups
       api-response.js     servicesResponse / bookmarksResponse / widgetsResponse
-      config-writer.js    readRawConfig / validateYaml / writeRawConfig (Fork-Erweiterung)
-      admin-auth.js       isConfigEditEnabled / checkAdminToken (Fork-Erweiterung)
+      config-writer.js    readRawConfig / validateYaml / writeRawConfig (Config-UI)
+      admin-auth.js       isConfigEditEnabled / checkAdminToken (Config-UI)
     proxy/                Widget-Proxy-Handler + URL-Sanitization
   skeleton/               Default-YAMLs, kopiert bei fehlender Config
   middleware.js           Host-Validierung (HOMEPAGE_ALLOWED_HOSTS), Matcher /api/:path*
@@ -82,7 +82,7 @@ src/
 - **Kommentare und Platzhalter erhalten:** `services.yaml` kann Kommentare und `{{HOMEPAGE_VAR_*}}` / `{{HOMEPAGE_FILE_*}}`-Platzhalter (siehe `substituteEnvironmentVars`) enthalten. Beim Editieren **roh** arbeiten (Text 1:1), nicht parsen→neu-serialisieren, sonst gehen Kommentare/Platzhalter verloren.
 - Beim Schreiben: vor YAML-Syntaxvalidierung niemals speichern; Backup + atomic write (siehe `config-writer.js`).
 
-### Env-Variablen der UI-Config (Fork)
+### Env-Variablen der UI-Config
 
 | Variable                     | Default | Zweck                                                                         |
 | ---------------------------- | ------- | ----------------------------------------------------------------------------- |
@@ -98,9 +98,9 @@ Backups landen in `CONF_DIR/.backups/<datei>.<ISO-timestamp>.bak`.
 - Tests liegen **neben** dem Code als `*.test.{js,jsx}`; Mocks via `vi.mock` / `vi.hoisted` (Vorlage: `src/utils/logger.test.js`).
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (siehe `jsconfig.json` / `vitest.config.mjs`).
 
-## Beiträge an Upstream
+## Lizenz & Herkunft
 
-Upstream (`gethomepage/homepage`) ist GPLv3 und **akzeptiert keine KI-generierten PRs ohne explizite Deklaration** (siehe `CONTRIBUTING.md`). Für Beiträge zurück an upstream entsprechend deklarieren. Bug-Reports laufen über GitHub Discussions, nicht Issues.
+Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/gethomepage/homepage) (**GPLv3**); diese Lizenz **gilt weiter** und muss eingehalten werden (Copyright-/Lizenzhinweise erhalten). `homepage-Kito` wird **eigenständig** weiterentwickelt — eine Rückführung an Upstream ist kein Projektziel. Falls doch einmal upstream beigetragen wird, gelten deren Regeln (KI-generierte PRs nur mit expliziter Deklaration; Bug-Reports über GitHub Discussions, nicht Issues).
 
 ## Roadmap: UI-gestützte Konfiguration
 
@@ -114,6 +114,8 @@ Upstream (`gethomepage/homepage`) ist GPLv3 und **akzeptiert keine KI-generierte
    - **5c (geplant):** Verschieben/Umsortieren von Einträgen und Gruppen über alle Config-Dateien (Reihenfolge ändern, zwischen Gruppen/Tabs verschieben).
 6. **Meilenstein 6 – Tabs/Layout-Verwaltung (geplant):** Neue Tabs anlegen die oberhalb der Gruppen stehen aber unter der Suche und das Gruppen-Layout über die UI verwalten (entspr. `settings.yaml` `layout`/Tab-Zuordnung; vgl. `components/tab.jsx`).
 7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (geplant):** Echte Auth/Session statt statischem Token, optional Audit-Log; rollenbasierte Rechte – Nur-Lesen vs. Bearbeiten, granular pro Tab/Gruppe/Kachel; nur Admins dürfen Services & Co. bearbeiten.
+   - **Migration weg vom Env-Gating:** Mit echter Auth werden die Env-Flags `HOMEPAGE_CONFIG_EDIT` und `HOMEPAGE_CONFIG_EDIT_TOKEN` **entfernt** — Zugriff/Schreibrecht wird dann über Rollen/Rechte gesteuert (nicht mehr über Env + statisches Token).
+   - **Admin-Button rollenabhängig:** Der **Admin**-Button oben rechts im Dashboard-Header erscheint dann **nur für Admins** (statt über `GET /api/config/status` / Env-Flag); analog die Sichtbarkeit der `/admin/*`-Seiten.
 8. **Meilenstein 8 – Theming, Branding & Custom UI (geplant):** Theming/Branding deutlich erweitern und `custom.css`/`custom.js` über die UI bearbeitbar machen. Geplante Teilbereiche:
    - **8a Theme-Presets:** einfache Auswahl per Buttons, z. B. rund/weich, kantig/technisch, Glasoptik/Blur, kompakt, minimal, OLED-Dark, Homelab-Neon.
    - **8b Hintergrundbild-Upload:** Hintergrundbilder über die UI hochladen/entfernen, optional Overlay, Abdunklung, Blur, Position und Skalierung einstellen; Speicherung kontrolliert unter `CONF_DIR`.
@@ -134,7 +136,7 @@ Per Playwright-Chromium gegen `pnpm dev` getrieben; alle Punkte **bestanden**:
 - **Gating an:** Footer-Link sichtbar; Schreiben erfordert weiterhin `HOMEPAGE_CONFIG_EDIT_TOKEN`.
 - **Services – strukturierte Bearbeitung (M5 5a), PASS (Browser-E2E + Unit-Tests grün):** Edit ändert Felder bzw. ergänzt fehlende; Description, Inline-Kommentare, Leerzeilen, 4/8-Einrückung und `---` bleiben erhalten; Delete entfernt nur den Zieleintrag (geleerte Gruppe bleibt als `[]`); Änderungen landen **nur im Editor** (Disk unverändert bis Save); bare-unquotete `{{HOMEPAGE_*}}` werden abgelehnt.
 - **Bookmarks/Widgets/Settings – strukturierte Bearbeitung (M5 5b), PASS (Browser-E2E + 28 yaml-edit-Unit-Tests, 1481 Tests gesamt grün):** Bookmark-Edit (abbr GH→GHB) erhält Nesting + Kommentare; Widget-Edit ändert nur das geänderte Feld (provider→google), andere Widgets/Optionen byte-gleich, Widget-Delete per Index; Settings zeigt `providers` als `{…:"[redacted]"}` (Namen sichtbar) **ohne** Edit-Button (nur Delete); Secrets bleiben byte-gleich und `[redacted]` wird nie geschrieben; Disk unverändert bis Save.
-- **Header-Navigation (Fork):** Dashboard-Header mit **Home** (links) + gated **Admin**-Button (rechts, via `/api/config/status`); „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server kann die Config-UI über ein `env`-Feld in `.claude/launch.json` aktivieren.
+- **Header-Navigation:** Dashboard-Header mit **Home** (links) + gated **Admin**-Button (rechts, via `/api/config/status`); „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server kann die Config-UI über ein `env`-Feld in `.claude/launch.json` aktivieren.
 
 Kleinere Beobachtung (kein Bug): Bookmark-Cards im 3-Spalten-Raster wirken auf breiten Screens schmal (Name/URL truncaten stark) — rein kosmetisch, read-only.
 
