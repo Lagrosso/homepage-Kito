@@ -104,6 +104,8 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 
 ## Roadmap: UI-gestützte Konfiguration
 
+**Legende:** `P1` = MVP/Bedienbarkeit (≈ M1–M5, weitgehend erledigt) · `P2` = Homelab-Mehrwert · `P3` = KitoDash/Runtime · `★` = persönliche Top-5 · `🔥` = Priorität laut features.md · **(Vision)** = großer Sicherheits-/Architektur-Sprung, **erst nach M7 (Auth/Rollen) + Audit**, verlässt den reinen „Config-UI/read-only"-Rahmen.
+
 1. **Meilenstein 1 (umgesetzt):** Sichere `services.yaml`-Bearbeitung über `/admin/config` — Raw-YAML-Editor + lesende strukturierte Vorschau, Validierung, Backup + atomic write, Gating per Env-Flag + Token. Card-Vorschau + Quick-Add ergänzt.
 2. **Meilenstein 2 (umgesetzt):** Gleiche Hybrid-UI für `bookmarks.yaml` über `/admin/bookmarks` (geteilte `ConfigEditor`-Shell, Writer-Whitelist erweitert). Footer-Link auf dem Dashboard, gegated über `GET /api/config/status`.
 3. **Meilenstein 3 (umgesetzt):** `widgets.yaml` über `/admin/widgets` als **secret-aware, preview-only** Editor — Redaction sensibler Felder in der Vorschau, `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}` bleiben sichtbar, **kein** Quick-Add (AddDialog in der Shell optional gemacht). Writer-Whitelist + Widgets-Nav-Tab ergänzt.
@@ -112,10 +114,12 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
    - **5a (umgesetzt):** `services.yaml` – Edit + Delete bestehender Service-Einträge. Neues `utils/config/yaml-edit.js` (`updateServiceEntry`/`deleteServiceEntry`); `ConfigEditor`-Shell additiv um optionale Props `EditDialog`/`editEntry`/`deleteEntry` erweitert; Edit/Delete-Buttons in der Card-Vorschau; `ServiceAddDialog` zu mode-fähigem `ServiceFormDialog` verallgemeinert. **Bare-unquotete** `{{HOMEPAGE_*}}` werden zum Schutz abgelehnt (Hinweis: Raw-Editor). `doc.toString()` bewusst **ohne** Optionen → layout-treu (4/8-Einrückung, Kommentare, Leerzeilen, `---`).
    - **5b (umgesetzt):** Edit + Delete auch für `bookmarks.yaml`, `widgets.yaml` und `settings.yaml` (gleiches Shell-Muster, Locator reicht das ganze `entry` durch). Neue Helfer in `yaml-edit.js` (`updateBookmarkEntry`/`deleteBookmarkEntry`, `updateWidgetOptions`/`deleteWidget`, `updateSetting`/`deleteSetting`) + geteilte `applyScalarField`/`applyRename`. **secret-aware** für `widgets.yaml`/`settings.yaml` via `secret-mask.js`: echte Secrets werden nie vorbefüllt, bei „leer = behalten" nicht überschrieben, `[redacted]` wird nie geschrieben; `editable`-Flag in `widget-preview.js`/`settings-preview.js` (nur skalare, nicht-secret, nicht-Platzhalter Werte). **v1-Grenzen:** Widgets nur String-Optionen editierbar (Zahlen/Booleans/Objekte → raw), kein Typ-Wechsel/Add; Settings nur skalare nicht-secret Werte (komplexe/`providers` → raw, Delete erlaubt); Bookmarks ohne Gruppenwechsel.
    - **5c (umgesetzt):** Verschieben/Umsortieren per **Hoch/Runter-Buttons** (kein Drag&Drop). Neue Helfer in `yaml-edit.js` (`moveEntryInGroup`, `moveGroup`, `moveEntryToGroup`, `moveWidget`); Move-Controls zentral in der `Preview`-Shell (Cards unverändert), bei bare `{{HOMEPAGE_*}}` ausgeblendet (wie Edit/Delete). **services/bookmarks:** Reihenfolge in Gruppe, Gruppen umsortieren, zwischen Gruppen verschieben (Cross-Group hängt v1 ans **Ende** der Zielgruppe; `toSeq.flow=false` erzwingt Block-Stil auch bei zuvor geleerten `[]`-Gruppen). **widgets:** nur ▲/▼ per Index. **settings ausgeklammert** (Anzeige-Gruppen ≠ Dateireihenfolge). **Limit (M5c-2):** beim Reorder wandert ein als `commentBefore` gebundener Kommentar mit seinem Knoten mit (ein Datei-Kopf-Kommentar ohne `---`-Bindung kann so in die Mitte rutschen) — valide, vor Save im Raw-Editor sichtbar. **Tabs** erst mit M6.
+   - **5d (geplant):** echtes **Drag & Drop** als Alternative zu Hoch/Runter (Einträge/Gruppen/Kacheln ziehen). (F1)
 6. **Meilenstein 6 – Tabs/Layout-Verwaltung (geplant):** Neue Tabs anlegen die oberhalb der Gruppen stehen aber unter der Suche und das Gruppen-Layout über die UI verwalten (entspr. `settings.yaml` `layout`/Tab-Zuordnung; vgl. `components/tab.jsx`).
 7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (geplant):** Echte Auth/Session statt statischem Token, optional Audit-Log; rollenbasierte Rechte – Nur-Lesen vs. Bearbeiten, granular pro Tab/Gruppe/Kachel; nur Admins dürfen Services & Co. bearbeiten.
    - **Migration weg vom Env-Gating:** Mit echter Auth werden die Env-Flags `HOMEPAGE_CONFIG_EDIT` und `HOMEPAGE_CONFIG_EDIT_TOKEN` **entfernt** — Zugriff/Schreibrecht wird dann über Rollen/Rechte gesteuert (nicht mehr über Env + statisches Token).
    - **Admin-Button rollenabhängig:** Der **Admin**-Button oben rechts im Dashboard-Header erscheint dann **nur für Admins** (statt über `GET /api/config/status` / Env-Flag); analog die Sichtbarkeit der `/admin/*`-Seiten.
+   - **Abgrenzung zu M10:** Reine **Ansichts-Profile** werden in M10 behandelt; echte per-User-Rechte und sicherheitsrelevante User-Bindung gehören hierher nach M7.
 8. **Meilenstein 8 – Theming, Branding & Custom UI (geplant):** Theming/Branding deutlich erweitern und `custom.css`/`custom.js` über die UI bearbeitbar machen. Geplante Teilbereiche:
    - **8a Theme-Presets:** einfache Auswahl per Buttons, z. B. rund/weich, kantig/technisch, Glasoptik/Blur, kompakt, minimal, OLED-Dark, Homelab-Neon.
    - **8b Hintergrundbild-Upload:** Hintergrundbilder über die UI hochladen/entfernen, optional Overlay, Abdunklung, Blur, Position und Skalierung einstellen; Speicherung kontrolliert unter `CONF_DIR`.
@@ -123,6 +127,37 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
    - **8d Custom-CSS/JS-Editor:** `custom.css` und optional `custom.js` über die UI bearbeiten, mit Warnhinweisen, Validierung soweit sinnvoll und Backup/Restore.
    - **8e Theme Import/Export:** Themes exportieren/importieren, ohne Secrets oder lokale Pfade ungewollt offenzulegen.
    - **8f Theme pro Benutzer:** Themes können pro benutzer induviduell sein und hinterlegt werden.
+
+#### Phase 1/2 – read-only, mit den Leitplanken vereinbar
+
+9. **M9 – Status & Health pro Dienst (P2, ★, 🔥🔥🔥):** online/offline, Antwortzeit, HTTP-Code, letzter Check, Warnsymbol, Mini-Verlauf; sortier-/filterbar („nur kaputte/langsame Dienste"), optional Benachrichtigung. Nutzt Homepage `siteMonitor`/ping; read-only. (F3; ersetzt Backlog „Service-Test")
+10. **M10 – Profile & Ansichts-Modi (P2/P3, ★, 🔥🔥🔥):** Profile (Admin/Familie/Gast/Kinder/Mobil) + Modi (Normal/Admin/Wartung/Familie), Umschalter, Sichtbarkeit pro Profil, „unsichtbar statt gelöscht". Sichtbarkeit read-only; echte User-Bindung via M7. (F2+F8; verzahnt mit M6/M7)
+11. **M11 – Smart Search / Command Palette (P2, 🔥🔥):** `Strg+K`/`/`: Services/Bookmarks/Gruppen suchen, zuletzt geöffnet, Einstellungen/Logs öffnen; später Admin-Aktionen. (F4; erweitert QuickLaunch + Backlog „Such-/Filter")
+12. **M12 – Favoriten & „Zuletzt/Häufig verwendet" (P2):** anpinnen, lokale Historie, kontextabhängige Vorschläge; lokal + abschaltbar. (F11)
+13. **M13 – Kontext-Badges pro Dienst (P2):** LAN/VPN/Public/Admin/Familie/Kritisch/Backup/Beta… konfigurierbar. (F12)
+14. **M14 – Multi-URL & Safe-Links (LAN/Tailscale/Public) (P2/P3, ★, 🔥🔥):** pro Dienst `urls{lan,tailscale,public}`, Auto-Wahl nach Kontext, Warnung bei versehentlich öffentlichem Link, Fallback. (F18 + Tailscale-Teil F6)
+15. **M15 – Service-Doku in der Kachel (P2):** Info-Panel (Zweck/Server/Backup/Admin/Notiz/„was tun bei Fehler"). (F17)
+16. **M16 – Mobile-first & PWA (P2, 🔥🔥):** untere Nav, große Suche, Favoriten oben, Swipe, kompakte Karten, „nur Favoriten", Long-Press-Aktionen, PWA, Offline-Fallback, QR. (F10; erweitert Backlog „Mobile-Optimierung")
+17. **M17 – Backup, Restore & Änderungsverlauf/Rollback (P1/P2, ★, 🔥🔥):** Backups anzeigen/ansehen/Diff/Restore/Download, Verlauf (wann/was/wer), Kommentar, Rollback. (F15; bündelt Backlog „Backup-/Restore-UI" + „Audit-Log")
+18. **M18 – Konfigurations-Health-Checks (P1/P2, 🔥🔥🔥):** über Syntax hinaus (fehlende `href`/Pflichtfelder, doppelte Namen/URLs, Icon existiert?, Widget-Typ?, Secret sichtbar?, Einrückung/Gruppen); präzise Meldungen (Datei/Gruppe/Dienst/Feld), Reparaturvorschläge, Vorher/Nachher, Backup. (F7; erweitert Backlog „Config-Health-Checks")
+19. **M19 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
+
+#### Phase 3 – Vision / Runtime / Infra
+
+Diese Meilensteine sind ausdrücklich **(Vision)**. Sie dürfen erst nach **M7 (Auth/Rollen) + Audit** umgesetzt werden, weil sie den reinen „Config-UI/read-only"-Rahmen verlassen.
+
+20. **M20 – (Vision) Service-Aktionen aus der Kachel (P3, 🔥🔥):** Öffnen/Admin/Logs/Neustart/Status; gefährliche Aktionen nur mit Bestätigung + Admin-Recht, protokolliert; „Nur anzeigen"-Modus. (F5)
+21. **M21 – (Vision) Autodiscovery & Integrationen Docker/Proxmox/Tailscale (P3, 🔥🔥):** Docker-Label-Discovery + Vorschläge + Compose-Snippet + Status/Neustart; Proxmox Nodes/VMs/LXC + Ressourcen + Console; Tailscale-Erreichbarkeit/Badges. (F6)
+22. **M22 – (Vision) Einrichtungsassistent (P3):** Sprache/Layout, Docker-Socket optional, Container scannen, Dienste/Gruppen vorschlagen, Icons automatisch. (F9; baut auf M21)
+23. **M23 – (Vision) Wartungs- & Update-Zentrale (P3):** Updates verfügbar, alte Images, ungenutzte/ohne Backup/Healthcheck/Icon, IP-statt-DNS-Hinweise. (F20)
+24. **M24 – (Vision) Notfall-Ansicht (P3):** kritische IPs/Zugänge, Backup-Orte, letzte funktionierende URLs, Hinweise, Export PDF/Markdown. (F14)
+25. **M25 – (Vision) Abhängigkeits- & Server-/Netzwerk-Überblick (P3):** strukturierter Baum pro Server, Ursachen-Hinweise bei Ausfall. (F13+F19)
+
+**Phasen-Mapping:**
+
+- **Phase 1 (MVP):** ≈ bereits durch M1–M5 abgedeckt (UI-Editor + Move + Validierung + Backup); Rollback = M17.
+- **Phase 2 (Homelab-Mehrwert):** M9–M19 (read-only).
+- **Phase 3 (KitoDash/Runtime):** M7, M20–M25.
 
 ### Verifikationsstatus (manuelle Browser-Prüfung, 2026-05-30)
 
@@ -146,6 +181,8 @@ Kleinere Beobachtung (kein Bug): Bookmark-Cards im 3-Spalten-Raster wirken auf b
 ## Vorgemerkte spätere Komfort-Features
 
 Ideen-Backlog für spätere Ausbaustufen (noch nicht eingeplant, nach Bedarf in die Roadmap zu überführen). Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
+
+> **Hinweis:** Backup/Restore, Audit-Log, Import-Assistent, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation erhalten. Icon-/Favicon-Helfer bleibt weiterhin relevant für **M22**.
 
 ### Backup-/Restore-UI
 
