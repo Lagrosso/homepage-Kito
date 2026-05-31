@@ -8,7 +8,9 @@ import {
   deleteServiceEntry,
   moveEntryInGroup,
   moveEntryToGroup,
+  moveEntryToIndex,
   moveGroup,
+  moveGroupToIndex,
   updateServiceEntry,
 } from "utils/config/yaml-edit";
 import { insertService } from "utils/config/yaml-insert";
@@ -285,8 +287,13 @@ function ServiceEditDialog(props) {
 }
 
 // Map the shell's move-to-group locator ({ entry }) onto the name-based helper.
-const moveServiceToGroup = (raw, { fromGroup, entry, toGroup }) =>
-  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup });
+// `toIndex` (drag & drop) inserts at that position; without it the helper appends.
+const moveServiceToGroup = (raw, { fromGroup, entry, toGroup, toIndex }) =>
+  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup, toIndex });
+
+// Drag & drop adapters (arbitrary target index).
+const reorderServiceTo = (raw, { group, name }, toIndex) => moveEntryToIndex(raw, { group, name }, toIndex);
+const reorderServiceGroupTo = (raw, { group }, toIndex) => moveGroupToIndex(raw, { group }, toIndex);
 
 export default function AdminServicesConfig() {
   return (
@@ -303,6 +310,8 @@ export default function AdminServicesConfig() {
       reorderEntry={moveEntryInGroup}
       reorderGroup={moveGroup}
       moveToGroup={moveServiceToGroup}
+      reorderEntryTo={reorderServiceTo}
+      reorderGroupTo={reorderServiceGroupTo}
     />
   );
 }

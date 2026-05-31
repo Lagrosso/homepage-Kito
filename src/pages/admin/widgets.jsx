@@ -2,7 +2,7 @@ import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import ConfigEditor, { Field, inputClass } from "components/admin/config-editor";
 import { useEffect, useState } from "react";
 import { MdDelete, MdEdit } from "react-icons/md";
-import { deleteWidget, moveWidget, updateWidgetOptions } from "utils/config/yaml-edit";
+import { deleteWidget, moveWidget, moveWidgetToIndex, updateWidgetOptions } from "utils/config/yaml-edit";
 import { parseWidgets } from "utils/config/widget-preview";
 
 // Read-only card for one info widget. Values are already masked by
@@ -167,6 +167,7 @@ function WidgetEditDialog({ open, onClose, onSubmit, initial }) {
 const editWidget = (raw, { entry }, values) => updateWidgetOptions(raw, { index: entry.index }, values);
 const removeWidget = (raw, { entry }) => deleteWidget(raw, { index: entry.index });
 const reorderWidget = (raw, { entry }, direction) => moveWidget(raw, { index: entry.index }, direction);
+const reorderWidgetTo = (raw, { entry }, toIndex) => moveWidgetToIndex(raw, { index: entry.index }, toIndex);
 
 export default function AdminWidgetsConfig() {
   return (
@@ -179,6 +180,7 @@ export default function AdminWidgetsConfig() {
       editEntry={editWidget}
       deleteEntry={removeWidget}
       reorderEntry={reorderWidget}
+      reorderEntryTo={reorderWidgetTo}
     />
   );
 }

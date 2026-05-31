@@ -1,9 +1,26 @@
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
+import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
@@ -173,6 +190,221 @@ function Preview({ content, parse, Card, gridClassName, onEdit, onDelete, onMove
   );
 }
 
+// --- drag & drop preview (M5d) --------------------------------------------
+// Stable positional ids: "g:<gi>" for a group section, "e:<gi>:<ei>" for an
+// entry card. Parsing them back gives the indices to mutate via the index-based
+// yaml-edit helpers. DnD mutates the editor text only; Save stays manual.
+function parseDndId(id) {
+  const [type, gi, ei] = String(id).split(":");
+  return { type, gi: Number(gi), ei: ei === undefined ? undefined : Number(ei) };
+}
+
+function DragHandle({ attributes, listeners, label }) {
+  return (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      aria-label={label}
+      title={label}
+      className="cursor-grab touch-none rounded p-0.5 text-theme-400 hover:text-theme-600 dark:hover:text-theme-200 hover:bg-theme-300/40 dark:hover:bg-white/10"
+    >
+      <MdDragIndicator className="w-4 h-4" />
+    </button>
+  );
+}
+
+function SortableEntryCard({ id, group, entry, ei, count, Card, onEdit, onDelete, onMoveEntry, onMoveToGroup, groupNames }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : undefined };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card
+        entry={entry}
+        group={group}
+        onEdit={onEdit ? () => onEdit(group, entry) : undefined}
+        onDelete={onDelete ? () => onDelete(group, entry) : undefined}
+      />
+      <div className="flex items-center gap-1 -mt-1 mb-2 pl-1">
+        <DragHandle attributes={attributes} listeners={listeners} label={`Drag ${entry.name}`} />
+        {onMoveEntry && (
+          <>
+            <MoveBtn dir="up" disabled={ei === 0} onClick={() => onMoveEntry(group, entry, "up")} label={`Move ${entry.name} up`} />
+            <MoveBtn
+              dir="down"
+              disabled={ei === count - 1}
+              onClick={() => onMoveEntry(group, entry, "down")}
+              label={`Move ${entry.name} down`}
+            />
+          </>
+        )}
+        {onMoveToGroup && groupNames.length > 1 && (
+          <select
+            aria-label={`Move ${entry.name} to another group`}
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                onMoveToGroup(group, entry, e.target.value);
+              }
+            }}
+            className="ml-1 rounded border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 text-xs px-1 py-0.5 text-theme-600 dark:text-theme-300"
+          >
+            <option value="">→ Gruppe…</option>
+            {groupNames
+              .filter((g) => g !== group)
+              .map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SortableGroupSection({ gi, group, count, onMoveGroup, canDragGroup, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `g:${gi}` });
+  const style = { transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : undefined };
+  return (
+    <section ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-1 pb-2 mb-2 border-b border-theme-300 dark:border-theme-700">
+        {canDragGroup && <DragHandle attributes={attributes} listeners={listeners} label={`Drag group ${group}`} />}
+        <h3 className="flex-1 min-w-0 truncate text-theme-800 dark:text-theme-200 text-sm font-medium">{group}</h3>
+        {onMoveGroup && (
+          <>
+            <MoveBtn dir="up" disabled={gi === 0} onClick={() => onMoveGroup(group, "up")} label={`Move group ${group} up`} />
+            <MoveBtn
+              dir="down"
+              disabled={gi === count - 1}
+              onClick={() => onMoveGroup(group, "down")}
+              label={`Move group ${group} down`}
+            />
+          </>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Card preview with drag & drop (used when index-based reorder handlers are
+// wired). Mirrors Preview's layout/controls and adds drag handles; the existing
+// up/down buttons stay as the accessible fallback.
+function DndPreview({
+  content,
+  parse,
+  Card,
+  gridClassName,
+  onEdit,
+  onDelete,
+  onMoveEntry,
+  onMoveGroup,
+  onMoveToGroup,
+  onDnd,
+  canDragGroup,
+}) {
+  const [activeLabel, setActiveLabel] = useState(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const result = useMemo(() => {
+    try {
+      return { groups: parse(content), error: null };
+    } catch (e) {
+      return { groups: [], error: describeYamlError(e) };
+    }
+  }, [content, parse]);
+
+  if (result.error) {
+    return <p className="text-sm text-red-500">Preview unavailable: {result.error}</p>;
+  }
+  if (result.groups.length === 0) {
+    return <p className="text-sm text-theme-500">No groups found.</p>;
+  }
+
+  const groups = result.groups;
+  const groupNames = groups.map((g) => g.name);
+  const groupIds = groups.map((_, gi) => `g:${gi}`);
+
+  const onDragStart = ({ active }) => {
+    const a = parseDndId(active.id);
+    setActiveLabel(a.type === "g" ? groups[a.gi]?.name : groups[a.gi]?.entries[a.ei]?.name);
+  };
+
+  const onDragEnd = ({ active, over }) => {
+    setActiveLabel(null);
+    if (!over || active.id === over.id) {
+      return;
+    }
+    const a = parseDndId(active.id);
+    const o = parseDndId(over.id);
+    if (a.type === "g") {
+      onDnd({ kind: "group", group: groups[a.gi].name, toIndex: o.gi });
+      return;
+    }
+    const fromGroup = groups[a.gi].name;
+    const entry = groups[a.gi].entries[a.ei];
+    if (o.type === "e") {
+      if (a.gi === o.gi) {
+        onDnd({ kind: "entry", group: fromGroup, entry, toIndex: o.ei });
+      } else {
+        onDnd({ kind: "entryToGroup", fromGroup, entry, toGroup: groups[o.gi].name, toIndex: o.ei });
+      }
+    } else if (a.gi !== o.gi) {
+      onDnd({ kind: "entryToGroup", fromGroup, entry, toGroup: groups[o.gi].name }); // dropped on group → append
+    }
+  };
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-col gap-5">
+          {groups.map((group, gi) => (
+            <SortableGroupSection
+              key={group.name}
+              gi={gi}
+              group={group.name}
+              count={groups.length}
+              onMoveGroup={onMoveGroup}
+              canDragGroup={canDragGroup}
+            >
+              <SortableContext items={group.entries.map((_, ei) => `e:${gi}:${ei}`)} strategy={rectSortingStrategy}>
+                <div className={gridClassName}>
+                  {group.entries.map((entry, ei) => (
+                    <SortableEntryCard
+                      key={entry.name}
+                      id={`e:${gi}:${ei}`}
+                      group={group.name}
+                      entry={entry}
+                      ei={ei}
+                      count={group.entries.length}
+                      Card={Card}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onMoveEntry={onMoveEntry}
+                      onMoveToGroup={onMoveToGroup}
+                      groupNames={groupNames}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+              {group.entries.length === 0 && <p className="text-sm text-theme-500">No entries.</p>}
+            </SortableGroupSection>
+          ))}
+        </div>
+      </SortableContext>
+      <DragOverlay>
+        {activeLabel ? (
+          <div className="rounded-md bg-blue-600 text-white text-sm px-3 py-1 shadow-lg">{activeLabel}</div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
 // Generic hybrid config editor: raw YAML editor + read-only card preview,
 // validation, token-gated save, backup-aware status, and a quick-add dialog.
 // All file-specific behavior is injected via props.
@@ -191,6 +423,8 @@ export default function ConfigEditor({
   reorderEntry = null,
   reorderGroup = null,
   moveToGroup = null,
+  reorderEntryTo = null,
+  reorderGroupTo = null,
   PreviewPanel = null,
 }) {
   const router = useRouter();
@@ -203,6 +437,8 @@ export default function ConfigEditor({
   const canMove = Boolean(reorderEntry);
   const canMoveGroup = Boolean(reorderGroup);
   const canMoveToGroup = Boolean(moveToGroup);
+  // Drag & drop (M5d) is opt-in via the index-based handlers.
+  const canDnd = Boolean(reorderEntryTo || reorderGroupTo);
   const apiUrl = `/api/config/raw/${configFile}`;
   const [content, setContent] = useState("");
   const [token, setToken] = useState("");
@@ -347,6 +583,34 @@ export default function ConfigEditor({
       }
     },
     [content, moveToGroup],
+  );
+
+  // Drag & drop: route the normalized move to the index-based helpers (editor only).
+  const onDnd = useCallback(
+    (move) => {
+      try {
+        if (move.kind === "group" && reorderGroupTo) {
+          setContent(reorderGroupTo(content, { group: move.group }, move.toIndex));
+        } else if (move.kind === "entry" && reorderEntryTo) {
+          setContent(
+            reorderEntryTo(content, { group: move.group, name: move.entry.name, entry: move.entry }, move.toIndex),
+          );
+        } else if (move.kind === "entryToGroup" && moveToGroup) {
+          setContent(
+            moveToGroup(content, {
+              fromGroup: move.fromGroup,
+              entry: move.entry,
+              toGroup: move.toGroup,
+              toIndex: move.toIndex,
+            }),
+          );
+          setStatus({ type: "info", message: `Moved "${move.entry.name}" to "${move.toGroup}" — review and Save.` });
+        }
+      } catch (e) {
+        setStatus({ type: "error", message: `Move failed — ${e.message}` });
+      }
+    },
+    [content, reorderEntryTo, reorderGroupTo, moveToGroup],
   );
 
   const onSave = useCallback(async () => {
@@ -505,6 +769,20 @@ export default function ConfigEditor({
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
                     {PreviewPanel ? (
                       <PreviewPanel content={content} setContent={setContent} setStatus={setStatus} />
+                    ) : canDnd && !placeholderBlocked ? (
+                      <DndPreview
+                        content={content}
+                        parse={parse}
+                        Card={Card}
+                        gridClassName={gridClassName}
+                        onEdit={showEdit ? onEditEntry : undefined}
+                        onDelete={showDelete ? onDeleteEntry : undefined}
+                        onMoveEntry={showMove ? onMoveEntry : undefined}
+                        onMoveGroup={showMoveGroup ? onMoveGroup : undefined}
+                        onMoveToGroup={showMoveToGroup ? onMoveToGroup : undefined}
+                        onDnd={onDnd}
+                        canDragGroup={Boolean(reorderGroupTo) && !placeholderBlocked}
+                      />
                     ) : (
                       <Preview
                         content={content}

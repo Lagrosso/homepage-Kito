@@ -8,7 +8,9 @@ import {
   deleteBookmarkEntry,
   moveEntryInGroup,
   moveEntryToGroup,
+  moveEntryToIndex,
   moveGroup,
+  moveGroupToIndex,
   updateBookmarkEntry,
 } from "utils/config/yaml-edit";
 import { insertBookmark } from "utils/config/yaml-insert";
@@ -256,8 +258,13 @@ function BookmarkEditDialog(props) {
 }
 
 // Map the shell's move-to-group locator ({ entry }) onto the name-based helper.
-const moveBookmarkToGroup = (raw, { fromGroup, entry, toGroup }) =>
-  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup });
+// `toIndex` (drag & drop) inserts at that position; without it the helper appends.
+const moveBookmarkToGroup = (raw, { fromGroup, entry, toGroup, toIndex }) =>
+  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup, toIndex });
+
+// Drag & drop adapters (arbitrary target index).
+const reorderBookmarkTo = (raw, { group, name }, toIndex) => moveEntryToIndex(raw, { group, name }, toIndex);
+const reorderBookmarkGroupTo = (raw, { group }, toIndex) => moveGroupToIndex(raw, { group }, toIndex);
 
 export default function AdminBookmarksConfig() {
   return (
@@ -275,6 +282,8 @@ export default function AdminBookmarksConfig() {
       reorderEntry={moveEntryInGroup}
       reorderGroup={moveGroup}
       moveToGroup={moveBookmarkToGroup}
+      reorderEntryTo={reorderBookmarkTo}
+      reorderGroupTo={reorderBookmarkGroupTo}
     />
   );
 }

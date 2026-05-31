@@ -328,9 +328,10 @@ export function moveGroup(rawText, { group }, direction) {
   return doc.toString();
 }
 
-// Move an entry out of `fromGroup` and onto the END of `toGroup` (both must
-// exist). Services & bookmarks. v1: appends, no chosen target index.
-export function moveEntryToGroup(rawText, { fromGroup, name, toGroup }) {
+// Move an entry out of `fromGroup` into `toGroup` (both must exist). Services &
+// bookmarks. With `toIndex` it inserts at that position (drag & drop, M5d);
+// without it appends to the end (button move, M5c).
+export function moveEntryToGroup(rawText, { fromGroup, name, toGroup, toIndex }) {
   if (!toGroup || fromGroup === toGroup) {
     return rawText ?? "";
   }
@@ -344,7 +345,11 @@ export function moveEntryToGroup(rawText, { fromGroup, name, toGroup }) {
   // A previously-emptied group serializes as flow `[]`; force block style so the
   // moved entry renders as a normal block list item, not inline `[ { … } ]`.
   toSeq.flow = false;
-  toSeq.items.push(node);
+  if (typeof toIndex === "number" && toIndex >= 0 && toIndex <= toSeq.items.length) {
+    toSeq.items.splice(toIndex, 0, node);
+  } else {
+    toSeq.items.push(node);
+  }
   return doc.toString();
 }
 
@@ -356,6 +361,53 @@ export function moveWidget(rawText, { index }, direction) {
     throw new Error(`Widget #${index} not found`);
   }
   swapInArray(top.items, index, direction);
+  return doc.toString();
+}
+
+// --- arbitrary index moves (drag & drop, M5d) -----------------------------
+// Move an item to an arbitrary index inside an array (dnd-kit arrayMove
+// semantics: remove `from`, then insert at `to`). Returns true if it ran.
+function arrayMoveInPlace(arr, from, to) {
+  if (from < 0 || from >= arr.length) {
+    return false;
+  }
+  const [node] = arr.splice(from, 1);
+  const dest = to < 0 ? arr.length + to : Math.min(to, arr.length);
+  arr.splice(dest, 0, node);
+  return true;
+}
+
+// Move an entry to an arbitrary index within its own group.
+export function moveEntryToIndex(rawText, { group, name }, toIndex) {
+  const doc = parseConfigDoc(rawText);
+  const { groupSeq, index } = locate(doc, group, name);
+  arrayMoveInPlace(groupSeq.items, index, toIndex);
+  return doc.toString();
+}
+
+// Move a top-level group to an arbitrary index.
+export function moveGroupToIndex(rawText, { group }, toIndex) {
+  const doc = parseConfigDoc(rawText);
+  const top = doc.contents;
+  if (!isSeq(top)) {
+    throw new Error("Config is not a list of groups");
+  }
+  const index = findGroupIndex(doc, group);
+  if (index === -1) {
+    throw new Error(`Group "${group}" not found`);
+  }
+  arrayMoveInPlace(top.items, index, toIndex);
+  return doc.toString();
+}
+
+// Move a widget to an arbitrary index in the flat widgets list.
+export function moveWidgetToIndex(rawText, { index }, toIndex) {
+  const doc = parseConfigDoc(rawText);
+  const top = doc.contents;
+  if (!isSeq(top) || !top.items[index]) {
+    throw new Error(`Widget #${index} not found`);
+  }
+  arrayMoveInPlace(top.items, index, toIndex);
   return doc.toString();
 }
 

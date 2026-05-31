@@ -11,8 +11,11 @@ import {
   hasBarePlaceholder,
   moveEntryInGroup,
   moveEntryToGroup,
+  moveEntryToIndex,
   moveGroup,
+  moveGroupToIndex,
   moveWidget,
+  moveWidgetToIndex,
   renameTab,
   setGroupLayoutField,
   updateBookmarkEntry,
@@ -361,6 +364,61 @@ describe("moveWidget", () => {
   it("is a no-op at the boundary", () => {
     const out = moveWidget(WIDGETS, { index: 0 }, "up");
     expect(out.indexOf("- resources:")).toBeLessThan(out.indexOf("- search:"));
+  });
+});
+
+// --- arbitrary index moves (drag & drop, M5d) -----------------------------
+describe("moveEntryToIndex", () => {
+  it("moves an entry to an arbitrary index within its group", () => {
+    const out = moveEntryToIndex(SRC, { group: "My First Group", name: "My First Service" }, 1);
+    expect(out.indexOf("- Embedded:")).toBeLessThan(out.indexOf("- My First Service:"));
+    expect(out).toContain("# For configuration options and examples, please see:");
+    expect(out).toContain('icon: "{{HOMEPAGE_FILE_ICON}}"'); // placeholders intact
+    expect(() => yaml.load(out)).not.toThrow();
+  });
+
+  it("clamps an out-of-range index to the end", () => {
+    const out = moveEntryToIndex(SRC, { group: "My First Group", name: "My First Service" }, 99);
+    expect(out.indexOf("- Embedded:")).toBeLessThan(out.indexOf("- My First Service:"));
+  });
+
+  it("refuses a file with a bare placeholder", () => {
+    const bare = "- G:\n    - A:\n        href: {{HOMEPAGE_VAR_X}}\n";
+    expect(() => moveEntryToIndex(bare, { group: "G", name: "A" }, 0)).toThrow(/unquoted/i);
+  });
+});
+
+describe("moveGroupToIndex", () => {
+  it("moves a group to an arbitrary index", () => {
+    const out = moveGroupToIndex(SRC, { group: "My Second Group" }, 0);
+    expect(out.indexOf("- My Second Group:")).toBeLessThan(out.indexOf("- My First Group:"));
+    expect(out).toContain("ping: 8.8.8.8"); // entries preserved
+  });
+
+  it("throws for an unknown group", () => {
+    expect(() => moveGroupToIndex(SRC, { group: "Nope" }, 0)).toThrow(/not found/i);
+  });
+});
+
+describe("moveWidgetToIndex", () => {
+  it("moves a widget to an arbitrary index and keeps secrets byte-identical", () => {
+    const out = moveWidgetToIndex(WIDGETS, { index: 0 }, 1);
+    expect(out.indexOf("- search:")).toBeLessThan(out.indexOf("- resources:"));
+    expect(out).toContain("password: super-secret");
+  });
+});
+
+describe("moveEntryToGroup with toIndex", () => {
+  it("inserts the moved entry at the chosen position in the target group", () => {
+    const out = moveEntryToGroup(SRC, {
+      fromGroup: "My First Group",
+      name: "Embedded",
+      toGroup: "My Second Group",
+      toIndex: 0,
+    });
+    expect(out.indexOf("- Embedded:")).toBeLessThan(out.indexOf("- My Second Service:"));
+    expect((out.match(/- Embedded:/g) || []).length).toBe(1);
+    expect(() => yaml.load(out)).not.toThrow();
   });
 });
 
