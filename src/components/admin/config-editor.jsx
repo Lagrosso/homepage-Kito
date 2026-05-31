@@ -1,18 +1,22 @@
 import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
 
-// Tabs shown in the editor header so the two config files cross-link.
+// Tabs shown in the editor header so the config pages cross-link. The active tab
+// is matched by route (href), so /admin/layout and /admin/settings stay distinct
+// even though both edit settings.yaml.
 const CONFIG_TABS = [
-  { file: "services.yaml", label: "Services", href: "/admin/config" },
-  { file: "bookmarks.yaml", label: "Bookmarks", href: "/admin/bookmarks" },
-  { file: "widgets.yaml", label: "Widgets", href: "/admin/widgets" },
-  { file: "settings.yaml", label: "Settings", href: "/admin/settings" },
+  { label: "Services", href: "/admin/config" },
+  { label: "Bookmarks", href: "/admin/bookmarks" },
+  { label: "Widgets", href: "/admin/widgets" },
+  { label: "Settings", href: "/admin/settings" },
+  { label: "Layout", href: "/admin/layout" },
 ];
 
 // Parse a YAML error into a readable line/column message. Shared by every
@@ -187,7 +191,9 @@ export default function ConfigEditor({
   reorderEntry = null,
   reorderGroup = null,
   moveToGroup = null,
+  PreviewPanel = null,
 }) {
+  const router = useRouter();
   // Quick-add is optional: a config (e.g. widgets.yaml) may ship preview-only.
   const canAdd = Boolean(AddDialog && insert);
   // Structured edit/delete are opt-in per config file (services.yaml first).
@@ -401,10 +407,10 @@ export default function ConfigEditor({
           <nav className="flex gap-2 mb-4">
             {CONFIG_TABS.map((tab) => (
               <Link
-                key={tab.file}
+                key={tab.href}
                 href={tab.href}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  tab.file === configFile
+                  tab.href === router.pathname
                     ? "bg-blue-600 text-white"
                     : "bg-theme-200 dark:bg-theme-700 hover:bg-theme-300 dark:hover:bg-theme-600"
                 }`}
@@ -476,19 +482,23 @@ export default function ConfigEditor({
                   />
                 </div>
                 <div>
-                  <span className="block text-sm font-medium mb-1">Preview (read-only)</span>
+                  <span className="block text-sm font-medium mb-1">{PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}</span>
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
-                    <Preview
-                      content={content}
-                      parse={parse}
-                      Card={Card}
-                      gridClassName={gridClassName}
-                      onEdit={showEdit ? onEditEntry : undefined}
-                      onDelete={showDelete ? onDeleteEntry : undefined}
-                      onMoveEntry={showMove ? onMoveEntry : undefined}
-                      onMoveGroup={showMoveGroup ? onMoveGroup : undefined}
-                      onMoveToGroup={showMoveToGroup ? onMoveToGroup : undefined}
-                    />
+                    {PreviewPanel ? (
+                      <PreviewPanel content={content} setContent={setContent} setStatus={setStatus} />
+                    ) : (
+                      <Preview
+                        content={content}
+                        parse={parse}
+                        Card={Card}
+                        gridClassName={gridClassName}
+                        onEdit={showEdit ? onEditEntry : undefined}
+                        onDelete={showDelete ? onDeleteEntry : undefined}
+                        onMoveEntry={showMove ? onMoveEntry : undefined}
+                        onMoveGroup={showMoveGroup ? onMoveGroup : undefined}
+                        onMoveToGroup={showMoveToGroup ? onMoveToGroup : undefined}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

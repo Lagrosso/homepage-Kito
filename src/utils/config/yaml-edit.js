@@ -358,3 +358,149 @@ export function moveWidget(rawText, { index }, direction) {
   swapInArray(top.items, index, direction);
   return doc.toString();
 }
+
+// --- settings.yaml `layout:` / tabs (M6) ----------------------------------
+// Tabs are derived from settings.yaml `layout[group].tab`. The `layout` block can
+// be a YAML list (`- Group: {…}`, ordered, preferred), an object (`Group: {…}`) or
+// absent. These helpers edit it in place (comment-preserving); the existing form
+// is kept, a freshly created block is written as a block list.
+
+// The per-group "name → options" pairs of the layout block, regardless of form.
+function layoutPairs(layout) {
+  if (isSeq(layout)) {
+    return layout.items.filter((it) => isMap(it) && it.items.length > 0).map((it) => it.items[0]);
+  }
+  if (isMap(layout)) {
+    return layout.items;
+  }
+  return [];
+}
+
+// Drop group entries whose options became empty (e.g. after clearing the only tab),
+// so settings.yaml doesn't accumulate dangling `- Group: {}` items.
+function pruneEmptyLayoutEntries(layout) {
+  const isEmptyOpts = (v) => !isMap(v) || v.items.length === 0;
+  if (isSeq(layout)) {
+    for (let i = layout.items.length - 1; i >= 0; i -= 1) {
+      const it = layout.items[i];
+      if (isMap(it) && it.items.length > 0 && isEmptyOpts(it.items[0].value)) {
+        layout.items.splice(i, 1);
+      }
+    }
+  } else if (isMap(layout)) {
+    for (let i = layout.items.length - 1; i >= 0; i -= 1) {
+      if (isEmptyOpts(layout.items[i].value)) {
+        layout.items.splice(i, 1);
+      }
+    }
+  }
+}
+
+// Assign a group to a tab (empty `tab` = remove the tab → group falls back to the
+// default view). Creates the layout block / group entry as needed. Returns new raw.
+export function assignGroupToTab(rawText, { group, tab }) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const value = typeof tab === "string" ? tab.trim() : "";
+
+  let layout = root.get("layout", true);
+  const pair = layoutPairs(layout).find((p) => String(p.key) === group) ?? null;
+
+  if (!pair) {
+    if (value === "") {
+      return doc.toString(); // group has no entry and stays unassigned: nothing to do
+    }
+    if (!isSeq(layout) && !isMap(layout)) {
+      layout = doc.createNode([]);
+      layout.flow = false;
+      root.set("layout", layout);
+    }
+    let created;
+    if (isSeq(layout)) {
+      const item = doc.createNode({ [group]: null });
+      item.flow = false;
+      layout.items.push(item);
+      created = item.items[0];
+    } else {
+      layout.set(group, null);
+      created = layout.items[layout.items.length - 1];
+    }
+    const opts = doc.createNode({});
+    opts.flow = false;
+    created.value = opts;
+    opts.set("tab", value);
+    return doc.toString();
+  }
+
+  // Group entry exists.
+  if (!isMap(pair.value)) {
+    if (value === "") {
+      return doc.toString();
+    }
+    const opts = doc.createNode({});
+    opts.flow = false;
+    pair.value = opts;
+  }
+  const opts = pair.value;
+  if (value === "") {
+    opts.delete("tab");
+    pruneEmptyLayoutEntries(layout);
+  } else {
+    const existing = opts.get("tab", true);
+    if (isScalar(existing)) {
+      existing.value = value;
+    } else {
+      opts.set("tab", value);
+    }
+  }
+  return doc.toString();
+}
+
+// Rename a tab: every layout group whose `tab` equals `from` is set to `to`.
+export function renameTab(rawText, { from, to }) {
+  const doc = parseConfigDoc(rawText);
+  const layout = doc.contents?.get("layout", true);
+  const target = typeof to === "string" ? to.trim() : "";
+  if (!target) {
+    throw new Error("New tab name is required");
+  }
+  let changed = 0;
+  layoutPairs(layout).forEach((p) => {
+    if (isMap(p.value)) {
+      const tabNode = p.value.get("tab", true);
+      if (isScalar(tabNode) && String(tabNode.value) === from) {
+        tabNode.value = target;
+        changed += 1;
+      }
+    }
+  });
+  if (changed === 0) {
+    throw new Error(`Tab "${from}" not found`);
+  }
+  return doc.toString();
+}
+
+// Delete a tab: remove the `tab` key from every group that used it (groups stay,
+// falling back to the default view). Empty group entries are pruned.
+export function deleteTab(rawText, { tab }) {
+  const doc = parseConfigDoc(rawText);
+  const layout = doc.contents?.get("layout", true);
+  let changed = 0;
+  layoutPairs(layout).forEach((p) => {
+    if (isMap(p.value)) {
+      const tabNode = p.value.get("tab", true);
+      if (isScalar(tabNode) && String(tabNode.value) === tab) {
+        p.value.delete("tab");
+        changed += 1;
+      }
+    }
+  });
+  if (changed === 0) {
+    throw new Error(`Tab "${tab}" not found`);
+  }
+  pruneEmptyLayoutEntries(layout);
+  return doc.toString();
+}

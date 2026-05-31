@@ -2,15 +2,18 @@ import yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import {
+  assignGroupToTab,
   deleteBookmarkEntry,
   deleteServiceEntry,
   deleteSetting,
+  deleteTab,
   deleteWidget,
   hasBarePlaceholder,
   moveEntryInGroup,
   moveEntryToGroup,
   moveGroup,
   moveWidget,
+  renameTab,
   updateBookmarkEntry,
   updateServiceEntry,
   updateSetting,
@@ -357,5 +360,115 @@ describe("moveWidget", () => {
   it("is a no-op at the boundary", () => {
     const out = moveWidget(WIDGETS, { index: 0 }, "up");
     expect(out.indexOf("- resources:")).toBeLessThan(out.indexOf("- search:"));
+  });
+});
+
+// --- settings.yaml layout / tabs (M6) -------------------------------------
+const SETTINGS_NO_LAYOUT = `---
+# settings
+title: My Homepage
+providers:
+  openweathermap: key
+`;
+
+const SETTINGS_LIST = `---
+# settings
+title: Home
+layout:
+  - Media:
+      tab: Apps
+  - Admin:
+      tab: Ops
+`;
+
+const SETTINGS_OBJ = `---
+layout:
+  Media:
+    tab: Apps
+`;
+
+describe("assignGroupToTab", () => {
+  it("creates a block-list layout when none exists", () => {
+    const out = assignGroupToTab(SETTINGS_NO_LAYOUT, { group: "Media", tab: "Apps" });
+    expect(out).toContain("# settings"); // comment preserved
+    const data = yaml.load(out);
+    expect(Array.isArray(data.layout)).toBe(true);
+    expect(data.layout[0].Media.tab).toBe("Apps");
+    expect(out).not.toMatch(/layout:\s*\[/); // block, not flow
+  });
+
+  it("sets the tab on an existing group (list form)", () => {
+    const out = assignGroupToTab(SETTINGS_LIST, { group: "Media", tab: "Medien" });
+    expect(yaml.load(out).layout.find((i) => i.Media)?.Media.tab).toBe("Medien");
+  });
+
+  it("clearing the tab prunes a now-empty entry", () => {
+    const out = assignGroupToTab(SETTINGS_LIST, { group: "Admin", tab: "" });
+    const data = yaml.load(out);
+    expect(data.layout.some((i) => i.Admin)).toBe(false);
+    expect(data.layout.some((i) => i.Media)).toBe(true);
+  });
+
+  it("keeps object form when the layout is an object", () => {
+    const out = assignGroupToTab(SETTINGS_OBJ, { group: "Admin", tab: "Ops" });
+    const data = yaml.load(out);
+    expect(Array.isArray(data.layout)).toBe(false);
+    expect(data.layout.Admin.tab).toBe("Ops");
+    expect(data.layout.Media.tab).toBe("Apps");
+  });
+
+  it("refuses when a bare placeholder is present", () => {
+    const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
+    expect(() => assignGroupToTab(bare, { group: "A", tab: "B" })).toThrow(/unquoted/i);
+  });
+});
+
+describe("renameTab", () => {
+  it("renames the tab across all matching groups and keeps comments", () => {
+    const src = `---
+# settings
+layout:
+  - Media:
+      tab: Apps
+  - More:
+      tab: Apps
+  - Admin:
+      tab: Ops
+`;
+    const out = renameTab(src, { from: "Apps", to: "Medien" });
+    const data = yaml.load(out);
+    expect(data.layout.find((i) => i.Media).Media.tab).toBe("Medien");
+    expect(data.layout.find((i) => i.More).More.tab).toBe("Medien");
+    expect(data.layout.find((i) => i.Admin).Admin.tab).toBe("Ops");
+    expect(out).toContain("# settings");
+  });
+
+  it("throws for an unknown tab", () => {
+    expect(() => renameTab(SETTINGS_LIST, { from: "Nope", to: "X" })).toThrow(/not found/i);
+  });
+});
+
+describe("deleteTab", () => {
+  it("removes the tab key and prunes emptied entries", () => {
+    const out = deleteTab(SETTINGS_LIST, { tab: "Ops" });
+    const data = yaml.load(out);
+    expect(data.layout.some((i) => i.Admin)).toBe(false); // Admin had only the tab → pruned
+    expect(data.layout.find((i) => i.Media).Media.tab).toBe("Apps");
+  });
+
+  it("keeps a group that has other layout options", () => {
+    const src = `layout:
+  - Media:
+      tab: Apps
+      style: row
+`;
+    const out = deleteTab(src, { tab: "Apps" });
+    const data = yaml.load(out);
+    expect(data.layout[0].Media.tab).toBeUndefined();
+    expect(data.layout[0].Media.style).toBe("row");
+  });
+
+  it("throws for an unknown tab", () => {
+    expect(() => deleteTab(SETTINGS_LIST, { tab: "Nope" })).toThrow(/not found/i);
   });
 });
