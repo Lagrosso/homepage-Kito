@@ -277,3 +277,84 @@ export function deleteSetting(rawText, { key }) {
   map.delete(key);
   return doc.toString();
 }
+
+// --- reordering / moving (M5c) --------------------------------------------
+// All swaps operate on the YAMLSeq `items` arrays; nodes carry their own
+// comments, so reordering keeps inline comments with the moved entry/group.
+
+// Index of a top-level group `{ GroupName: [...] }` in the document sequence.
+function findGroupIndex(doc, groupName) {
+  const top = doc.contents;
+  if (!isSeq(top)) {
+    return -1;
+  }
+  return top.items.findIndex(
+    (item) => isMap(item) && item.items.length > 0 && String(item.items[0].key) === groupName,
+  );
+}
+
+// Swap two entries of a (local) items array. `up`/`down` out of range = no-op.
+function swapInArray(arr, index, direction) {
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= arr.length) {
+    return false;
+  }
+  const tmp = arr[index];
+  arr[index] = arr[target];
+  arr[target] = tmp;
+  return true;
+}
+
+// Move an entry up/down within its group (services & bookmarks share structure).
+export function moveEntryInGroup(rawText, { group, name }, direction) {
+  const doc = parseConfigDoc(rawText);
+  const { groupSeq, index } = locate(doc, group, name);
+  swapInArray(groupSeq.items, index, direction);
+  return doc.toString();
+}
+
+// Move a whole group up/down at the top level (services & bookmarks).
+export function moveGroup(rawText, { group }, direction) {
+  const doc = parseConfigDoc(rawText);
+  const top = doc.contents;
+  if (!isSeq(top)) {
+    throw new Error("Config is not a list of groups");
+  }
+  const index = findGroupIndex(doc, group);
+  if (index === -1) {
+    throw new Error(`Group "${group}" not found`);
+  }
+  swapInArray(top.items, index, direction);
+  return doc.toString();
+}
+
+// Move an entry out of `fromGroup` and onto the END of `toGroup` (both must
+// exist). Services & bookmarks. v1: appends, no chosen target index.
+export function moveEntryToGroup(rawText, { fromGroup, name, toGroup }) {
+  if (!toGroup || fromGroup === toGroup) {
+    return rawText ?? "";
+  }
+  const doc = parseConfigDoc(rawText);
+  const { groupSeq: fromSeq, index } = locate(doc, fromGroup, name);
+  const toSeq = findGroupSeq(doc, toGroup);
+  if (!toSeq) {
+    throw new Error(`Group "${toGroup}" not found`);
+  }
+  const [node] = fromSeq.items.splice(index, 1);
+  // A previously-emptied group serializes as flow `[]`; force block style so the
+  // moved entry renders as a normal block list item, not inline `[ { … } ]`.
+  toSeq.flow = false;
+  toSeq.items.push(node);
+  return doc.toString();
+}
+
+// Move a widget up/down in the flat widgets list (by index).
+export function moveWidget(rawText, { index }, direction) {
+  const doc = parseConfigDoc(rawText);
+  const top = doc.contents;
+  if (!isSeq(top) || !top.items[index]) {
+    throw new Error(`Widget #${index} not found`);
+  }
+  swapInArray(top.items, index, direction);
+  return doc.toString();
+}

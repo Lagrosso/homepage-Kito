@@ -4,7 +4,13 @@ import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
 import { MdDelete, MdEdit } from "react-icons/md";
-import { deleteBookmarkEntry, updateBookmarkEntry } from "utils/config/yaml-edit";
+import {
+  deleteBookmarkEntry,
+  moveEntryInGroup,
+  moveEntryToGroup,
+  moveGroup,
+  updateBookmarkEntry,
+} from "utils/config/yaml-edit";
 import { insertBookmark } from "utils/config/yaml-insert";
 
 // Parse bookmarks.yaml into groups of card props for the read-only preview.
@@ -249,6 +255,10 @@ function BookmarkEditDialog(props) {
   return <BookmarkFormDialog mode="edit" {...props} />;
 }
 
+// Map the shell's move-to-group locator ({ entry }) onto the name-based helper.
+const moveBookmarkToGroup = (raw, { fromGroup, entry, toGroup }) =>
+  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup });
+
 export default function AdminBookmarksConfig() {
   return (
     <ConfigEditor
@@ -262,6 +272,9 @@ export default function AdminBookmarksConfig() {
       EditDialog={BookmarkEditDialog}
       editEntry={updateBookmarkEntry}
       deleteEntry={deleteBookmarkEntry}
+      reorderEntry={moveEntryInGroup}
+      reorderGroup={moveGroup}
+      moveToGroup={moveBookmarkToGroup}
     />
   );
 }

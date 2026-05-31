@@ -2,7 +2,7 @@ import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MdHome } from "react-icons/md";
+import { MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
@@ -50,7 +50,23 @@ export function Field({ label, required, children }) {
   );
 }
 
-function Preview({ content, parse, Card, gridClassName, onEdit, onDelete }) {
+// Small up/down arrow button used by the reorder controls.
+function MoveBtn({ dir, disabled, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="rounded p-0.5 text-theme-500 enabled:hover:text-theme-700 enabled:dark:hover:text-theme-200 enabled:hover:bg-theme-300/40 enabled:dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+      {dir === "up" ? <MdKeyboardArrowUp className="w-4 h-4" /> : <MdKeyboardArrowDown className="w-4 h-4" />}
+    </button>
+  );
+}
+
+function Preview({ content, parse, Card, gridClassName, onEdit, onDelete, onMoveEntry, onMoveGroup, onMoveToGroup }) {
   const result = useMemo(() => {
     try {
       return { groups: parse(content), error: null };
@@ -66,22 +82,84 @@ function Preview({ content, parse, Card, gridClassName, onEdit, onDelete }) {
     return <p className="text-sm text-theme-500">No groups found.</p>;
   }
 
+  const groupNames = result.groups.map((g) => g.name);
+
   return (
     <div className="flex flex-col gap-5">
-      {result.groups.map((group) => (
+      {result.groups.map((group, gi) => (
         <section key={group.name}>
-          <h3 className="text-theme-800 dark:text-theme-200 text-sm font-medium pb-2 mb-2 border-b border-theme-300 dark:border-theme-700">
-            {group.name}
-          </h3>
+          <div className="flex items-center gap-1 pb-2 mb-2 border-b border-theme-300 dark:border-theme-700">
+            <h3 className="flex-1 min-w-0 truncate text-theme-800 dark:text-theme-200 text-sm font-medium">
+              {group.name}
+            </h3>
+            {onMoveGroup && (
+              <>
+                <MoveBtn
+                  dir="up"
+                  disabled={gi === 0}
+                  onClick={() => onMoveGroup(group.name, "up")}
+                  label={`Move group ${group.name} up`}
+                />
+                <MoveBtn
+                  dir="down"
+                  disabled={gi === result.groups.length - 1}
+                  onClick={() => onMoveGroup(group.name, "down")}
+                  label={`Move group ${group.name} down`}
+                />
+              </>
+            )}
+          </div>
           <div className={gridClassName}>
-            {group.entries.map((entry) => (
-              <Card
-                key={entry.name}
-                entry={entry}
-                group={group.name}
-                onEdit={onEdit ? () => onEdit(group.name, entry) : undefined}
-                onDelete={onDelete ? () => onDelete(group.name, entry) : undefined}
-              />
+            {group.entries.map((entry, ei) => (
+              <div key={entry.name}>
+                <Card
+                  entry={entry}
+                  group={group.name}
+                  onEdit={onEdit ? () => onEdit(group.name, entry) : undefined}
+                  onDelete={onDelete ? () => onDelete(group.name, entry) : undefined}
+                />
+                {(onMoveEntry || onMoveToGroup) && (
+                  <div className="flex items-center gap-1 -mt-1 mb-2 pl-1">
+                    {onMoveEntry && (
+                      <>
+                        <MoveBtn
+                          dir="up"
+                          disabled={ei === 0}
+                          onClick={() => onMoveEntry(group.name, entry, "up")}
+                          label={`Move ${entry.name} up`}
+                        />
+                        <MoveBtn
+                          dir="down"
+                          disabled={ei === group.entries.length - 1}
+                          onClick={() => onMoveEntry(group.name, entry, "down")}
+                          label={`Move ${entry.name} down`}
+                        />
+                      </>
+                    )}
+                    {onMoveToGroup && groupNames.length > 1 && (
+                      <select
+                        aria-label={`Move ${entry.name} to another group`}
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            onMoveToGroup(group.name, entry, e.target.value);
+                          }
+                        }}
+                        className="ml-1 rounded border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 text-xs px-1 py-0.5 text-theme-600 dark:text-theme-300"
+                      >
+                        <option value="">→ Gruppe…</option>
+                        {groupNames
+                          .filter((g) => g !== group.name)
+                          .map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
           {group.entries.length === 0 && <p className="text-sm text-theme-500">No entries.</p>}
@@ -106,12 +184,19 @@ export default function ConfigEditor({
   EditDialog = null,
   editEntry = null,
   deleteEntry = null,
+  reorderEntry = null,
+  reorderGroup = null,
+  moveToGroup = null,
 }) {
   // Quick-add is optional: a config (e.g. widgets.yaml) may ship preview-only.
   const canAdd = Boolean(AddDialog && insert);
   // Structured edit/delete are opt-in per config file (services.yaml first).
   const canEdit = Boolean(EditDialog && editEntry);
   const canDelete = Boolean(deleteEntry);
+  // Reordering/moving is opt-in too (M5c).
+  const canMove = Boolean(reorderEntry);
+  const canMoveGroup = Boolean(reorderGroup);
+  const canMoveToGroup = Boolean(moveToGroup);
   const apiUrl = `/api/config/raw/${configFile}`;
   const [content, setContent] = useState("");
   const [token, setToken] = useState("");
@@ -155,6 +240,9 @@ export default function ConfigEditor({
   const placeholderBlocked = useMemo(() => hasBarePlaceholder(content), [content]);
   const showEdit = canEdit && !placeholderBlocked;
   const showDelete = canDelete && !placeholderBlocked;
+  const showMove = canMove && !placeholderBlocked;
+  const showMoveGroup = canMoveGroup && !placeholderBlocked;
+  const showMoveToGroup = canMoveToGroup && !placeholderBlocked;
 
   const onTokenChange = useCallback((value) => {
     setToken(value);
@@ -218,6 +306,41 @@ export default function ConfigEditor({
       }
     },
     [content, deleteEntry],
+  );
+
+  // Reorder / move: mutate the editor text only; Save stays manual.
+  const onMoveEntry = useCallback(
+    (group, entry, direction) => {
+      try {
+        setContent(reorderEntry(content, { group, name: entry.name, entry }, direction));
+      } catch (e) {
+        setStatus({ type: "error", message: `Move failed — ${e.message}` });
+      }
+    },
+    [content, reorderEntry],
+  );
+
+  const onMoveGroup = useCallback(
+    (group, direction) => {
+      try {
+        setContent(reorderGroup(content, { group }, direction));
+      } catch (e) {
+        setStatus({ type: "error", message: `Move failed — ${e.message}` });
+      }
+    },
+    [content, reorderGroup],
+  );
+
+  const onMoveToGroup = useCallback(
+    (group, entry, toGroup) => {
+      try {
+        setContent(moveToGroup(content, { fromGroup: group, entry, toGroup }));
+        setStatus({ type: "info", message: `Moved "${entry.name}" to "${toGroup}" — review and Save.` });
+      } catch (e) {
+        setStatus({ type: "error", message: `Move failed — ${e.message}` });
+      }
+    },
+    [content, moveToGroup],
   );
 
   const onSave = useCallback(async () => {
@@ -320,7 +443,7 @@ export default function ConfigEditor({
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
 
-              {(canEdit || canDelete) && placeholderBlocked && (
+              {(canEdit || canDelete || canMove) && placeholderBlocked && (
                 <div className="mb-3 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-3 text-xs">
                   Structured edit/delete is disabled because this file contains an unquoted{" "}
                   <code>{"{{HOMEPAGE_*}}"}</code> placeholder (it can&apos;t be round-tripped safely). Use the raw YAML
@@ -362,6 +485,9 @@ export default function ConfigEditor({
                       gridClassName={gridClassName}
                       onEdit={showEdit ? onEditEntry : undefined}
                       onDelete={showDelete ? onDeleteEntry : undefined}
+                      onMoveEntry={showMove ? onMoveEntry : undefined}
+                      onMoveGroup={showMoveGroup ? onMoveGroup : undefined}
+                      onMoveToGroup={showMoveToGroup ? onMoveToGroup : undefined}
                     />
                   </div>
                 </div>

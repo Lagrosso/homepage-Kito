@@ -4,7 +4,13 @@ import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
 import { MdDelete, MdEdit } from "react-icons/md";
-import { deleteServiceEntry, updateServiceEntry } from "utils/config/yaml-edit";
+import {
+  deleteServiceEntry,
+  moveEntryInGroup,
+  moveEntryToGroup,
+  moveGroup,
+  updateServiceEntry,
+} from "utils/config/yaml-edit";
 import { insertService } from "utils/config/yaml-insert";
 
 // Parse services.yaml into groups of card props for the read-only preview.
@@ -278,6 +284,10 @@ function ServiceEditDialog(props) {
   return <ServiceFormDialog mode="edit" {...props} />;
 }
 
+// Map the shell's move-to-group locator ({ entry }) onto the name-based helper.
+const moveServiceToGroup = (raw, { fromGroup, entry, toGroup }) =>
+  moveEntryToGroup(raw, { fromGroup, name: entry.name, toGroup });
+
 export default function AdminServicesConfig() {
   return (
     <ConfigEditor
@@ -290,6 +300,9 @@ export default function AdminServicesConfig() {
       EditDialog={ServiceEditDialog}
       editEntry={updateServiceEntry}
       deleteEntry={deleteServiceEntry}
+      reorderEntry={moveEntryInGroup}
+      reorderGroup={moveGroup}
+      moveToGroup={moveServiceToGroup}
     />
   );
 }

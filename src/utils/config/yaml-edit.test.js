@@ -7,6 +7,10 @@ import {
   deleteSetting,
   deleteWidget,
   hasBarePlaceholder,
+  moveEntryInGroup,
+  moveEntryToGroup,
+  moveGroup,
+  moveWidget,
   updateBookmarkEntry,
   updateServiceEntry,
   updateSetting,
@@ -286,5 +290,72 @@ describe("deleteSetting", () => {
 
   it("throws for an unknown key", () => {
     expect(() => deleteSetting(SETTINGS, { key: "nope" })).toThrow(/not found/i);
+  });
+});
+
+// --- reordering / moving (M5c) --------------------------------------------
+describe("moveEntryInGroup", () => {
+  it("moves an entry up within its group and leaves other groups intact", () => {
+    const out = moveEntryInGroup(SRC, { group: "My First Group", name: "Embedded" }, "up");
+    expect(out.indexOf("- Embedded:")).toBeLessThan(out.indexOf("- My First Service:"));
+    expect(out).toContain("- My Second Service:");
+    expect(out).toContain("# For configuration options and examples, please see:");
+    expect(() => yaml.load(out)).not.toThrow();
+  });
+
+  it("is a no-op at the boundary", () => {
+    const out = moveEntryInGroup(SRC, { group: "My First Group", name: "My First Service" }, "up");
+    expect(out.indexOf("- My First Service:")).toBeLessThan(out.indexOf("- Embedded:"));
+  });
+});
+
+describe("moveGroup", () => {
+  it("reorders whole groups", () => {
+    const out = moveGroup(SRC, { group: "My Second Group" }, "up");
+    expect(out.indexOf("- My Second Group:")).toBeLessThan(out.indexOf("- My First Group:"));
+    expect(out).toContain("ping: 8.8.8.8"); // entries preserved
+  });
+});
+
+describe("moveEntryToGroup", () => {
+  it("moves an entry to the end of another group with its props/placeholders", () => {
+    const out = moveEntryToGroup(SRC, { fromGroup: "My First Group", name: "Embedded", toGroup: "My Second Group" });
+    expect(out.indexOf("- Embedded:")).toBeGreaterThan(out.indexOf("- My Second Service:"));
+    expect(out).toContain("href: http://{{HOMEPAGE_VAR_HOST}}:8080"); // placeholder preserved
+    expect((out.match(/- Embedded:/g) || []).length).toBe(1); // moved, not duplicated
+    expect(() => yaml.load(out)).not.toThrow();
+  });
+
+  it("throws when the target group is missing", () => {
+    expect(() =>
+      moveEntryToGroup(SRC, { fromGroup: "My First Group", name: "Embedded", toGroup: "Nope" }),
+    ).toThrow(/not found/i);
+  });
+
+  it("moves into a previously-emptied group as block style (not inline flow)", () => {
+    // Empty "My Second Group" first, then move an entry back into it.
+    const emptied = deleteServiceEntry(SRC, { group: "My Second Group", name: "My Second Service" });
+    expect(emptied).toContain("My Second Group: []"); // delete leaves an empty flow seq
+    const out = moveEntryToGroup(emptied, {
+      fromGroup: "My First Group",
+      name: "My First Service",
+      toGroup: "My Second Group",
+    });
+    expect(out).not.toMatch(/My Second Group:\s*\[/); // not inline flow
+    expect(out).toMatch(/- My Second Group:\n {4}- My First Service:/); // proper block entry
+    expect(() => yaml.load(out)).not.toThrow();
+  });
+});
+
+describe("moveWidget", () => {
+  it("swaps adjacent widgets by index and keeps secrets byte-identical", () => {
+    const out = moveWidget(WIDGETS, { index: 1 }, "up");
+    expect(out.indexOf("- search:")).toBeLessThan(out.indexOf("- resources:"));
+    expect(out).toContain("password: super-secret");
+  });
+
+  it("is a no-op at the boundary", () => {
+    const out = moveWidget(WIDGETS, { index: 0 }, "up");
+    expect(out.indexOf("- resources:")).toBeLessThan(out.indexOf("- search:"));
   });
 });
