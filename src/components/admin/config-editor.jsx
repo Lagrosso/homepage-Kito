@@ -719,38 +719,45 @@ export default function ConfigEditor({
       <Head>
         <title>{`Homepage - ${title}`}</title>
       </Head>
-      <div className="min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-800 dark:text-theme-200 p-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-900 dark:text-theme-100">
+        {/* Header */}
+        <header className="flex items-center justify-between px-4 py-3 border-b border-theme-200 dark:border-theme-700 bg-white dark:bg-theme-900">
+          <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 text-sm text-theme-500 hover:text-theme-700 dark:hover:text-theme-300"
+              aria-label="Dashboard"
+              className="flex items-center gap-1 text-theme-500 hover:text-theme-700 dark:hover:text-theme-200"
             >
-              <MdHome className="w-4 h-4" /> Dashboard
+              <MdHome className="w-5 h-5" />
             </Link>
-            <div className="flex items-center gap-2">
-              {currentUser && <span className="text-xs text-theme-500">{currentUser.username}</span>}
-              <LogoutButton className="inline-flex items-center gap-1 rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-1.5 text-xs font-medium hover:bg-theme-300 dark:hover:bg-theme-600 disabled:opacity-60" />
-            </div>
+            <span className="text-theme-300 dark:text-theme-600">/</span>
+            <span className="text-sm font-medium">{title}</span>
+            {currentUser && (
+              <span className="hidden sm:inline text-xs text-theme-400 ml-2">({currentUser.username})</span>
+            )}
           </div>
-          <h1 className="text-xl font-bold mb-1">{title}</h1>
-          <p className="text-sm text-theme-500 mb-3">Editing {configFile}</p>
+          <LogoutButton />
+        </header>
 
-          <nav className="flex gap-2 mb-4">
-            {CONFIG_TABS.map((tab) => (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  tab.href === router.pathname
-                    ? "bg-blue-600 text-white"
-                    : "bg-theme-200 dark:bg-theme-700 hover:bg-theme-300 dark:hover:bg-theme-600"
-                }`}
-              >
-                {tab.label}
-              </Link>
-            ))}
-          </nav>
+        {/* Nav tabs */}
+        <nav className="flex overflow-x-auto border-b border-theme-200 dark:border-theme-700 bg-white dark:bg-theme-900 px-2">
+          {CONFIG_TABS.map((tab) => (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                tab.href === router.pathname
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-theme-500 dark:text-theme-400 hover:text-theme-700 dark:hover:text-theme-200"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="mx-auto max-w-6xl px-4 py-6">
+          <p className="text-sm text-theme-500 mb-4">Editing {configFile}</p>
 
           {(authState === "checking" || loadState === "loading") && <p className="text-sm text-theme-500">Loading…</p>}
 
