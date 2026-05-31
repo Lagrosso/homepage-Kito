@@ -119,14 +119,14 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (geplant):** Echte Auth/Session statt statischem Token, optional Audit-Log; rollenbasierte Rechte – Nur-Lesen vs. Bearbeiten, granular pro Tab/Gruppe/Kachel; nur Admins dürfen Services & Co. bearbeiten.
    - **Migration weg vom Env-Gating:** Mit echter Auth werden die Env-Flags `HOMEPAGE_CONFIG_EDIT` und `HOMEPAGE_CONFIG_EDIT_TOKEN` **entfernt** — Zugriff/Schreibrecht wird dann über Rollen/Rechte gesteuert (nicht mehr über Env + statisches Token).
    - **Admin-Button rollenabhängig:** Der **Admin**-Button oben rechts im Dashboard-Header erscheint dann **nur für Admins** (statt über `GET /api/config/status` / Env-Flag); analog die Sichtbarkeit der `/admin/*`-Seiten.
-   - **Abgrenzung zu M10:** Reine **Ansichts-Profile** werden in M10 behandelt; echte per-User-Rechte und sicherheitsrelevante User-Bindung gehören hierher nach M7.
+   - **Abgrenzung zu M10:** Reine **Ansichts-Profile** werden in M10 behandelt; echte per-User-Rechte und sicherheitsrelevante User-Bindung gehören zu M7 und sind Voraussetzung für spätere Runtime-/Admin-Funktionen.
 8. **Meilenstein 8 – Theming, Branding & Custom UI (geplant):** Theming/Branding deutlich erweitern und `custom.css`/`custom.js` über die UI bearbeitbar machen. Geplante Teilbereiche:
    - **8a Theme-Presets:** einfache Auswahl per Buttons, z. B. rund/weich, kantig/technisch, Glasoptik/Blur, kompakt, minimal, OLED-Dark, Homelab-Neon.
    - **8b Hintergrundbild-Upload:** Hintergrundbilder über die UI hochladen/entfernen, optional Overlay, Abdunklung, Blur, Position und Skalierung einstellen; Speicherung kontrolliert unter `CONF_DIR`.
    - **8c Visueller Theme-Editor:** Akzentfarbe, Kartenradius, Rahmenstärke, Schatten, Transparenz, Blur-Stärke, Abstände und Kompaktheit über UI-Regler bearbeiten.
    - **8d Custom-CSS/JS-Editor:** `custom.css` und optional `custom.js` über die UI bearbeiten, mit Warnhinweisen, Validierung soweit sinnvoll und Backup/Restore.
    - **8e Theme Import/Export:** Themes exportieren/importieren, ohne Secrets oder lokale Pfade ungewollt offenzulegen.
-   - **8f Theme pro Benutzer:** Themes können pro benutzer induviduell sein und hinterlegt werden.
+   - **8f Theme pro Benutzer:** Themes können pro Benutzer individuell hinterlegt werden.
 
 #### Phase 1/2 – read-only, mit den Leitplanken vereinbar
 
@@ -180,7 +180,7 @@ Kleinere Beobachtung (kein Bug): Bookmark-Cards im 3-Spalten-Raster wirken auf b
 
 ## Vorgemerkte spätere Komfort-Features
 
-Ideen-Backlog für spätere Ausbaustufen (noch nicht eingeplant, nach Bedarf in die Roadmap zu überführen). Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
+Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Punkte sind inzwischen als Meilensteine in der Roadmap geführt; die Detail-Bullets bleiben als spätere Ausgestaltung erhalten. Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
 
 > **Hinweis:** Backup/Restore, Audit-Log, Import-Assistent, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation erhalten. Icon-/Favicon-Helfer bleibt weiterhin relevant für **M22**.
 
