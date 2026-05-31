@@ -1,13 +1,12 @@
 import Link from "next/link";
 import useSWR from "swr";
 
-// Small dashboard link to the config editor. Self-contained and gated: it asks
-// the server whether HOMEPAGE_CONFIG_EDIT is on and renders nothing otherwise,
-// so the default-off deployment is unaffected.
+// Small dashboard link to the config editor. Viewers can use the dashboard, but
+// only admins see links into the config UI.
 export default function ConfigEditorLink() {
-  const { data } = useSWR("/api/config/status");
+  const { data } = useSWR("/api/auth/me");
 
-  if (!data?.enabled) {
+  if (data?.user?.role !== "admin") {
     return null;
   }
 

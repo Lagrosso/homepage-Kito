@@ -15,6 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import LogoutButton from "components/admin/logout-button";
 import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
@@ -22,8 +23,6 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
-
-const TOKEN_STORAGE_KEY = "homepage-config-edit-token";
 
 // Tabs shown in the editor header so the config pages cross-link. The active tab
 // is matched by route (href), so /admin/layout and /admin/settings stay distinct
@@ -214,7 +213,19 @@ function DragHandle({ attributes, listeners, label }) {
   );
 }
 
-function SortableEntryCard({ id, group, entry, ei, count, Card, onEdit, onDelete, onMoveEntry, onMoveToGroup, groupNames }) {
+function SortableEntryCard({
+  id,
+  group,
+  entry,
+  ei,
+  count,
+  Card,
+  onEdit,
+  onDelete,
+  onMoveEntry,
+  onMoveToGroup,
+  groupNames,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : undefined };
   return (
@@ -229,7 +240,12 @@ function SortableEntryCard({ id, group, entry, ei, count, Card, onEdit, onDelete
         <DragHandle attributes={attributes} listeners={listeners} label={`Drag ${entry.name}`} />
         {onMoveEntry && (
           <>
-            <MoveBtn dir="up" disabled={ei === 0} onClick={() => onMoveEntry(group, entry, "up")} label={`Move ${entry.name} up`} />
+            <MoveBtn
+              dir="up"
+              disabled={ei === 0}
+              onClick={() => onMoveEntry(group, entry, "up")}
+              label={`Move ${entry.name} up`}
+            />
             <MoveBtn
               dir="down"
               disabled={ei === count - 1}
@@ -274,7 +290,12 @@ function SortableGroupSection({ gi, group, count, onMoveGroup, canDragGroup, chi
         <h3 className="flex-1 min-w-0 truncate text-theme-800 dark:text-theme-200 text-sm font-medium">{group}</h3>
         {onMoveGroup && (
           <>
-            <MoveBtn dir="up" disabled={gi === 0} onClick={() => onMoveGroup(group, "up")} label={`Move group ${group} up`} />
+            <MoveBtn
+              dir="up"
+              disabled={gi === 0}
+              onClick={() => onMoveGroup(group, "up")}
+              label={`Move group ${group} up`}
+            />
             <MoveBtn
               dir="down"
               disabled={gi === count - 1}
@@ -406,7 +427,7 @@ function DndPreview({
 }
 
 // Generic hybrid config editor: raw YAML editor + read-only card preview,
-// validation, token-gated save, backup-aware status, and a quick-add dialog.
+// validation, role-gated save, backup-aware status, and a quick-add dialog.
 // All file-specific behavior is injected via props.
 export default function ConfigEditor({
   configFile,
@@ -441,19 +462,60 @@ export default function ConfigEditor({
   const canDnd = Boolean(reorderEntryTo || reorderGroupTo);
   const apiUrl = `/api/config/raw/${configFile}`;
   const [content, setContent] = useState("");
-  const [token, setToken] = useState("");
+  const [authState, setAuthState] = useState("checking"); // checking | admin | denied
+  const [currentUser, setCurrentUser] = useState(null);
   const [loadState, setLoadState] = useState("loading"); // loading | ready | disabled | error
   const [status, setStatus] = useState(null); // { type: "success"|"error"|"info", message }
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null); // { group, entry } | null
 
   useEffect(() => {
-    setToken(localStorage.getItem(TOKEN_STORAGE_KEY) || "");
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.replace(`/login?next=${encodeURIComponent(router.asPath || "/admin/config")}`);
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Failed to check session (${res.status})`);
+        }
+        const data = await res.json();
+        if (data?.user?.role !== "admin") {
+          if (!cancelled) {
+            setAuthState("denied");
+          }
+          router.replace("/");
+          return;
+        }
+        if (!cancelled) {
+          setCurrentUser(data.user);
+          setAuthState("admin");
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setAuthState("denied");
+          setLoadState("error");
+          setStatus({ type: "error", message: e.message });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (authState !== "admin") {
+      return;
+    }
     fetch(apiUrl)
       .then(async (res) => {
-        if (res.status === 404) {
-          setLoadState("disabled");
-          return;
+        if (res.status === 401) {
+          throw new Error("Please log in again.");
+        }
+        if (res.status === 403) {
+          throw new Error("Admin role required.");
         }
         if (!res.ok) {
           throw new Error(`Failed to load config (${res.status})`);
@@ -466,7 +528,7 @@ export default function ConfigEditor({
         setLoadState("error");
         setStatus({ type: "error", message: e.message });
       });
-  }, [apiUrl]);
+  }, [apiUrl, authState]);
 
   // Group names for the quick-add datalist (best-effort; ignores parse errors).
   const existingGroups = useMemo(() => {
@@ -485,11 +547,6 @@ export default function ConfigEditor({
   const showMove = canMove && !placeholderBlocked;
   const showMoveGroup = canMoveGroup && !placeholderBlocked;
   const showMoveToGroup = canMoveToGroup && !placeholderBlocked;
-
-  const onTokenChange = useCallback((value) => {
-    setToken(value);
-    localStorage.setItem(TOKEN_STORAGE_KEY, value);
-  }, []);
 
   const onValidate = useCallback(() => {
     try {
@@ -628,7 +685,6 @@ export default function ConfigEditor({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ content }),
       });
@@ -636,7 +692,11 @@ export default function ConfigEditor({
       if (!res.ok) {
         const detail = data.detail
           ? `${data.detail.message}${data.detail.line ? ` (line ${data.detail.line}, column ${data.detail.column})` : ""}`
-          : data.error;
+          : res.status === 401
+            ? "Please log in again."
+            : res.status === 403
+              ? "Admin role required."
+              : data.error;
         setStatus({ type: "error", message: `Not saved — ${detail || `error ${res.status}`}` });
         return;
       }
@@ -647,7 +707,7 @@ export default function ConfigEditor({
     } catch (e) {
       setStatus({ type: "error", message: `Not saved — ${e.message}` });
     }
-  }, [apiUrl, content, token]);
+  }, [apiUrl, content]);
 
   const statusColor =
     status?.type === "error" ? "text-red-500" : status?.type === "success" ? "text-green-600" : "text-theme-500";
@@ -655,16 +715,22 @@ export default function ConfigEditor({
   return (
     <>
       <Head>
-        <title>Homepage — {title}</title>
+        <title>{`Homepage - ${title}`}</title>
       </Head>
       <div className="min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-800 dark:text-theme-200 p-6">
         <div className="mx-auto max-w-6xl">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-sm text-theme-500 hover:text-theme-700 dark:hover:text-theme-300 mb-3"
-          >
-            <MdHome className="w-4 h-4" /> Dashboard
-          </Link>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-sm text-theme-500 hover:text-theme-700 dark:hover:text-theme-300"
+            >
+              <MdHome className="w-4 h-4" /> Dashboard
+            </Link>
+            <div className="flex items-center gap-2">
+              {currentUser && <span className="text-xs text-theme-500">{currentUser.username}</span>}
+              <LogoutButton className="inline-flex items-center gap-1 rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-1.5 text-xs font-medium hover:bg-theme-300 dark:hover:bg-theme-600 disabled:opacity-60" />
+            </div>
+          </div>
           <h1 className="text-xl font-bold mb-1">{title}</h1>
           <p className="text-sm text-theme-500 mb-3">Editing {configFile}</p>
 
@@ -684,16 +750,13 @@ export default function ConfigEditor({
             ))}
           </nav>
 
-          {loadState === "disabled" && (
-            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-4 text-sm">
-              Config editing is disabled. Set <code>HOMEPAGE_CONFIG_EDIT=true</code> (and{" "}
-              <code>HOMEPAGE_CONFIG_EDIT_TOKEN</code> for saving) to enable this page.
-            </div>
+          {(authState === "checking" || loadState === "loading") && <p className="text-sm text-theme-500">Loading…</p>}
+
+          {authState === "denied" && loadState !== "error" && (
+            <p className="text-sm text-theme-500">Redirecting to a page available for your role…</p>
           )}
 
-          {loadState === "loading" && <p className="text-sm text-theme-500">Loading…</p>}
-
-          {loadState === "ready" && (
+          {authState === "admin" && loadState === "ready" && (
             <>
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 <button
@@ -710,27 +773,8 @@ export default function ConfigEditor({
                 >
                   Save
                 </button>
-                <label className="flex items-center gap-2 text-sm">
-                  <span className="text-theme-500">Token</span>
-                  <input
-                    type="password"
-                    value={token}
-                    onChange={(e) => onTokenChange(e.target.value)}
-                    placeholder="HOMEPAGE_CONFIG_EDIT_TOKEN"
-                    aria-label="Config edit token"
-                    className={`w-56 rounded-md border bg-white dark:bg-theme-800 px-3 py-2 font-mono text-xs ${
-                      token ? "border-theme-300 dark:border-theme-700" : "border-amber-400"
-                    }`}
-                  />
-                </label>
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
-              {!token && (
-                <p className="-mt-1 mb-3 text-xs text-amber-600 dark:text-amber-400">
-                  Saving requires the <code>HOMEPAGE_CONFIG_EDIT_TOKEN</code>. It is stored locally in your browser and
-                  sent only when saving.
-                </p>
-              )}
 
               {(canEdit || canDelete || canMove) && placeholderBlocked && (
                 <div className="mb-3 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-3 text-xs">
@@ -765,7 +809,9 @@ export default function ConfigEditor({
                   />
                 </div>
                 <div>
-                  <span className="block text-sm font-medium mb-1">{PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}</span>
+                  <span className="block text-sm font-medium mb-1">
+                    {PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}
+                  </span>
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
                     {PreviewPanel ? (
                       <PreviewPanel content={content} setContent={setContent} setStatus={setStatus} />

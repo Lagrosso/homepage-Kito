@@ -1,6 +1,48 @@
 import { NextResponse } from "next/server";
 
-export function middleware(req) {
+import { getSessionFromRequest, isAuthenticatedSession } from "utils/config/session";
+
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/setup",
+  "/favicon.ico",
+  "/homepage.ico",
+  "/apple-touch-icon.png",
+  "/favicon-16x16.png",
+  "/favicon-32x32.png",
+  "/android-chrome-192x192.png",
+  "/android-chrome-512x512.png",
+  "/mstile-70x70.png",
+  "/mstile-144x144.png",
+  "/mstile-150x150.png",
+  "/mstile-310x150.png",
+  "/mstile-310x310.png",
+  "/safari-pinned-tab.svg",
+  "/site.webmanifest",
+  "/browserconfig.xml",
+  "/robots.txt",
+]);
+
+function isPublicPath(pathname) {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/api/auth/");
+}
+
+function unauthorizedApi() {
+  return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+}
+
+function redirectToLogin(req) {
+  const url = req.nextUrl.clone();
+  const next = `${req.nextUrl.pathname}${req.nextUrl.search}`;
+  url.pathname = "/login";
+  url.search = "";
+  if (next && next !== "/login") {
+    url.searchParams.set("next", next);
+  }
+  return NextResponse.redirect(url);
+}
+
+export async function middleware(req) {
   // Check the Host header, if HOMEPAGE_ALLOWED_HOSTS is set
   const host = req.headers.get("host");
   const port = process.env.PORT || 3000;
@@ -15,9 +57,24 @@ export function middleware(req) {
     );
     return NextResponse.json({ error: "Host validation failed. See logs for more details." }, { status: 400 });
   }
-  return NextResponse.next();
+
+  const { pathname } = req.nextUrl;
+  if (isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  const res = NextResponse.next();
+  const session = await getSessionFromRequest(req, res);
+  if (isAuthenticatedSession(session)) {
+    return res;
+  }
+
+  if (pathname.startsWith("/api/")) {
+    return unauthorizedApi();
+  }
+  return redirectToLogin(req);
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/", "/((?!_next/static|_next/image).*)"],
 };

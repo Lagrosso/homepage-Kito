@@ -49,6 +49,10 @@ const AdminNavLink = dynamic(() => import("components/admin/admin-nav-link"), {
   ssr: false,
 });
 
+const LogoutButton = dynamic(() => import("components/admin/logout-button"), {
+  ssr: false,
+});
+
 const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime"];
 
 // Normalize language codes so older config values like zh-CN still point to Crowdin-provided ones
@@ -469,7 +473,10 @@ function Home({ initialSettings }) {
             <MdHome className="w-5 h-5" />
             <span className="hidden sm:inline">Home</span>
           </Link>
-          <AdminNavLink />
+          <div className="flex items-center gap-1">
+            <AdminNavLink />
+            <LogoutButton />
+          </div>
         </div>
         <div
           id="information-widgets"

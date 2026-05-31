@@ -1,13 +1,16 @@
-import { checkAdminToken, isConfigEditEnabled } from "utils/config/admin-auth";
 import { isEditableConfig, readRawConfig, writeRawConfig } from "utils/config/config-writer";
+import { getSession, isAdminSession, isAuthenticatedSession } from "utils/config/session";
 import createLogger from "utils/logger";
 
 const logger = createLogger("config-raw-api");
 
 export default async function handler(req, res) {
-  // Whole feature is gated behind the env flag; pretend it doesn't exist otherwise.
-  if (!isConfigEditEnabled()) {
-    return res.status(404).json({ error: "Config editing is disabled" });
+  const session = await getSession(req, res);
+  if (!isAuthenticatedSession(session)) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  if (!isAdminSession(session)) {
+    return res.status(403).json({ error: "Admin role required" });
   }
 
   const { file } = req.query;
@@ -26,10 +29,6 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    if (!checkAdminToken(req)) {
-      return res.status(401).json({ error: "Invalid or missing config edit token" });
-    }
-
     const { content } = req.body ?? {};
     if (typeof content !== "string") {
       return res.status(400).json({ error: "Request body must include a string 'content' field" });

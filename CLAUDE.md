@@ -60,18 +60,21 @@ src/
       services/index.js   GET /api/services (read-only Aggregation)
       bookmarks.js, validate.js, ...
       config/[path].js     custom.css / custom.js (read-only)
-      config/raw/[file].js GET/POST Roh-Config lesen+schreiben (Config-UI)
+      config/raw/[file].js GET/POST Roh-Config lesen+schreiben (Admin-Rolle)
+      auth/*              Login/Logout/Setup/Session-Status
   components/             services/, bookmarks/, widgets/, toggles/
   utils/
     config/               Config-Loader (serverseitig, FS + YAML)
       config.js           CONF_DIR, checkAndCopyConfig, getSettings, substituteEnvironmentVars
       service-helpers.js  servicesFromConfig / parseServicesToGroups
       api-response.js     servicesResponse / bookmarksResponse / widgetsResponse
-      config-writer.js    readRawConfig / validateYaml / writeRawConfig (Config-UI)
-      admin-auth.js       isConfigEditEnabled / checkAdminToken (Config-UI)
+      config-writer.js    readRawConfig / validateYaml / writeRawConfig (Admin-Config-UI)
+      password.js         scrypt-Hashing
+      session.js          iron-session Optionen + Rollenhelfer (edge-safe)
+      users.js            dateibasierter User-Store (`users.yaml`)
     proxy/                Widget-Proxy-Handler + URL-Sanitization
   skeleton/               Default-YAMLs, kopiert bei fehlender Config
-  middleware.js           Host-Validierung (HOMEPAGE_ALLOWED_HOSTS), Matcher /api/:path*
+  middleware.js           Host-Validierung + Login-Wall (Cookie-Session, edge-safe)
   test-utils/             create-mock-res, render-with-providers, Assertions
 ```
 
@@ -82,12 +85,11 @@ src/
 - **Kommentare und Platzhalter erhalten:** `services.yaml` kann Kommentare und `{{HOMEPAGE_VAR_*}}` / `{{HOMEPAGE_FILE_*}}`-Platzhalter (siehe `substituteEnvironmentVars`) enthalten. Beim Editieren **roh** arbeiten (Text 1:1), nicht parsen→neu-serialisieren, sonst gehen Kommentare/Platzhalter verloren.
 - Beim Schreiben: vor YAML-Syntaxvalidierung niemals speichern; Backup + atomic write (siehe `config-writer.js`).
 
-### Env-Variablen der UI-Config
+### Env-Variablen für Auth/Session
 
-| Variable                     | Default | Zweck                                                                         |
-| ---------------------------- | ------- | ----------------------------------------------------------------------------- |
-| `HOMEPAGE_CONFIG_EDIT`       | `false` | Aktiviert die Admin-Config-UI und die Lese-Route.                             |
-| `HOMEPAGE_CONFIG_EDIT_TOKEN` | –       | Token für Schreibzugriff (POST). Ohne gesetztes Token wird nicht geschrieben. |
+| Variable                  | Default | Zweck                                                                        |
+| ------------------------- | ------- | ---------------------------------------------------------------------------- |
+| `HOMEPAGE_SESSION_SECRET` | –       | Pflicht-Secret für das verschlüsselte Session-Cookie, mindestens 32 Zeichen. |
 
 Backups landen in `CONF_DIR/.backups/<datei>.<ISO-timestamp>.bak`.
 
@@ -106,8 +108,8 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 
 **Legende:** `P1` = MVP/Bedienbarkeit (≈ M1–M5, weitgehend erledigt) · `P2` = Homelab-Mehrwert · `P3` = KitoDash/Runtime · `★` = persönliche Top-5 · `🔥` = Priorität laut features.md · **(Vision)** = großer Sicherheits-/Architektur-Sprung, **erst nach M7 (Auth/Rollen) + Audit**, verlässt den reinen „Config-UI/read-only"-Rahmen.
 
-1. **Meilenstein 1 (umgesetzt):** Sichere `services.yaml`-Bearbeitung über `/admin/config` — Raw-YAML-Editor + lesende strukturierte Vorschau, Validierung, Backup + atomic write, Gating per Env-Flag + Token. Card-Vorschau + Quick-Add ergänzt.
-2. **Meilenstein 2 (umgesetzt):** Gleiche Hybrid-UI für `bookmarks.yaml` über `/admin/bookmarks` (geteilte `ConfigEditor`-Shell, Writer-Whitelist erweitert). Footer-Link auf dem Dashboard, gegated über `GET /api/config/status`.
+1. **Meilenstein 1 (umgesetzt):** Sichere `services.yaml`-Bearbeitung über `/admin/config` — Raw-YAML-Editor + lesende strukturierte Vorschau, Validierung, Backup + atomic write, inzwischen per Admin-Rolle geschützt. Card-Vorschau + Quick-Add ergänzt.
+2. **Meilenstein 2 (umgesetzt):** Gleiche Hybrid-UI für `bookmarks.yaml` über `/admin/bookmarks` (geteilte `ConfigEditor`-Shell, Writer-Whitelist erweitert). Footer-Link auf dem Dashboard, inzwischen rollenbasiert nur für Admins sichtbar.
 3. **Meilenstein 3 (umgesetzt):** `widgets.yaml` über `/admin/widgets` als **secret-aware, preview-only** Editor — Redaction sensibler Felder in der Vorschau, `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}` bleiben sichtbar, **kein** Quick-Add (AddDialog in der Shell optional gemacht). Writer-Whitelist + Widgets-Nav-Tab ergänzt.
 4. **Meilenstein 4 (umgesetzt):** `settings.yaml` über `/admin/settings` als **secret-aware, preview-only** Editor — strukturierte Vorschau gruppiert bekannte Settings (Allgemein, Layout/UI, Verhalten, Hintergrund/Branding, Provider/Integrationen), unbekannte Felder unter „Weitere Einstellungen"; Redaction-/Platzhalter-Logik in geteiltes `secret-mask.js` extrahiert (von `widget-preview.js` mitgenutzt). `providers:` wird als Secret-Value-Container behandelt (Namen sichtbar, Werte redigiert). Damit ist die Hybrid-UI für alle vier Config-Dateien abgedeckt.
 5. **Meilenstein 5 – Strukturierte Bearbeitung (Formulare):** Einträge per Formular bearbeiten/löschen mit **kommentarerhaltendem** YAML-Parser (eemeli `yaml`, Document-API) statt destruktivem Round-Trip. Raw-YAML bleibt Quelle der Wahrheit; Änderungen landen nur im Editor, Validate/Save/Backup bleiben manuell.
@@ -123,9 +125,12 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
      - Pro Gruppe zusätzlich: `header` (an/aus), `initiallyCollapsed`, `useEqualHeights` (Checkboxen; „Default" = Feld gelöscht).
      - Neuer generischer Helfer `setGroupLayoutField(raw,{group,field},value)` in `yaml-edit.js` (eemeli, kommentarerhaltend; erbt Block-Erzeugung + Skalar-`layout`-Guard + `flow=false`); `assignGroupToTab` ist jetzt ein Thin-Wrapper darüber. Global via vorhandene `updateSetting`/`deleteSetting`. `layout-preview.js`: `parseLayout` um style/columns/header/initiallyCollapsed/useEqualHeights erweitert + neues `parseGlobalLayout`. Änderungen nur im Editor; Validate/Save/Backup/Gating wie gehabt.
      - **v1-Grenzen:** Nested Groups in `layout[group]`, per-Gruppe `icon`, `maxBookmarkGroupColumns` und Gruppen-Reorder (→ 5d) bleiben dem Raw-Editor vorbehalten.
-7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (geplant):** Echte Auth/Session statt statischem Token, optional Audit-Log; rollenbasierte Rechte – Nur-Lesen vs. Bearbeiten, granular pro Tab/Gruppe/Kachel; nur Admins dürfen Services & Co. bearbeiten.
-   - **Migration weg vom Env-Gating:** Mit echter Auth werden die Env-Flags `HOMEPAGE_CONFIG_EDIT` und `HOMEPAGE_CONFIG_EDIT_TOKEN` **entfernt** — Zugriff/Schreibrecht wird dann über Rollen/Rechte gesteuert (nicht mehr über Env + statisches Token).
-   - **Admin-Button rollenabhängig:** Der **Admin**-Button oben rechts im Dashboard-Header erscheint dann **nur für Admins** (statt über `GET /api/config/status` / Env-Flag); analog die Sichtbarkeit der `/admin/*`-Seiten.
+7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (umgesetzt):** Echte Cookie-Session (`iron-session`) statt statischem Token; voller Login-Zwang auch für das Dashboard; rollenbasierte Rechte v1.
+   - **Rollen v1:** `admin` darf Dashboard ansehen und Configs lesen/schreiben; `viewer` darf nur Dashboard/API-Read-Pfade nutzen. Raw-Config-GET/POST ist nur für Admins erreichbar, damit Klartext-Secrets nicht an Viewer gehen.
+   - **Setup v1:** `/setup` legt nur den ersten Admin an, solange noch kein `users.yaml` existiert. Danach erfolgt Login über `/login`.
+   - **Weitere User:** v1 hat kein User-Management-UI. Weitere Admin-/Viewer-User werden direkt in `users.yaml` mit dem scrypt-Hash-Helfer gepflegt.
+   - **Admin-Button rollenabhängig:** Der **Admin**-Button oben rechts im Dashboard-Header und der Footer-Link erscheinen nur für Admins; `/admin/*` redirectet Viewer clientseitig zurück, APIs erzwingen die Rolle serverseitig.
+   - **V1-Grenzen:** keine granularen Rechte, kein Audit-Log, keine Passwortänderung und keine User-Verwaltungsoberfläche.
    - **Abgrenzung zu M10:** Reine **Ansichts-Profile** werden in M10 behandelt; echte per-User-Rechte und sicherheitsrelevante User-Bindung gehören zu M7 und sind Voraussetzung für spätere Runtime-/Admin-Funktionen.
    - **Admin-Sammeltab „Alle Services & Bookmarks" (nach M7):** Ein zusätzlicher, **immer vorhandener** Tab, der **alle** Gruppen aggregiert und **nur für Admins** sichtbar ist. Bewusst **nicht** in M6b umgesetzt: (a) die admin-only-Sichtbarkeit braucht echte Auth/Rollen (M7); (b) ein „zeigt-immer-alles"-Tab ist über Homepages Tab-Modell **nicht rein per `settings.yaml`** abbildbar (Gruppen ohne `tab:` erscheinen bereits auf allen Tabs, mit `tab:` nur dort) und erfordert eine Änderung am **Render-Pfad** (`src/pages/index.jsx`-Tab-Filter) — verlässt die Leitplanke „Render-Pfad unangetastet". Gehört damit zu den Ansichts-Profilen (M10) auf Basis von M7.
 8. **Meilenstein 8 – Theming, Branding & Custom UI (geplant):** Theming/Branding deutlich erweitern und `custom.css`/`custom.js` über die UI bearbeitbar machen. Geplante Teilbereiche:
@@ -171,23 +176,32 @@ Diese Meilensteine sind ausdrücklich **(Vision)**. Sie dürfen erst nach **M7 (
 
 Per Playwright-Chromium gegen `pnpm dev` getrieben; alle Punkte **bestanden**:
 
-- **Services (`/admin/config`):** lädt `services.yaml` (Kommentare erhalten), Card-Vorschau pro Gruppe, Add-Service fügt gültiges YAML **nur in den Editor** ein (Disk unverändert; URL mit `#` korrekt gequotet), Validate meldet Zeile/Spalte bei kaputtem YAML, Save nur mit korrektem Token (ohne/falsch → abgelehnt), Backup unter `config/.backups/` angelegt (== Vorzustand), Dashboard zeigt Service nach Reload.
+- **Services (`/admin/config`):** lädt `services.yaml` (Kommentare erhalten), Card-Vorschau pro Gruppe, Add-Service fügt gültiges YAML **nur in den Editor** ein (Disk unverändert; URL mit `#` korrekt gequotet), Validate meldet Zeile/Spalte bei kaputtem YAML, Save nur für Admin-Session, Backup unter `config/.backups/` angelegt (== Vorzustand), Dashboard zeigt Service nach Reload.
 - **Bookmarks (`/admin/bookmarks`):** lädt `bookmarks.yaml`, Card-Vorschau mit Abbr-Badge, Add-Bookmark erzeugt korrekt verschachteltes `- abbr/href/…`-YAML, Validate/Save/Backup wie oben, Dashboard zeigt Bookmark nach Reload.
 - **Widgets (`/admin/widgets`) — v1 secret-aware, PASS:** lädt die rohe `widgets.yaml` (Kommentare erhalten); Preview-Cards zeigen Widgets korrekt an; sensible Felder (`username`, `password`, `token`, `secret`, `apiKey`) erscheinen in der Vorschau als `[redacted]`; **echte Secret-Werte tauchen nicht im Preview-DOM auf** (inkl. `title`-Attribute); `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}`-Platzhalter bleiben sichtbar; der Raw-Editor enthält weiterhin den originalen YAML-Inhalt (YAML bleibt Quelle der Wahrheit); Validate, Save, Backup und Gating funktionieren; **preview-only** (kein Add-Button/-Dialog).
 - **Settings (`/admin/settings`) — v1 secret-aware, PASS:** lädt die rohe `settings.yaml` (Kommentare erhalten); strukturierte Vorschau in 6 Gruppen, unbekannte Felder unter „Weitere Einstellungen" (nicht verworfen); sensible Feldnamen und `providers:`-Werte als `[redacted]`, Provider-**Namen** bleiben sichtbar; **echte Secret-Werte tauchen nicht im Preview-DOM auf**; `{{HOMEPAGE_VAR_*}}`/`{{HOMEPAGE_FILE_*}}`-Platzhalter bleiben sichtbar (auch unquotet im Container); Raw-Editor unverändert, Validate/Save/Backup/Gating funktionieren; **preview-only**.
-- **Gating aus (`HOMEPAGE_CONFIG_EDIT` ungesetzt):** `/api/config/status` → `{enabled:false}`; Raw-Route GET/POST → 404 (auch mit gültigem Token); Editor-Seiten zeigen Disabled-Hinweis statt Editor; Footer-Link versteckt.
-- **Gating an:** Footer-Link sichtbar; Schreiben erfordert weiterhin `HOMEPAGE_CONFIG_EDIT_TOKEN`.
+- **Legacy-Gating (vor M7):** Die frühere Env-/Token-Sperre wurde durch Cookie-Session + Rollen ersetzt; Raw-Config-GET/POST ist nur noch für Admins erlaubt.
 - **Services – strukturierte Bearbeitung (M5 5a), PASS (Browser-E2E + Unit-Tests grün):** Edit ändert Felder bzw. ergänzt fehlende; Description, Inline-Kommentare, Leerzeilen, 4/8-Einrückung und `---` bleiben erhalten; Delete entfernt nur den Zieleintrag (geleerte Gruppe bleibt als `[]`); Änderungen landen **nur im Editor** (Disk unverändert bis Save); bare-unquotete `{{HOMEPAGE_*}}` werden abgelehnt.
 - **Bookmarks/Widgets/Settings – strukturierte Bearbeitung (M5 5b), PASS (Browser-E2E + 28 yaml-edit-Unit-Tests, 1481 Tests gesamt grün):** Bookmark-Edit (abbr GH→GHB) erhält Nesting + Kommentare; Widget-Edit ändert nur das geänderte Feld (provider→google), andere Widgets/Optionen byte-gleich, Widget-Delete per Index; Settings zeigt `providers` als `{…:"[redacted]"}` (Namen sichtbar) **ohne** Edit-Button (nur Delete); Secrets bleiben byte-gleich und `[redacted]` wird nie geschrieben; Disk unverändert bis Save.
 - **Verschieben/Umsortieren (M5c), PASS (Browser-E2E + Move-Unit-Tests, gesamt grün):** services — Gruppe ▲ (My Second Group nach oben), Cross-Group (My First Service ans Ende von My Third Group, Quellgruppe `[]`, **Block-Stil** nach Fix M5c-1), Eintrag ▲/▼ in Gruppe; Kommentare + 😎 erhalten. widgets — ▲/▼ per Index, **keine** Gruppen-/„→ Gruppe"-Controls. settings — keine Move-Controls. Disk unverändert bis Save. (Hinweis M5c-2: `commentBefore`-Kommentare wandern beim Reorder mit dem Knoten.)
-- **Header-Navigation:** Dashboard-Header mit **Home** (links) + gated **Admin**-Button (rechts, via `/api/config/status`); „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server kann die Config-UI über ein `env`-Feld in `.claude/launch.json` aktivieren.
+- **Header-Navigation:** Dashboard-Header mit **Home** (links), rollenbasiertem **Admin**-Button (nur `admin`) und Logout; „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server braucht `HOMEPAGE_SESSION_SECRET` im `env`-Feld von `.claude/launch.json`.
 - **Tabs/Layout-Verwaltung (M6 v1), PASS (Browser-E2E + 15 Layout-Unit-Tests, 1507 gesamt grün):** `/admin/layout` lädt Gruppen aus services+bookmarks (Cross-File); Nav-Highlight href-basiert (nur „Layout"); Tab anlegen (Inline-Formular) erzeugt `layout:`-Block (Kommentar + `providers` erhalten), 2. Gruppe zuweisen, Tab umbenennen (Inline), Tab löschen (`confirm`, Einträge geprunt → `layout: []`); Disk unverändert bis Save; andere Admin-Seiten unverändert. **Fix:** `window.prompt` durch Inline-Eingaben ersetzt (Turbopack-Runtime unterstützt `prompt()` nicht). **Kosmetik:** leeres `layout: []` bleibt, wenn alle Gruppen entfernt werden.
 - **Drag & Drop (M5d), PASS (Browser-E2E + 7 Index-Move-Unit-Tests, 1527 gesamt grün):** `/admin/config` rendert die `DndPreview` mit Drag-Handles je Karte/Gruppe **neben** den Hoch/Runter-Buttons. Synthetische Pointer-Drags verifiziert: Eintrag **Cross-Group** an Zielindex (`My First Service` → `My Third Group` Pos. 0; Quellgruppe wird `[]`, Block-Stil + 😎 + Kommentare erhalten) und **Gruppen-Reorder** (Third über Second). Mutation **nur im Editor** (Disk unverändert bis Save); bei bare `{{HOMEPAGE_*}}` ist DnD aus (wie M5c). @dnd-kit-Deps ergänzt. **Hinweis:** echte Drag-Simulation via Pointer-Events funktioniert; within-group-Reorder teilt denselben Pfad.
-- **Per-Gruppe-Anzeige & globale Anordnung (M6b), PASS (Browser-E2E + Unit-Tests, gesamt grün):** in `/admin/layout` je Gruppe Ausrichtung (`style: row`), `columns` (nur bei row aktiv) und Checkboxen `header`/`initiallyCollapsed`/`useEqualHeights`; global `maxGroupColumns` (4–8, schreibt Top-Level, entfernt `fiveColumns`). Felder werden **in place** ergänzt/geändert (andere Optionen, Kommentare, `providers` byte-gleich erhalten), Default-Wechsel **löscht** das Feld (leert `style`→ auch `columns`), Eintrag bleibt solange noch Optionen da sind. Save schreibt korrektes YAML + Backup; Disk unverändert bis Save; Dashboard rendert die Layout-Optionen fehlerfrei. `setGroupLayoutField` lehnt Skalar-`layout:` und bare `{{HOMEPAGE_*}}` ab. **Token-UX-Fix mitverifiziert:** Token-Feld in der Aktionsleiste neben „Save" (amber, solange leer). **Hinweis:** stale `.next`-Cache nach Edits führte zu hängendem „Loading…" → `rm -rf .next` + Server-Neustart behob es (Doku-Hinweis weiter unten).
+- **Per-Gruppe-Anzeige & globale Anordnung (M6b), PASS (Browser-E2E + Unit-Tests, gesamt grün):** in `/admin/layout` je Gruppe Ausrichtung (`style: row`), `columns` (nur bei row aktiv) und Checkboxen `header`/`initiallyCollapsed`/`useEqualHeights`; global `maxGroupColumns` (4–8, schreibt Top-Level, entfernt `fiveColumns`). Felder werden **in place** ergänzt/geändert (andere Optionen, Kommentare, `providers` byte-gleich erhalten), Default-Wechsel **löscht** das Feld (leert `style`→ auch `columns`), Eintrag bleibt solange noch Optionen da sind. Save schreibt korrektes YAML + Backup; Disk unverändert bis Save; Dashboard rendert die Layout-Optionen fehlerfrei. `setGroupLayoutField` lehnt Skalar-`layout:` und bare `{{HOMEPAGE_*}}` ab. **Hinweis:** stale `.next`-Cache nach Edits führte zu hängendem „Loading…" → `rm -rf .next` + Server-Neustart behob es (Doku-Hinweis weiter unten).
 
 Kleinere Beobachtung (kein Bug): Bookmark-Cards im 3-Spalten-Raster wirken auf breiten Screens schmal (Name/URL truncaten stark) — rein kosmetisch, read-only.
 
-**Hinweis für künftige Browser-Verifikationen:** Vor einem erneuten `pnpm dev`-Start immer sicherstellen, dass Port 3000 frei ist bzw. alte `next`-Prozesse beendet wurden (`pkill -f next`, dann Port prüfen). Sonst belegt ein alter Server den Port weiter, der neue Start scheitert mit `EADDRINUSE`, und Requests treffen weiterhin den alten Server mit anderen Env-Flags — das verfälscht insbesondere die Gating-Verifikation (z. B. `enabled:true` statt `false`). **Zusätzlich:** Wenn die Editor-Seite hängt (loadState „Loading…") oder die dynamische Route `/api/config/raw/[file]` eine **Next-404-HTML** statt JSON liefert, obwohl `/api/config/status` `enabled:true` meldet, liegt meist ein **stale `.next`-Build-Cache** vor → Server stoppen, `rm -rf .next`, neu starten.
+**Hinweis für künftige Browser-Verifikationen:** Vor einem erneuten `pnpm dev`-Start immer sicherstellen, dass Port 3000 frei ist bzw. alte `next`-Prozesse beendet wurden (`pkill -f next`, dann Port prüfen). Sonst belegt ein alter Server den Port weiter, der neue Start scheitert mit `EADDRINUSE`, und Requests treffen weiterhin den alten Server mit anderen Env-Werten. **Zusätzlich:** Wenn die Editor-Seite hängt (loadState „Loading…") oder dynamische API-Routes eine **Next-404-HTML** statt JSON liefern, liegt meist ein **stale `.next`-Build-Cache** vor → Server stoppen, `rm -rf .next`, neu starten.
+
+### Verifikationsstatus (M7 Auth/Rollen, 2026-05-31)
+
+Per Vitest/Lint, Component-Tests und lokale HTTP-Smoke-Checks gegen `pnpm dev` mit gesetztem
+`HOMEPAGE_SESSION_SECRET` geprüft:
+
+- Ohne Session redirectet `/` nach `/login`; bei fehlendem `users.yaml` führt der Flow weiter nach `/setup`; der erste Admin wird angelegt und direkt eingeloggt.
+- Admin sieht Dashboard, Admin-Link und `/admin/config`; Save funktioniert ohne Token-Feld/Authorization-Header und legt Backups an.
+- Viewer sieht Dashboard, aber keinen Admin-Link; `/admin/*` redirectet clientseitig; Raw-Config-GET/POST liefert für Viewer 403 und ohne Cookie 401.
+- Logout zerstört die Session und führt zurück zu `/login`.
 
 ## Vorgemerkte spätere Komfort-Features
 

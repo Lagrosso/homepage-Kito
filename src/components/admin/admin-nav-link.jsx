@@ -2,13 +2,12 @@ import Link from "next/link";
 import { MdAdminPanelSettings } from "react-icons/md";
 import useSWR from "swr";
 
-// Header button linking into the admin/config UI. Gated the same way as the
-// footer ConfigEditorLink: it asks the server whether HOMEPAGE_CONFIG_EDIT is
-// on and renders nothing otherwise, so the default-off deployment is unaffected.
+// Header button linking into the admin/config UI. Visibility is derived from
+// the current session role; viewers can use the dashboard but do not see admin UI.
 export default function AdminNavLink() {
-  const { data } = useSWR("/api/config/status");
+  const { data } = useSWR("/api/auth/me");
 
-  if (!data?.enabled) {
+  if (data?.user?.role !== "admin") {
     return null;
   }
 
