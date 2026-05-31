@@ -16,7 +16,9 @@ import {
   moveGroupToIndex,
   moveWidget,
   moveWidgetToIndex,
+  removeBackground,
   renameTab,
+  setBackgroundField,
   setGroupLayoutField,
   updateBookmarkEntry,
   updateServiceEntry,
@@ -297,6 +299,69 @@ describe("deleteSetting", () => {
 
   it("throws for an unknown key", () => {
     expect(() => deleteSetting(SETTINGS, { key: "nope" })).toThrow(/not found/i);
+  });
+});
+
+const SETTINGS_WITH_BG = `---
+title: My Homepage
+theme: dark
+background:
+  image: https://example.com/bg.jpg
+  opacity: 30
+  blur: md
+`;
+
+describe("setBackgroundField", () => {
+  it("creates the background block when absent and sets a field", () => {
+    const out = setBackgroundField(SETTINGS, "image", "https://example.com/bg.jpg");
+    expect(out).toContain("background:");
+    expect(out).toContain("image: https://example.com/bg.jpg");
+    expect(out).toContain("title: My Homepage");
+  });
+
+  it("updates an existing background field", () => {
+    const out = setBackgroundField(SETTINGS_WITH_BG, "opacity", 50);
+    expect(out).toContain("opacity: 50");
+    expect(out).toContain("image: https://example.com/bg.jpg");
+  });
+
+  it("adds a new field to an existing background block", () => {
+    const out = setBackgroundField(SETTINGS_WITH_BG, "saturate", 150);
+    expect(out).toContain("saturate: 150");
+    expect(out).toContain("image: https://example.com/bg.jpg");
+  });
+
+  it("removes a field when value is empty string", () => {
+    const out = setBackgroundField(SETTINGS_WITH_BG, "blur", "");
+    expect(out).not.toContain("blur:");
+    expect(out).toContain("image: https://example.com/bg.jpg");
+  });
+
+  it("is a no-op when clearing a field that has no background block", () => {
+    const out = setBackgroundField(SETTINGS, "blur", "");
+    expect(out).not.toContain("background:");
+    expect(out).toContain("title: My Homepage");
+  });
+
+  it("preserves comments and other settings", () => {
+    const out = setBackgroundField(SETTINGS, "image", "https://x.com/img.png");
+    expect(out).toContain("# settings");
+    expect(out).toContain("providers:");
+  });
+});
+
+describe("removeBackground", () => {
+  it("removes the background key entirely", () => {
+    const out = removeBackground(SETTINGS_WITH_BG);
+    expect(out).not.toContain("background:");
+    expect(out).not.toContain("image:");
+    expect(out).toContain("title: My Homepage");
+  });
+
+  it("is a no-op when background is absent", () => {
+    const out = removeBackground(SETTINGS);
+    expect(out).toContain("title: My Homepage");
+    expect(out).not.toContain("background:");
   });
 });
 

@@ -133,13 +133,14 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
    - **V1-Grenzen:** keine granularen Rechte, kein Audit-Log, keine Passwortänderung und keine User-Verwaltungsoberfläche.
    - **Abgrenzung zu M10:** Reine **Ansichts-Profile** werden in M10 behandelt; echte per-User-Rechte und sicherheitsrelevante User-Bindung gehören zu M7 und sind Voraussetzung für spätere Runtime-/Admin-Funktionen.
    - **Admin-Sammeltab „Alle Services & Bookmarks" (nach M7):** Ein zusätzlicher, **immer vorhandener** Tab, der **alle** Gruppen aggregiert und **nur für Admins** sichtbar ist. Bewusst **nicht** in M6b umgesetzt: (a) die admin-only-Sichtbarkeit braucht echte Auth/Rollen (M7); (b) ein „zeigt-immer-alles"-Tab ist über Homepages Tab-Modell **nicht rein per `settings.yaml`** abbildbar (Gruppen ohne `tab:` erscheinen bereits auf allen Tabs, mit `tab:` nur dort) und erfordert eine Änderung am **Render-Pfad** (`src/pages/index.jsx`-Tab-Filter) — verlässt die Leitplanke „Render-Pfad unangetastet". Gehört damit zu den Ansichts-Profilen (M10) auf Basis von M7.
-8. **Meilenstein 8 – Theming, Branding & Custom UI (geplant):** Theming/Branding deutlich erweitern und `custom.css`/`custom.js` über die UI bearbeitbar machen. Geplante Teilbereiche:
-   - **8a Theme-Presets:** einfache Auswahl per Buttons, z. B. rund/weich, kantig/technisch, Glasoptik/Blur, kompakt, minimal, OLED-Dark, Homelab-Neon.
-   - **8b Hintergrundbild-Upload:** Hintergrundbilder über die UI hochladen/entfernen, optional Overlay, Abdunklung, Blur, Position und Skalierung einstellen; Speicherung kontrolliert unter `CONF_DIR`.
-   - **8c Visueller Theme-Editor:** Akzentfarbe, Kartenradius, Rahmenstärke, Schatten, Transparenz, Blur-Stärke, Abstände und Kompaktheit über UI-Regler bearbeiten.
-   - **8d Custom-CSS/JS-Editor:** `custom.css` und optional `custom.js` über die UI bearbeiten, mit Warnhinweisen, Validierung soweit sinnvoll und Backup/Restore.
-   - **8e Theme Import/Export:** Themes exportieren/importieren, ohne Secrets oder lokale Pfade ungewollt offenzulegen.
-   - **8f Theme pro Benutzer:** Themes können pro Benutzer individuell hinterlegt werden.
+8. **Meilenstein 8 – Theming, Branding & Custom UI (umgesetzt):** Neue Admin-Seite `/admin/theme` — eigenständige Seite (kein ConfigEditor-Shell), lädt `settings.yaml` + `custom.css` parallel, speichert getrennt.
+   - **8a Theme-Presets (umgesetzt):** 25 Presets (15 Dark, 10 Light) in `utils/config/theme-presets.js`; Preset-Karte zeigt Farbvorschau + Dark/Light-Badge; Klick wendet `color`/`theme`/`cardBlur` via yaml-edit auf `settings.yaml` an. Neues `CONFIG_TABS`-Export aus `config-editor.jsx` für konsistente Nav.
+   - **8b Hintergrundbild-Upload (umgesetzt):** Neuer API-Endpunkt `POST /api/config/background-image` (base64-JSON, max. 10 MB) speichert unter `CONF_DIR/images/`; `GET ?file=<name>` liefert Bild aus; Pfad wird via `setBackgroundField` in `settings.yaml` gesetzt. Regler für Deckkraft/Blur/Sättigung/Helligkeit direkt im Theme-UI.
+   - **8c Visueller Theme-Editor (umgesetzt):** Farbpalette mit **34 Farben** (23 Tailwind-Standard + `orange`-Fix + 11 neue Custom-Farben: `forest`, `ocean`, `lavender`, `coral`, `gold`, `midnight`, `rust`, `sage`, `maroon`, `neon`, `cherry`); Hell/Dunkel-Toggle; Card-Blur-Auswahl. Alles schreibt in `settings.yaml`.
+   - **8d Custom-CSS-Editor (umgesetzt):** `custom.css` über `/admin/theme` bearbeiten — neues `utils/config/css-writer.js` (Backup + atomic write); API `GET/POST /api/config/custom-css` (Admin-only); Warnbanner im UI.
+   - **8e Theme Import/Export (umgesetzt):** Export: JSON mit `color`, `theme`, `cardBlur`, `background`-Effekten, `customCss` — ohne `background.image` (Pfad nicht portabel) und ohne Secrets. Import: JSON einfügen → sofort auf `settings.yaml` + `customCss`-State anwenden.
+   - **8f Theme pro Benutzer:** ausdrücklich aus M8 ausgeklammert (erfordert User-Store-Erweiterung jenseits von `users.yaml`).
+   - **Neue yaml-edit-Helfer:** `setBackgroundField(raw, field, value)` + `removeBackground(raw)` für nested `background.*` in `settings.yaml`.
 
 #### Phase 1/2 – read-only, mit den Leitplanken vereinbar
 
@@ -202,6 +203,19 @@ Per Vitest/Lint, Component-Tests und lokale HTTP-Smoke-Checks gegen `pnpm dev` m
 - Admin sieht Dashboard, Admin-Link und `/admin/config`; Save funktioniert ohne Token-Feld/Authorization-Header und legt Backups an.
 - Viewer sieht Dashboard, aber keinen Admin-Link; `/admin/*` redirectet clientseitig; Raw-Config-GET/POST liefert für Viewer 403 und ohne Cookie 401.
 - Logout zerstört die Session und führt zurück zu `/login`.
+
+### Verifikationsstatus (M8 Theming, 2026-05-31)
+
+`pnpm lint` + `pnpm test` grün (545 Testdateien / 1588 Tests). Neue Unit-Tests: `css-writer.test.js` (6), `yaml-edit.test.js` +10 Background-Helfer.
+
+- **`/admin/theme`** erreichbar für Admin; Nav-Tab „Theme" in allen Admin-Seiten sichtbar.
+- **Presets:** 25 Karten, jede mit Farbvorschau-Balken + Dark/Light-Badge; Aktiv-Markierung via `border-blue-500`.
+- **Farbpalette:** 34 Farben (inkl. 11 neue Custom-Farben), alle visuell in Grid mit Skalierung auf Auswahl.
+- **Hell/Dunkel-Toggle**, **Card-Blur-Dropdown** schreiben via yaml-edit in `settings.yaml`.
+- **Hintergrund:** URL-Eingabe + Datei-Upload (base64, max. 10 MB, Vorschau), Regler Deckkraft/Blur/Sättigung/Helligkeit.
+- **Custom CSS:** Textarea + Backup-Write via `css-writer.js`.
+- **Export:** JSON ohne `background.image` und ohne Secrets. **Import:** JSON → sofort auf State anwenden.
+- Dashboard-Farbwechsel durch Pager grün, `settings.yaml` korrekt mutiert.
 
 ## Vorgemerkte spätere Komfort-Features
 

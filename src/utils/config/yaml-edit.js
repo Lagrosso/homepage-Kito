@@ -278,6 +278,49 @@ export function deleteSetting(rawText, { key }) {
   return doc.toString();
 }
 
+// Set/clear one scalar field inside the `background` object in settings.yaml.
+// Creates the `background` map if absent. Clears the field when value is empty/null.
+// Returns new raw text.
+export function setBackgroundField(rawText, field, value) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const cleared =
+    value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+
+  let bgNode = root.get("background", true);
+
+  if (!isMap(bgNode)) {
+    if (cleared) {
+      return doc.toString(); // nothing to remove, already absent
+    }
+    const newBg = doc.createNode({});
+    newBg.flow = false;
+    root.set("background", newBg);
+    bgNode = root.get("background", true);
+  }
+
+  if (isMap(bgNode)) {
+    bgNode.flow = false;
+    applyScalarField(bgNode, field, cleared ? "" : value);
+  }
+
+  return doc.toString();
+}
+
+// Remove the entire `background` key from settings.yaml. No-op when absent.
+export function removeBackground(rawText) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  root.delete("background");
+  return doc.toString();
+}
+
 // --- reordering / moving (M5c) --------------------------------------------
 // All swaps operate on the YAMLSeq `items` arrays; nodes carry their own
 // comments, so reordering keeps inline comments with the moved entry/group.

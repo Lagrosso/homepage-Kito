@@ -379,3 +379,179 @@
   --color-logo-start: 251 113 133;
   --color-logo-stop: 190 18 60;
 }
+
+.theme-forest {
+  --color-50: 241 252 237;
+  --color-100: 215 247 205;
+  --color-200: 165 237 162;
+  --color-300: 106 218 108;
+  --color-400: 58 190 72;
+  --color-500: 28 155 45;
+  --color-600: 14 120 30;
+  --color-700: 8 90 20;
+  --color-800: 4 65 12;
+  --color-900: 2 44 8;
+
+  --color-logo-start: 58 190 72;
+  --color-logo-stop: 8 90 20;
+}
+
+.theme-ocean {
+  --color-50: 236 249 255;
+  --color-100: 205 238 254;
+  --color-200: 162 222 252;
+  --color-300: 98 198 248;
+  --color-400: 28 168 230;
+  --color-500: 2 138 200;
+  --color-600: 0 104 164;
+  --color-700: 0 74 130;
+  --color-800: 0 50 95;
+  --color-900: 0 30 64;
+
+  --color-logo-start: 28 168 230;
+  --color-logo-stop: 0 74 130;
+}
+
+.theme-lavender {
+  --color-50: 248 246 255;
+  --color-100: 240 235 255;
+  --color-200: 225 218 255;
+  --color-300: 202 192 255;
+  --color-400: 172 160 252;
+  --color-500: 144 128 248;
+  --color-600: 117 96 238;
+  --color-700: 93 68 218;
+  --color-800: 72 50 188;
+  --color-900: 53 36 155;
+
+  --color-logo-start: 172 160 252;
+  --color-logo-stop: 93 68 218;
+}
+
+.theme-coral {
+  --color-50: 255 246 244;
+  --color-100: 255 232 228;
+  --color-200: 255 208 200;
+  --color-300: 255 174 164;
+  --color-400: 255 136 118;
+  --color-500: 255 98 78;
+  --color-600: 234 60 40;
+  --color-700: 196 38 20;
+  --color-800: 158 26 12;
+  --color-900: 120 18 8;
+
+  --color-logo-start: 255 136 118;
+  --color-logo-stop: 196 38 20;
+}
+
+.theme-gold {
+  --color-50: 255 253 230;
+  --color-100: 255 248 196;
+  --color-200: 254 238 130;
+  --color-300: 252 222 58;
+  --color-400: 246 198 10;
+  --color-500: 214 164 2;
+  --color-600: 173 128 0;
+  --color-700: 132 94 0;
+  --color-800: 92 64 0;
+  --color-900: 58 40 0;
+
+  --color-logo-start: 246 198 10;
+  --color-logo-stop: 132 94 0;
+}
+
+.theme-midnight {
+  --color-50: 234 238 255;
+  --color-100: 212 220 255;
+  --color-200: 182 196 255;
+  --color-300: 140 158 250;
+  --color-400: 96 118 238;
+  --color-500: 60 80 215;
+  --color-600: 38 57 185;
+  --color-700: 22 38 148;
+  --color-800: 12 24 110;
+  --color-900: 6 13 72;
+
+  --color-logo-start: 96 118 238;
+  --color-logo-stop: 22 38 148;
+}
+
+.theme-rust {
+  --color-50: 255 247 242;
+  --color-100: 255 234 222;
+  --color-200: 255 210 186;
+  --color-300: 252 180 148;
+  --color-400: 245 142 98;
+  --color-500: 222 104 52;
+  --color-600: 182 70 26;
+  --color-700: 146 46 12;
+  --color-800: 110 30 6;
+  --color-900: 74 18 3;
+
+  --color-logo-start: 245 142 98;
+  --color-logo-stop: 146 46 12;
+}
+
+.theme-sage {
+  --color-50: 245 249 245;
+  --color-100: 231 242 231;
+  --color-200: 205 228 204;
+  --color-300: 170 207 170;
+  --color-400: 128 178 128;
+  --color-500: 92 150 92;
+  --color-600: 65 120 65;
+  --color-700: 46 94 46;
+  --color-800: 30 68 30;
+  --color-900: 18 46 18;
+
+  --color-logo-start: 128 178 128;
+  --color-logo-stop: 46 94 46;
+}
+
+.theme-maroon {
+  --color-50: 255 240 244;
+  --color-100: 255 220 230;
+  --color-200: 255 184 204;
+  --color-300: 255 142 174;
+  --color-400: 248 96 140;
+  --color-500: 220 48 98;
+  --color-600: 176 18 62;
+  --color-700: 138 8 44;
+  --color-800: 100 4 30;
+  --color-900: 64 2 18;
+
+  --color-logo-start: 248 96 140;
+  --color-logo-stop: 138 8 44;
+}
+
+.theme-neon {
+  --color-50: 235 255 242;
+  --color-100: 202 255 220;
+  --color-200: 146 255 188;
+  --color-300: 74 255 148;
+  --color-400: 18 252 106;
+  --color-500: 0 218 70;
+  --color-600: 0 172 54;
+  --color-700: 0 132 40;
+  --color-800: 0 92 27;
+  --color-900: 0 58 16;
+
+  --color-logo-start: 18 252 106;
+  --color-logo-stop: 0 132 40;
+}
+
+.theme-cherry {
+  --color-50: 255 238 248;
+  --color-100: 255 214 238;
+  --color-200: 255 170 222;
+  --color-300: 255 116 198;
+  --color-400: 255 58 168;
+  --color-500: 228 12 132;
+  --color-600: 184 4 100;
+  --color-700: 144 2 76;
+  --color-800: 104 1 54;
+  --color-900: 66 0 34;
+
+  --color-logo-start: 255 58 168;
+  --color-logo-stop: 144 2 76;
+}
