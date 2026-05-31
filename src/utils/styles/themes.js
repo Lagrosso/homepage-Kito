@@ -137,6 +137,72 @@ const themes = {
     iconEnd: "#be123c",
     dark: "#9f1239",
   },
+  forest: {
+    light: "#f1fced",
+    iconStart: "#3abe48",
+    iconEnd: "#085a14",
+    dark: "#04410c",
+  },
+  ocean: {
+    light: "#ecf9ff",
+    iconStart: "#1ca8e6",
+    iconEnd: "#004a82",
+    dark: "#00325f",
+  },
+  lavender: {
+    light: "#f8f6ff",
+    iconStart: "#aca0fc",
+    iconEnd: "#5d44da",
+    dark: "#4832bc",
+  },
+  coral: {
+    light: "#fff6f4",
+    iconStart: "#ff8876",
+    iconEnd: "#c42614",
+    dark: "#9e1a0c",
+  },
+  gold: {
+    light: "#fffde6",
+    iconStart: "#f6c60a",
+    iconEnd: "#845e00",
+    dark: "#5c4000",
+  },
+  midnight: {
+    light: "#eaeeff",
+    iconStart: "#6076ee",
+    iconEnd: "#162694",
+    dark: "#0c186e",
+  },
+  rust: {
+    light: "#fff7f2",
+    iconStart: "#f58e62",
+    iconEnd: "#922e0c",
+    dark: "#6e1e06",
+  },
+  sage: {
+    light: "#f5f9f5",
+    iconStart: "#80b280",
+    iconEnd: "#2e5e2e",
+    dark: "#1e441e",
+  },
+  maroon: {
+    light: "#fff0f4",
+    iconStart: "#f8608c",
+    iconEnd: "#8a082c",
+    dark: "#64041e",
+  },
+  neon: {
+    light: "#ebfff2",
+    iconStart: "#12fc6a",
+    iconEnd: "#008428",
+    dark: "#005c1b",
+  },
+  cherry: {
+    light: "#ffeef8",
+    iconStart: "#ff3aa8",
+    iconEnd: "#90024c",
+    dark: "#680136",
+  },
 };
 
 export default themes;
