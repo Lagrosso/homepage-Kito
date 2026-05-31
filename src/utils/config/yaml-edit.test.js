@@ -14,6 +14,7 @@ import {
   moveGroup,
   moveWidget,
   renameTab,
+  setGroupLayoutField,
   updateBookmarkEntry,
   updateServiceEntry,
   updateSetting,
@@ -480,5 +481,54 @@ describe("deleteTab", () => {
 
   it("throws for an unknown tab", () => {
     expect(() => deleteTab(SETTINGS_LIST, { tab: "Nope" })).toThrow(/not found/i);
+  });
+});
+
+describe("setGroupLayoutField", () => {
+  it("creates a block-list layout + group entry for a fresh field", () => {
+    const out = setGroupLayoutField(SETTINGS_NO_LAYOUT, { group: "Media", field: "style" }, "row");
+    expect(out).toContain("# settings"); // comment preserved
+    expect(out).not.toMatch(/layout:\s*\[/); // block, not flow
+    expect(yaml.load(out).layout[0].Media.style).toBe("row");
+  });
+
+  it("writes a numeric field (columns)", () => {
+    const out = setGroupLayoutField(SETTINGS_LIST, { group: "Media", field: "columns" }, 4);
+    expect(yaml.load(out).layout.find((i) => i.Media).Media.columns).toBe(4);
+  });
+
+  it("writes a boolean field (header: false)", () => {
+    const out = setGroupLayoutField(SETTINGS_LIST, { group: "Media", field: "header" }, false);
+    expect(yaml.load(out).layout.find((i) => i.Media).Media.header).toBe(false);
+  });
+
+  it("clearing a field deletes it and prunes a now-empty entry", () => {
+    // Admin had only `tab: Ops`; clearing it leaves no options → entry pruned.
+    const out = setGroupLayoutField(SETTINGS_LIST, { group: "Admin", field: "tab" }, "");
+    const data = yaml.load(out);
+    expect(data.layout.some((i) => i.Admin)).toBe(false);
+    expect(data.layout.some((i) => i.Media)).toBe(true);
+  });
+
+  it("keeps other fields (incl. tab) when setting a new one", () => {
+    const out = setGroupLayoutField(SETTINGS_LIST, { group: "Media", field: "style" }, "row");
+    const media = yaml.load(out).layout.find((i) => i.Media).Media;
+    expect(media.tab).toBe("Apps");
+    expect(media.style).toBe("row");
+  });
+
+  it("writes block style when adding onto an empty flow `{}` entry", () => {
+    const out = setGroupLayoutField(`layout:\n  - Misc: {}\n`, { group: "Misc", field: "style" }, "row");
+    expect(out).not.toMatch(/\{\s*style/);
+    expect(yaml.load(out).layout[0].Misc.style).toBe("row");
+  });
+
+  it("refuses to overwrite a non-null scalar `layout:`", () => {
+    expect(() => setGroupLayoutField("layout: nope\n", { group: "A", field: "style" }, "row")).toThrow(/raw editor/i);
+  });
+
+  it("refuses when a bare placeholder is present", () => {
+    const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
+    expect(() => setGroupLayoutField(bare, { group: "A", field: "style" }, "row")).toThrow(/unquoted/i);
   });
 });

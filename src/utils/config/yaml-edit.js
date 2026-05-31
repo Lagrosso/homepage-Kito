@@ -396,22 +396,26 @@ function pruneEmptyLayoutEntries(layout) {
   }
 }
 
-// Assign a group to a tab (empty `tab` = remove the tab → group falls back to the
-// default view). Creates the layout block / group entry as needed. Returns new raw.
-export function assignGroupToTab(rawText, { group, tab }) {
+// Set or clear one scalar field (`tab`, `style`, `columns`, `header`, …) on a
+// group's `layout` options. A value is written in place (comment-preserving);
+// "" / whitespace / null / undefined clears the field. Creates the layout block
+// and the group entry as needed, prunes entries whose options become empty, and
+// refuses an unexpected scalar `layout:` (raw editor stays the escape hatch).
+// Returns new raw text.
+export function setGroupLayoutField(rawText, { group, field }, value) {
   const doc = parseConfigDoc(rawText);
   const root = doc.contents;
   if (!isMap(root)) {
     throw new Error("settings.yaml is not a mapping");
   }
-  const value = typeof tab === "string" ? tab.trim() : "";
+  const cleared = value === undefined || value === null || (typeof value === "string" && value.trim() === "");
 
   let layout = root.get("layout", true);
   const pair = layoutPairs(layout).find((p) => String(p.key) === group) ?? null;
 
   if (!pair) {
-    if (value === "") {
-      return doc.toString(); // group has no entry and stays unassigned: nothing to do
+    if (cleared) {
+      return doc.toString(); // group has no entry and the field is empty: nothing to do
     }
     if (!isSeq(layout) && !isMap(layout)) {
       // A non-null scalar `layout:` is an unexpected shape — don't silently
@@ -436,13 +440,13 @@ export function assignGroupToTab(rawText, { group, tab }) {
     const opts = doc.createNode({});
     opts.flow = false;
     created.value = opts;
-    opts.set("tab", value);
+    applyScalarField(opts, field, value);
     return doc.toString();
   }
 
   // Group entry exists.
   if (!isMap(pair.value)) {
-    if (value === "") {
+    if (cleared) {
       return doc.toString();
     }
     const opts = doc.createNode({});
@@ -450,19 +454,16 @@ export function assignGroupToTab(rawText, { group, tab }) {
     pair.value = opts;
   }
   const opts = pair.value;
-  if (value === "") {
-    opts.delete("tab");
-    pruneEmptyLayoutEntries(layout);
-  } else {
-    const existing = opts.get("tab", true);
-    if (isScalar(existing)) {
-      existing.value = value;
-    } else {
-      opts.flow = false; // an empty `{}` entry would otherwise stay inline flow
-      opts.set("tab", value);
-    }
-  }
+  opts.flow = false; // an empty `{}` entry would otherwise stay inline flow
+  applyScalarField(opts, field, value);
+  pruneEmptyLayoutEntries(layout);
   return doc.toString();
+}
+
+// Assign a group to a tab (empty `tab` = remove the tab → group falls back to the
+// default view). Thin wrapper over setGroupLayoutField for the `tab` field.
+export function assignGroupToTab(rawText, { group, tab }) {
+  return setGroupLayoutField(rawText, { group, field: "tab" }, tab);
 }
 
 // Rename a tab: every layout group whose `tab` equals `from` is set to `to`.

@@ -1,8 +1,15 @@
 import ConfigEditor, { inputClass } from "components/admin/config-editor";
 import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdClose, MdDelete, MdEdit } from "react-icons/md";
-import { assignGroupToTab, deleteTab, renameTab } from "utils/config/yaml-edit";
-import { groupNamesFromRaw, parseLayout } from "utils/config/layout-preview";
+import {
+  assignGroupToTab,
+  deleteSetting,
+  deleteTab,
+  renameTab,
+  setGroupLayoutField,
+  updateSetting,
+} from "utils/config/yaml-edit";
+import { groupNamesFromRaw, parseGlobalLayout, parseLayout } from "utils/config/layout-preview";
 
 // Tab/layout manager rendered inside the ConfigEditor shell (configFile=settings.yaml).
 // It edits only the editor text (via setContent); Save/Validate/Backup stay manual.
@@ -36,12 +43,15 @@ function LayoutManager({ content, setContent, setStatus }) {
 
   const layout = useMemo(() => parseLayout(content), [content]);
   const tabByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e.tab])), [layout]);
+  const optsByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e])), [layout]);
   const tabs = useMemo(() => [...new Set(layout.map((e) => e.tab).filter(Boolean))], [layout]);
   const allGroups = useMemo(() => {
     const set = new Set(groupNames);
     layout.forEach((e) => set.add(e.group));
     return [...set];
   }, [groupNames, layout]);
+  const global = useMemo(() => parseGlobalLayout(content), [content]);
+  const maxColsValue = global.fiveColumns ? "5" : global.maxGroupColumns != null ? String(global.maxGroupColumns) : "";
 
   const apply = (next, message) => {
     setContent(next);
@@ -89,6 +99,49 @@ function LayoutManager({ content, setContent, setStatus }) {
     if (!window.confirm(`Tab "${tab}" entfernen? Die zugewiesenen Gruppen bleiben erhalten (Default-Ansicht).`)) return;
     try {
       apply(deleteTab(content, { tab }), `Tab "${tab}" entfernt — review and Save.`);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // Per-group layout option (style/columns/header/…). "" clears the field.
+  const onSetField = (group, field, value) => {
+    try {
+      apply(setGroupLayoutField(content, { group, field }, value), `"${group}" aktualisiert (im Editor) — review and Save.`);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // Style is special: leaving "row" also clears the now-meaningless `columns`.
+  const onSetStyle = (group, value) => {
+    try {
+      let next = setGroupLayoutField(content, { group, field: "style" }, value);
+      if (value !== "row") {
+        next = setGroupLayoutField(next, { group, field: "columns" }, "");
+      }
+      apply(next, `"${group}" aktualisiert (im Editor) — review and Save.`);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // Global "groups side by side" (maxGroupColumns 4–8). "" = back to default.
+  // Always clears `fiveColumns` so it can't silently override the chosen value.
+  const onSetMaxCols = (value) => {
+    try {
+      let next = content;
+      if (parseGlobalLayout(next).fiveColumns !== undefined) {
+        next = deleteSetting(next, { key: "fiveColumns" });
+      }
+      if (value === "") {
+        if (parseGlobalLayout(next).maxGroupColumns !== undefined) {
+          next = deleteSetting(next, { key: "maxGroupColumns" });
+        }
+      } else {
+        next = updateSetting(next, { key: "maxGroupColumns" }, Number(value));
+      }
+      apply(next, `Max. Gruppen nebeneinander: ${value || "Standard (4)"} — review and Save.`);
     } catch (e) {
       fail(e);
     }
@@ -190,29 +243,119 @@ function LayoutManager({ content, setContent, setStatus }) {
       </section>
 
       <section>
-        <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen zuordnen</h3>
+        <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen-Anordnung</h3>
+        <label className="flex items-center gap-2">
+          <span className="min-w-0">Max. Gruppen nebeneinander</span>
+          <select
+            aria-label="Max. Gruppen nebeneinander (maxGroupColumns)"
+            value={maxColsValue}
+            onChange={(e) => onSetMaxCols(e.target.value)}
+            className={`${inputClass} max-w-[10rem]`}
+          >
+            <option value="">Standard (4)</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+        <p className="mt-1 text-xs text-theme-400">
+          Gilt global (4–8). Weniger als 4 nebeneinander ist nicht global einstellbar — dafür eine Gruppe unten auf
+          „nebeneinander (volle Breite)" stellen.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen-Anzeige</h3>
         {allGroups.length === 0 ? (
           <p className="text-theme-500 text-xs">Keine Gruppen in services.yaml / bookmarks.yaml gefunden.</p>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {allGroups.map((group) => (
-              <li key={group} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate">{group}</span>
-                <select
-                  aria-label={`Tab für ${group}`}
-                  value={tabByGroup.get(group) ?? ""}
-                  onChange={(e) => onAssign(group, e.target.value)}
-                  className={`${inputClass} max-w-[55%]`}
+          <ul className="flex flex-col gap-3">
+            {allGroups.map((group) => {
+              const opts = optsByGroup.get(group) ?? {};
+              const isRow = opts.style === "row";
+              return (
+                <li
+                  key={group}
+                  className="flex flex-col gap-2 rounded-md border border-theme-200 dark:border-theme-700 p-2"
                 >
-                  <option value="">— kein Tab (Default) —</option>
-                  {tabs.map((tab) => (
-                    <option key={tab} value={tab}>
-                      {tab}
-                    </option>
-                  ))}
-                </select>
-              </li>
-            ))}
+                  <span className="font-medium min-w-0 truncate">{group}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <label className="flex items-center gap-1">
+                      <span className="text-theme-500 text-xs">Tab</span>
+                      <select
+                        aria-label={`Tab für ${group}`}
+                        value={tabByGroup.get(group) ?? ""}
+                        onChange={(e) => onAssign(group, e.target.value)}
+                        className={`${inputClass} max-w-[9rem]`}
+                      >
+                        <option value="">— kein Tab —</option>
+                        {tabs.map((tab) => (
+                          <option key={tab} value={tab}>
+                            {tab}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <span className="text-theme-500 text-xs">Ausrichtung</span>
+                      <select
+                        aria-label={`Ausrichtung für ${group}`}
+                        value={isRow ? "row" : ""}
+                        onChange={(e) => onSetStyle(group, e.target.value)}
+                        className={`${inputClass} max-w-[11rem]`}
+                      >
+                        <option value="">untereinander (Default)</option>
+                        <option value="row">nebeneinander (volle Breite)</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <span className="text-theme-500 text-xs">Services/Reihe</span>
+                      <select
+                        aria-label={`Services pro Reihe für ${group}`}
+                        value={opts.columns != null ? String(opts.columns) : ""}
+                        disabled={!isRow}
+                        onChange={(e) => onSetField(group, "columns", e.target.value === "" ? "" : Number(e.target.value))}
+                        className={`${inputClass} max-w-[7rem] disabled:opacity-50`}
+                      >
+                        <option value="">Auto</option>
+                        {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={opts.header !== false}
+                        onChange={(e) => onSetField(group, "header", e.target.checked ? "" : false)}
+                      />
+                      Überschrift anzeigen
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={opts.initiallyCollapsed === true}
+                        onChange={(e) => onSetField(group, "initiallyCollapsed", e.target.checked ? true : "")}
+                      />
+                      eingeklappt starten
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={opts.useEqualHeights === true}
+                        onChange={(e) => onSetField(group, "useEqualHeights", e.target.checked ? true : "")}
+                      />
+                      gleiche Höhen
+                    </label>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
