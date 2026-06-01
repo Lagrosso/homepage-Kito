@@ -370,7 +370,7 @@ export default function AdminTheme() {
               {/* ── Presets ── */}
               <section>
                 <h2 className="text-lg font-semibold mb-3">Presets</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                   {THEME_PRESETS.map((p) => {
                     const active = parsed.color === p.color && parsed.theme === p.theme;
                     return (
@@ -378,22 +378,18 @@ export default function AdminTheme() {
                         key={p.id}
                         type="button"
                         onClick={() => applyPreset(p)}
-                        title={p.label}
+                        title={`${p.label} · ${p.theme === "dark" ? "Dark" : "Light"}${p.cardBlur ? ` · blur-${p.cardBlur}` : ""}`}
                         className={classNames(
-                          "rounded-lg overflow-hidden text-left border-2 transition-all hover:scale-[1.03]",
+                          "rounded-md overflow-hidden text-left border transition-all hover:scale-[1.04]",
                           active
-                            ? "border-blue-500 ring-2 ring-blue-400/40"
+                            ? "border-blue-500 ring-1 ring-blue-400/40"
                             : "border-transparent hover:border-theme-300 dark:hover:border-theme-600",
                         )}
                       >
-                        <div className={`theme-${p.color} h-10 w-full bg-theme-500`} />
-                        <div className="px-2 py-1 bg-white dark:bg-theme-800">
-                          <span className="block text-xs font-medium truncate text-theme-900 dark:text-theme-100">
+                        <div className={`theme-${p.color} h-6 w-full bg-theme-500`} />
+                        <div className="px-1.5 py-0.5 bg-white dark:bg-theme-800">
+                          <span className="block text-[11px] leading-tight font-medium truncate text-theme-900 dark:text-theme-100">
                             {p.label}
-                          </span>
-                          <span className="text-[10px] text-theme-400">
-                            {p.theme === "dark" ? "Dark" : "Light"}
-                            {p.cardBlur ? ` · blur-${p.cardBlur}` : ""}
                           </span>
                         </div>
                       </button>
