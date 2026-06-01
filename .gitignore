@@ -56,3 +56,4 @@ site*/
 
 # local Claude Code preview launch config (may contain a session secret)
 .claude/launch.json
+codex-desktop-linux
