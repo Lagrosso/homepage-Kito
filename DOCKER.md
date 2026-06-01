@@ -68,6 +68,10 @@ docker compose pull && docker compose up -d
 - **`HOMEPAGE_ALLOWED_HOSTS`**: Standardmäßig sind nur `localhost:3000` / `127.0.0.1` erlaubt. Für den
   Zugriff über IP oder Domain die echte(n) Adresse(n) (kommagetrennt) eintragen, z. B.
   `homepage.local:3000,192.168.14.10:3000` — oder `*` zum Deaktivieren der Prüfung.
+- **`HOMEPAGE_SECURE_COOKIE`** (Default `false`): Nur auf `true` setzen, wenn du das Dashboard über
+  **HTTPS** aufrufst. Über `http://` (LAN/IP) muss es `false` bleiben — sonst markiert der Server das
+  Login-Cookie als `Secure`, der Browser verwirft es über HTTP, und du kannst dich nach dem Setup
+  **nicht anmelden** (häufigste Stolperfalle).
 - **Konfiguration & Backups** liegen im Volume `./config` (services.yaml, bookmarks.yaml, widgets.yaml,
   settings.yaml, `users.yaml`, `.backups/`, hochgeladene Hintergründe). **Im Image stecken keine Secrets** –
   daher ist ein öffentliches Docker-Hub-Repo unproblematisch.

@@ -23,6 +23,15 @@ export function requireSessionSecret() {
   return secret;
 }
 
+// The session cookie is marked `Secure` only when explicitly enabled via
+// HOMEPAGE_SECURE_COOKIE=true. Default is off so the login works over plain HTTP
+// (typical LAN/homelab access) — a `Secure` cookie would be dropped by the
+// browser over http:// and the user could never stay logged in. Enable it when
+// serving over HTTPS.
+export function isSecureCookieEnabled() {
+  return process.env.HOMEPAGE_SECURE_COOKIE === "true";
+}
+
 export function getSessionOptions() {
   return {
     cookieName: SESSION_COOKIE_NAME,
@@ -32,7 +41,7 @@ export function getSessionOptions() {
       httpOnly: true,
       path: "/",
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookieEnabled(),
     },
   };
 }

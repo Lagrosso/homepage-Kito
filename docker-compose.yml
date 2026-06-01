@@ -15,6 +15,9 @@ services:
       # Nötig, sobald der Zugriff NICHT über localhost:3000 läuft (Host-Header-Prüfung).
       # In .env z. B. auf "192.168.14.10:3000" setzen, oder "*" zum Deaktivieren.
       - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS:-localhost:3000}
+      # Nur auf "true" setzen, wenn du das Dashboard über HTTPS aufrufst. Über http://
+      # (LAN/IP) muss das aus bleiben, sonst verwirft der Browser das Login-Cookie.
+      - HOMEPAGE_SECURE_COOKIE=${HOMEPAGE_SECURE_COOKIE:-false}
       # Optional: als bestimmter Benutzer laufen (Dateirechte im config-Volume).
       # - PUID=1000
       # - PGID=1000

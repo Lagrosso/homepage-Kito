@@ -112,6 +112,7 @@ src/
 | Variable                  | Default | Zweck                                                                        |
 | ------------------------- | ------- | ---------------------------------------------------------------------------- |
 | `HOMEPAGE_SESSION_SECRET` | –       | Pflicht-Secret für das verschlüsselte Session-Cookie, mindestens 32 Zeichen. |
+| `HOMEPAGE_SECURE_COOKIE`  | `false` | `Secure`-Flag des Session-Cookies. Nur bei HTTPS auf `true`; über HTTP muss es `false` bleiben, sonst verwirft der Browser das Cookie und Login schlägt fehl. |
 
 Backups landen in `CONF_DIR/.backups/<datei>.<ISO-timestamp>.bak`.
 

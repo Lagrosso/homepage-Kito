@@ -55,9 +55,22 @@ describe("session config", () => {
         httpOnly: true,
         path: "/",
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
       },
     });
+  });
+
+  it("marks the cookie Secure only when HOMEPAGE_SECURE_COOKIE=true", () => {
+    process.env.HOMEPAGE_SESSION_SECRET = VALID_SECRET;
+
+    delete process.env.HOMEPAGE_SECURE_COOKIE;
+    expect(getSessionOptions().cookieOptions.secure).toBe(false);
+
+    process.env.HOMEPAGE_SECURE_COOKIE = "true";
+    expect(getSessionOptions().cookieOptions.secure).toBe(true);
+
+    process.env.HOMEPAGE_SECURE_COOKIE = "false";
+    expect(getSessionOptions().cookieOptions.secure).toBe(false);
   });
 
   it("sets secure cookie defaults for the homepage session", () => {
