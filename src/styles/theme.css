@@ -555,3 +555,165 @@
   --color-logo-start: 255 58 168;
   --color-logo-stop: 144 2 76;
 }
+
+/* --- Muted / pastel palettes (calm, desaturated) ------------------------- */
+
+.theme-fog {
+  --color-50: 244 246 248;
+  --color-100: 234 238 242;
+  --color-200: 214 222 230;
+  --color-300: 186 198 210;
+  --color-400: 146 162 180;
+  --color-500: 116 134 154;
+  --color-600: 92 108 128;
+  --color-700: 72 86 102;
+  --color-800: 50 60 72;
+  --color-900: 32 40 50;
+
+  --color-logo-start: 146 162 180;
+  --color-logo-stop: 72 86 102;
+}
+
+.theme-denim {
+  --color-50: 242 246 250;
+  --color-100: 230 238 246;
+  --color-200: 206 222 236;
+  --color-300: 172 196 220;
+  --color-400: 122 154 190;
+  --color-500: 92 126 166;
+  --color-600: 72 102 138;
+  --color-700: 58 82 110;
+  --color-800: 42 58 78;
+  --color-900: 28 40 54;
+
+  --color-logo-start: 122 154 190;
+  --color-logo-stop: 58 82 110;
+}
+
+.theme-dusk {
+  --color-50: 244 245 250;
+  --color-100: 235 237 246;
+  --color-200: 216 220 238;
+  --color-300: 186 192 222;
+  --color-400: 138 146 190;
+  --color-500: 108 118 164;
+  --color-600: 86 96 136;
+  --color-700: 68 76 108;
+  --color-800: 48 54 78;
+  --color-900: 32 36 52;
+
+  --color-logo-start: 138 146 190;
+  --color-logo-stop: 68 76 108;
+}
+
+.theme-mauve {
+  --color-50: 247 245 249;
+  --color-100: 240 236 244;
+  --color-200: 226 218 234;
+  --color-300: 204 192 218;
+  --color-400: 168 150 192;
+  --color-500: 140 122 166;
+  --color-600: 114 98 138;
+  --color-700: 90 78 110;
+  --color-800: 64 54 78;
+  --color-900: 42 36 52;
+
+  --color-logo-start: 168 150 192;
+  --color-logo-stop: 90 78 110;
+}
+
+.theme-blush {
+  --color-50: 250 245 246;
+  --color-100: 247 236 238;
+  --color-200: 240 218 222;
+  --color-300: 226 190 196;
+  --color-400: 202 150 160;
+  --color-500: 176 122 132;
+  --color-600: 148 98 108;
+  --color-700: 118 78 86;
+  --color-800: 84 56 62;
+  --color-900: 56 38 42;
+
+  --color-logo-start: 202 150 160;
+  --color-logo-stop: 118 78 86;
+}
+
+.theme-dust {
+  --color-50: 248 244 245;
+  --color-100: 240 232 234;
+  --color-200: 224 210 214;
+  --color-300: 200 180 186;
+  --color-400: 170 142 150;
+  --color-500: 142 114 122;
+  --color-600: 116 92 100;
+  --color-700: 92 72 80;
+  --color-800: 64 50 56;
+  --color-900: 42 32 37;
+
+  --color-logo-start: 170 142 150;
+  --color-logo-stop: 92 72 80;
+}
+
+.theme-clay {
+  --color-50: 250 246 243;
+  --color-100: 246 238 232;
+  --color-200: 236 220 208;
+  --color-300: 220 192 174;
+  --color-400: 192 150 126;
+  --color-500: 166 122 98;
+  --color-600: 138 98 78;
+  --color-700: 110 78 62;
+  --color-800: 78 56 44;
+  --color-900: 52 38 30;
+
+  --color-logo-start: 192 150 126;
+  --color-logo-stop: 110 78 62;
+}
+
+.theme-sand {
+  --color-50: 250 248 244;
+  --color-100: 246 242 234;
+  --color-200: 236 228 214;
+  --color-300: 218 206 182;
+  --color-400: 188 170 138;
+  --color-500: 160 142 112;
+  --color-600: 132 116 90;
+  --color-700: 104 92 72;
+  --color-800: 74 64 50;
+  --color-900: 50 44 34;
+
+  --color-logo-start: 188 170 138;
+  --color-logo-stop: 104 92 72;
+}
+
+.theme-moss {
+  --color-50: 246 247 242;
+  --color-100: 238 240 230;
+  --color-200: 222 226 208;
+  --color-300: 198 204 174;
+  --color-400: 158 168 124;
+  --color-500: 130 140 98;
+  --color-600: 104 114 76;
+  --color-700: 82 90 60;
+  --color-800: 58 64 42;
+  --color-900: 38 42 28;
+
+  --color-logo-start: 158 168 124;
+  --color-logo-stop: 82 90 60;
+}
+
+.theme-fern {
+  --color-50: 242 248 246;
+  --color-100: 232 242 238;
+  --color-200: 210 228 222;
+  --color-300: 178 206 196;
+  --color-400: 130 172 158;
+  --color-500: 102 144 130;
+  --color-600: 80 116 104;
+  --color-700: 64 92 82;
+  --color-800: 46 64 58;
+  --color-900: 30 44 40;
+
+  --color-logo-start: 130 172 158;
+  --color-logo-stop: 64 92 82;
+}

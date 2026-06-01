@@ -31,10 +31,14 @@ export const THEME_PRESETS = [
   { id: "arctic-white",    label: "Arctic White",     color: "white",    theme: "light", cardBlur: "" },
 ];
 
+// Curated calm/muted palette offered in the color picker. Deliberately leaves
+// out the loud, highly saturated tones to keep the choices restful (pastel /
+// desaturated). The vivid colors stay defined in theme.css / themes.js, so
+// existing configs and presets that use them still render — they are just no
+// longer offered here.
 export const ALL_COLORS = [
   "slate", "gray", "zinc", "neutral", "stone",
-  "amber", "orange", "yellow", "lime", "green", "emerald", "teal", "forest",
-  "cyan", "sky", "ocean", "blue", "indigo", "midnight", "violet", "lavender",
-  "purple", "fuchsia", "pink", "rose", "cherry", "maroon", "red", "rust",
-  "coral", "gold", "sage", "neon", "white",
+  "fog", "denim", "dusk", "fern", "moss",
+  "sage", "sand", "clay", "dust", "mauve",
+  "blush", "lavender",
 ];

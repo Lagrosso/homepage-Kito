@@ -203,6 +203,67 @@ const themes = {
     iconEnd: "#90024c",
     dark: "#680136",
   },
+  // Muted / pastel palettes (calm, desaturated)
+  fog: {
+    light: "#f4f6f8",
+    iconStart: "#92a2b4",
+    iconEnd: "#485666",
+    dark: "#323c48",
+  },
+  denim: {
+    light: "#f2f6fa",
+    iconStart: "#7a9abe",
+    iconEnd: "#3a526e",
+    dark: "#2a3a4e",
+  },
+  dusk: {
+    light: "#f4f5fa",
+    iconStart: "#8a92be",
+    iconEnd: "#444c6c",
+    dark: "#30364e",
+  },
+  mauve: {
+    light: "#f7f5f9",
+    iconStart: "#a896c0",
+    iconEnd: "#5a4e6e",
+    dark: "#40364e",
+  },
+  blush: {
+    light: "#faf5f6",
+    iconStart: "#ca96a0",
+    iconEnd: "#764e56",
+    dark: "#54383e",
+  },
+  dust: {
+    light: "#f8f4f5",
+    iconStart: "#aa8e96",
+    iconEnd: "#5c4850",
+    dark: "#403238",
+  },
+  clay: {
+    light: "#faf6f3",
+    iconStart: "#c0967e",
+    iconEnd: "#6e4e3e",
+    dark: "#4e382c",
+  },
+  sand: {
+    light: "#faf8f4",
+    iconStart: "#bcaa8a",
+    iconEnd: "#685c48",
+    dark: "#4a4032",
+  },
+  moss: {
+    light: "#f6f7f2",
+    iconStart: "#9ea87c",
+    iconEnd: "#525a3c",
+    dark: "#3a402a",
+  },
+  fern: {
+    light: "#f2f8f6",
+    iconStart: "#82ac9e",
+    iconEnd: "#405c52",
+    dark: "#2e403a",
+  },
 };
 
 export default themes;
