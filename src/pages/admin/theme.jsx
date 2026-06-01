@@ -346,7 +346,7 @@ export default function AdminTheme() {
       <Head>
         <title>Theme &amp; Branding</title>
       </Head>
-      <div className="min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-900 dark:text-theme-100">
+      <div className="admin-shell min-h-screen bg-theme-50 dark:bg-theme-900 text-theme-900 dark:text-theme-100">
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-theme-200 dark:border-theme-700 bg-white dark:bg-theme-900">
           <div className="flex items-center gap-3">

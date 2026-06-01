@@ -1,16 +1,34 @@
 /* eslint-disable react/jsx-props-no-spreading */
+import "@fontsource-variable/jetbrains-mono";
 import { appWithTranslation } from "next-i18next";
 import Head from "next/head";
 import "styles/globals.css";
-import "styles/manrope.css";
 import "styles/theme.css";
-import { SWRConfig } from "swr";
+import { useEffect } from "react";
+import useSWR, { SWRConfig } from "swr";
 import { ColorProvider } from "utils/contexts/color";
 import { SettingsProvider } from "utils/contexts/settings";
 import { TabProvider } from "utils/contexts/tab";
 import { ThemeProvider } from "utils/contexts/theme";
+import { cardRadiusValue } from "utils/styles/card-radius";
 
 import nextI18nextConfig from "../../next-i18next.config";
+
+// Applies the configured card corner radius as a global CSS variable on every
+// page (dashboard and admin), so the rounding stays consistent everywhere.
+function CardRadiusVar() {
+  const { data } = useSWR("/api/config/theme-vars");
+  useEffect(() => {
+    const value = cardRadiusValue(data?.cardRadius);
+    const html = document.documentElement;
+    if (value) {
+      html.style.setProperty("--card-radius", value);
+    } else {
+      html.style.removeProperty("--card-radius");
+    }
+  }, [data?.cardRadius]);
+  return null;
+}
 
 // eslint-disable-next-line no-unused-vars
 const tailwindSafelist = [
@@ -88,6 +106,7 @@ function MyApp({ Component, pageProps }) {
         <ThemeProvider>
           <SettingsProvider>
             <TabProvider>
+              <CardRadiusVar />
               <Component {...pageProps} />
             </TabProvider>
           </SettingsProvider>
