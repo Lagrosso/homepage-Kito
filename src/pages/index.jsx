@@ -584,11 +584,29 @@ export default function Wrapper({ initialSettings, fallback }) {
       html.classList.add(desiredThemeClass);
     }
 
+    // Configurable card corner radius
+    const radiusMap = {
+      none: "0px",
+      sm: "0.125rem",
+      md: "0.375rem",
+      lg: "0.5rem",
+      xl: "0.75rem",
+      "2xl": "1rem",
+      "3xl": "1.5rem",
+      full: "9999px",
+    };
+    const cardRadius = radiusMap[initialSettings.cardRadius];
+    if (cardRadius) {
+      html.style.setProperty("--card-radius", cardRadius);
+    } else {
+      html.style.removeProperty("--card-radius");
+    }
+
     // Remove any previously applied inline styles
     body.style.backgroundImage = "";
     body.style.backgroundColor = "";
     body.style.backgroundAttachment = "";
-  }, [backgroundImage, opacity, theme, color, initialSettings.color]);
+  }, [backgroundImage, opacity, theme, color, initialSettings.color, initialSettings.cardRadius]);
 
   return (
     <>

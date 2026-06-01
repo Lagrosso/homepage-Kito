@@ -167,6 +167,18 @@ export default function AdminTheme() {
       return updateSetting(r, { key: "cardBlur" }, v);
     }, `Card Blur: ${v || "keiner"}`);
 
+  const setCardRadius = (v) =>
+    mutateSettings((r) => {
+      if (!v) {
+        try {
+          return deleteSetting(r, { key: "cardRadius" });
+        } catch {
+          return r;
+        }
+      }
+      return updateSetting(r, { key: "cardRadius" }, v);
+    }, `Ecken-Rundung: ${v || "Standard"}`);
+
   // --- Background ---
   const setBgField = (field, value) =>
     mutateSettings((r) => setBackgroundField(r, field, value), `Hintergrund: ${field} geändert`);
@@ -262,6 +274,7 @@ export default function AdminTheme() {
       color: parsed.color ?? null,
       theme: parsed.theme ?? null,
       cardBlur: parsed.cardBlur ?? null,
+      cardRadius: parsed.cardRadius ?? null,
       ...(Object.keys(bg).length > 0 ? { background: bg } : {}),
       ...(cssContent ? { customCss: cssContent } : {}),
     };
@@ -297,6 +310,17 @@ export default function AdminTheme() {
           }
         } else {
           raw = updateSetting(raw, { key: "cardBlur" }, data.cardBlur);
+        }
+      }
+      if (data.cardRadius != null) {
+        if (data.cardRadius === "") {
+          try {
+            raw = deleteSetting(raw, { key: "cardRadius" });
+          } catch {
+            /* ok */
+          }
+        } else {
+          raw = updateSetting(raw, { key: "cardRadius" }, data.cardRadius);
         }
       }
       if (data.background && typeof data.background === "object") {
@@ -463,6 +487,29 @@ export default function AdminTheme() {
                       <option value="md">md</option>
                       <option value="lg">lg</option>
                       <option value="xl">xl</option>
+                    </select>
+                  </div>
+
+                  {/* Card corner radius */}
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <label htmlFor="cardRadius" className="text-sm font-medium">
+                      Ecken-Rundung
+                    </label>
+                    <select
+                      id="cardRadius"
+                      value={parsed.cardRadius ?? ""}
+                      onChange={(e) => setCardRadius(e.target.value)}
+                      className={`${inputClass} max-w-[10rem]`}
+                    >
+                      <option value="">Standard (md)</option>
+                      <option value="none">Keine (eckig)</option>
+                      <option value="sm">sm</option>
+                      <option value="md">md</option>
+                      <option value="lg">lg</option>
+                      <option value="xl">xl</option>
+                      <option value="2xl">2xl</option>
+                      <option value="3xl">3xl</option>
+                      <option value="full">Voll (rund)</option>
                     </select>
                   </div>
                 </div>
