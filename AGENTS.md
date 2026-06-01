@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Guidance for working in this repository.
 
@@ -32,7 +32,9 @@ Für Plan-Modi gilt: Architekturvorschläge, Vor- und Nachteile, Empfehlungen, A
 - **Next.js 16** mit **Pages Router** (`src/pages/`), `output: "standalone"`, SSG via `getStaticProps`.
 - **React 19**, **Tailwind CSS v4**, `@headlessui/react`, `react-icons`.
 - **next-i18next** (Crowdin-Übersetzungen unter `public/locales/<lang>/common.json`).
-- **js-yaml** für YAML, **winston** für Logging, **memory-cache** für Env-Var-Caching.
+- **js-yaml** für bestehende Loader/Validierung, **eemeli `yaml`** für kommentererhaltende YAML-Edits,
+  **winston** für Logging, **memory-cache** für Env-Var-Caching.
+- **iron-session** für Cookie-Sessions; **@fontsource-variable/jetbrains-mono** als self-hosted UI-Font.
 - **Vitest** für Tests, **ESLint + Prettier** (`prettier-plugin-organize-imports`).
 - **pnpm only** (`preinstall` erzwingt pnpm via `only-allow`).
 
@@ -61,6 +63,7 @@ docker compose pull && docker compose up -d   # → http://server:3000 → /setu
 
 - `docker-compose.yml` (Repo-Root) zieht nur `${DOCKERHUB_IMAGE}` (kein Build auf dem Server);
   `.env.example` als Vorlage; `.env` ist gitignored.
+- Aktuelles Docker-Hub-Image im Nutzer-Setup: `lagrosso/homepage-kito:latest`.
 - **`HOMEPAGE_SESSION_SECRET` ist Pflicht** (≥32 Zeichen), sonst startet die App nicht.
   `HOMEPAGE_ALLOWED_HOSTS` setzen, sobald der Zugriff nicht über `localhost:3000` läuft.
 - Der Healthcheck nutzt `GET /api/healthcheck` — dieser Pfad ist in `middleware.js` **vor** der Login-Wall
@@ -77,13 +80,18 @@ src/
   pages/                  Next.js Pages + API-Routes
     index.jsx             Haupt-Dashboard (getStaticProps, SSG)
     _app.jsx, _document.jsx
-    admin/config.jsx      Admin-/Config-UI
+    admin/                Admin-/Config-UI: config, bookmarks, widgets, settings,
+                          layout, theme, users
     api/
       services/index.js   GET /api/services (read-only Aggregation)
       bookmarks.js, validate.js, ...
       config/[path].js     custom.css / custom.js (read-only)
       config/raw/[file].js GET/POST Roh-Config lesen+schreiben (Admin-Rolle)
+      config/background-image.js  Hintergrundbilder lesen/schreiben (Admin-Rolle)
+      config/custom-css.js        custom.css lesen/schreiben (Admin-Rolle)
+      config/theme-vars.js        sichere visuelle Theme-Variablen
       auth/*              Login/Logout/Setup/Session-Status
+      users.js            Admin-only User-Management-API
   components/             services/, bookmarks/, widgets/, toggles/
   utils/
     config/               Config-Loader (serverseitig, FS + YAML)
@@ -139,7 +147,7 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
    - **5a (umgesetzt):** `services.yaml` – Edit + Delete bestehender Service-Einträge. Neues `utils/config/yaml-edit.js` (`updateServiceEntry`/`deleteServiceEntry`); `ConfigEditor`-Shell additiv um optionale Props `EditDialog`/`editEntry`/`deleteEntry` erweitert; Edit/Delete-Buttons in der Card-Vorschau; `ServiceAddDialog` zu mode-fähigem `ServiceFormDialog` verallgemeinert. **Bare-unquotete** `{{HOMEPAGE_*}}` werden zum Schutz abgelehnt (Hinweis: Raw-Editor). `doc.toString()` bewusst **ohne** Optionen → layout-treu (4/8-Einrückung, Kommentare, Leerzeilen, `---`).
    - **5b (umgesetzt):** Edit + Delete auch für `bookmarks.yaml`, `widgets.yaml` und `settings.yaml` (gleiches Shell-Muster, Locator reicht das ganze `entry` durch). Neue Helfer in `yaml-edit.js` (`updateBookmarkEntry`/`deleteBookmarkEntry`, `updateWidgetOptions`/`deleteWidget`, `updateSetting`/`deleteSetting`) + geteilte `applyScalarField`/`applyRename`. **secret-aware** für `widgets.yaml`/`settings.yaml` via `secret-mask.js`: echte Secrets werden nie vorbefüllt, bei „leer = behalten" nicht überschrieben, `[redacted]` wird nie geschrieben; `editable`-Flag in `widget-preview.js`/`settings-preview.js` (nur skalare, nicht-secret, nicht-Platzhalter Werte). **v1-Grenzen:** Widgets nur String-Optionen editierbar (Zahlen/Booleans/Objekte → raw), kein Typ-Wechsel/Add; Settings nur skalare nicht-secret Werte (komplexe/`providers` → raw, Delete erlaubt); Bookmarks ohne Gruppenwechsel.
    - **5c (umgesetzt):** Verschieben/Umsortieren per **Hoch/Runter-Buttons** (kein Drag&Drop). Neue Helfer in `yaml-edit.js` (`moveEntryInGroup`, `moveGroup`, `moveEntryToGroup`, `moveWidget`); Move-Controls zentral in der `Preview`-Shell (Cards unverändert), bei bare `{{HOMEPAGE_*}}` ausgeblendet (wie Edit/Delete). **services/bookmarks:** Reihenfolge in Gruppe, Gruppen umsortieren, zwischen Gruppen verschieben (Cross-Group hängt v1 ans **Ende** der Zielgruppe; `toSeq.flow=false` erzwingt Block-Stil auch bei zuvor geleerten `[]`-Gruppen). **widgets:** nur ▲/▼ per Index. **settings ausgeklammert** (Anzeige-Gruppen ≠ Dateireihenfolge). **Limit (M5c-2):** beim Reorder wandert ein als `commentBefore` gebundener Kommentar mit seinem Knoten mit (ein Datei-Kopf-Kommentar ohne `---`-Bindung kann so in die Mitte rutschen) — valide, vor Save im Raw-Editor sichtbar. **Tabs** erst mit M6.
-   - **5d (umgesetzt):** echtes **Drag & Drop** als Alternative zu Hoch/Runter (**@dnd-kit**, Buttons bleiben als barrierefreier Fallback). Neue index-basierte Helfer in `yaml-edit.js` (`moveEntryToIndex`/`moveGroupToIndex`/`moveWidgetToIndex` + `moveEntryToGroup` mit optionalem `toIndex`); `Preview` in `config-editor.jsx` um `DndPreview` (DndContext + SortableContext, Drag-Handle pro Karte/Gruppe) erweitert, aktiv sobald die Index-Helfer verdrahtet sind (services/bookmarks: Einträge in Gruppe, Gruppen, Cross-Group mit Zielposition; widgets: per Index). Mutation nur im Editor; bei bare `{{HOMEPAGE_*}}` deaktiviert (wie M5c). **Out of scope v1:** Tabs-Reihenfolge und die Listen-UI in `/admin/layout`. (F1)
+   - **5d (umgesetzt):** echtes **Drag & Drop** als Alternative zu Hoch/Runter (**@dnd-kit**, Buttons bleiben als barrierefreier Fallback). Neue index-basierte Helfer in `yaml-edit.js` (`moveEntryToIndex`/`moveGroupToIndex`/`moveWidgetToIndex` + `moveEntryToGroup` mit optionalem `toIndex`); `Preview` in `config-editor.jsx` um `DndPreview` (DndContext + SortableContext, Drag-Handle pro Karte/Gruppe) erweitert, aktiv sobald die Index-Helfer verdrahtet sind (services/bookmarks: Einträge in Gruppe, Gruppen, Cross-Group mit Zielposition; widgets: per Index). Mutation nur im Editor; bei bare `{{HOMEPAGE_*}}` deaktiviert (wie M5c). **Nachtrag:** Wenn `settings.yaml` `layout:` nutzt, steuert dieses Layout die sichtbare Gruppen-Reihenfolge; Services-/Bookmarks-Preview blendet Datei-Gruppen-Reorder dann aus und verweist auf `/admin/layout`. **Out of scope v1:** Tabs-Reihenfolge. (F1)
 6. **Meilenstein 6 – Tabs/Layout-Verwaltung:** Tabs (oberhalb der Gruppen, unter der Suche) und das Gruppen-Layout über die UI verwalten (entspr. `settings.yaml` `layout`; vgl. `components/tab.jsx`, `components/services/group.jsx`).
    - **6 v1 (umgesetzt):** Seite `/admin/layout` (eigener Nav-Tab, href-basiertes Highlight). **Tabs anlegen/umbenennen/löschen** + **Gruppe↔Tab zuordnen** (inkl. „kein Tab"). Helfer `assignGroupToTab`/`renameTab`/`deleteTab` in `yaml-edit.js` (eemeli, kommentarerhaltend; Listen-/Objekt-/Fehlt-Form; prunt leere Einträge); read-only `layout-preview.js` (`parseLayout`/`groupNamesFromRaw`, Cross-File aus services+bookmarks); Shell additiv um `PreviewPanel`-Prop erweitert. Eingaben **inline** (kein `window.prompt` — von Next.js 16/Turbopack nicht unterstützt; `confirm` bleibt für Delete). Änderungen nur im Editor; Validate/Save/Backup/Gating wie gehabt.
    - **6b (umgesetzt) – Per-Gruppe-Anzeige & globale Gruppen-Anordnung über die UI:** in `/admin/layout` zusätzlich zu Tabs.
@@ -147,7 +155,8 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
      - **Globale Gruppen-Anordnung:** `maxGroupColumns` (4–8) = wie viele Gruppen **max. nebeneinander**; **Grenze:** <4 ist global nicht einstellbar (Homepage-`3xl:`-Breakpoint) — weniger pro Reihe via per-Gruppe `style: row` (volle Breite). Beim Setzen wird `fiveColumns` entfernt, damit es den Wert nicht überschreibt.
      - Pro Gruppe zusätzlich: `header` (an/aus), `initiallyCollapsed`, `useEqualHeights` (Checkboxen; „Default" = Feld gelöscht).
      - Neuer generischer Helfer `setGroupLayoutField(raw,{group,field},value)` in `yaml-edit.js` (eemeli, kommentarerhaltend; erbt Block-Erzeugung + Skalar-`layout`-Guard + `flow=false`); `assignGroupToTab` ist jetzt ein Thin-Wrapper darüber. Global via vorhandene `updateSetting`/`deleteSetting`. `layout-preview.js`: `parseLayout` um style/columns/header/initiallyCollapsed/useEqualHeights erweitert + neues `parseGlobalLayout`. Änderungen nur im Editor; Validate/Save/Backup/Gating wie gehabt.
-     - **v1-Grenzen:** Nested Groups in `layout[group]`, per-Gruppe `icon`, `maxBookmarkGroupColumns` und Gruppen-Reorder (→ 5d) bleiben dem Raw-Editor vorbehalten.
+     - **Nachtrag (umgesetzt): globale Gruppen-Reihenfolge in `/admin/layout`.** `moveLayoutGroup`/`moveLayoutGroupToIndex` in `yaml-edit.js` ordnen Gruppen kommentererhaltend über `settings.yaml` `layout:`; `/admin/layout` bietet ▲/▼ dafür. DnD nutzt pointer-basierte Kollisionserkennung (`dndCollisionDetection`).
+     - **v1-Grenzen:** Nested Groups in `layout[group]`, per-Gruppe `icon`, `maxBookmarkGroupColumns` und Tabs-Reihenfolge bleiben dem Raw-Editor vorbehalten.
 7. **Meilenstein 7 – Authentifizierung & Rollen/Berechtigungen (umgesetzt):** Echte Cookie-Session (`iron-session`) statt statischem Token; voller Login-Zwang auch für das Dashboard; rollenbasierte Rechte v1.
    - **Rollen v1:** `admin` darf Dashboard ansehen und Configs lesen/schreiben; `viewer` darf nur Dashboard/API-Read-Pfade nutzen. Raw-Config-GET/POST ist nur für Admins erreichbar, damit Klartext-Secrets nicht an Viewer gehen.
    - **Setup v1:** `/setup` legt nur den ersten Admin an, solange noch kein `users.yaml` existiert. Danach erfolgt Login über `/login`.
@@ -159,12 +168,13 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 8. **Meilenstein 8 – Theming, Branding & Custom UI (umgesetzt):** Neue Admin-Seite `/admin/theme` — eigenständige Seite (kein ConfigEditor-Shell), lädt `settings.yaml` + `custom.css` parallel, speichert getrennt.
    - **8a Theme-Presets (umgesetzt):** 25 Presets (15 Dark, 10 Light) in `utils/config/theme-presets.js`; Preset-Karte zeigt Farbvorschau + Dark/Light-Badge; Klick wendet `color`/`theme`/`cardBlur` via yaml-edit auf `settings.yaml` an. Neues `CONFIG_TABS`-Export aus `config-editor.jsx` für konsistente Nav.
    - **8b Hintergrundbild-Upload (umgesetzt):** Neuer API-Endpunkt `POST /api/config/background-image` (base64-JSON, max. 10 MB) speichert unter `CONF_DIR/images/`; `GET ?file=<name>` liefert Bild aus; Pfad wird via `setBackgroundField` in `settings.yaml` gesetzt. Regler für Deckkraft/Blur/Sättigung/Helligkeit direkt im Theme-UI.
-   - **8c Visueller Theme-Editor (umgesetzt):** Farbpalette mit **34 Farben** (23 Tailwind-Standard + `orange`-Fix + 11 neue Custom-Farben: `forest`, `ocean`, `lavender`, `coral`, `gold`, `midnight`, `rust`, `sage`, `maroon`, `neon`, `cherry`); Hell/Dunkel-Toggle; Card-Blur-Auswahl. Alles schreibt in `settings.yaml`.
+   - **8c Visueller Theme-Editor (umgesetzt):** kuratierte ruhige Farbpalette (`ALL_COLORS`) mit gedämpften/pastelligen Farben; Hell/Dunkel-Toggle; Card-Blur-Auswahl; globale Ecken-Rundung (`settings.cardRadius`). Alles schreibt in `settings.yaml`.
    - **8d Custom-CSS-Editor (umgesetzt):** `custom.css` über `/admin/theme` bearbeiten — neues `utils/config/css-writer.js` (Backup + atomic write); API `GET/POST /api/config/custom-css` (Admin-only); Warnbanner im UI.
    - **8e Theme Import/Export (umgesetzt):** Export: JSON mit `color`, `theme`, `cardBlur`, `background`-Effekten, `customCss` — ohne `background.image` (Pfad nicht portabel) und ohne Secrets. Import: JSON einfügen → sofort auf `settings.yaml` + `customCss`-State anwenden.
    - **8f Theme pro Benutzer:** ausdrücklich aus M8 ausgeklammert (erfordert User-Store-Erweiterung jenseits von `users.yaml`).
-   - **8c-Nachtrag (umgesetzt): ruhige Farbpalette.** Der Farbpicker bietet jetzt eine **kuratierte gedämpfte/pastellige** Auswahl (neutrale Verläufe + 10 neue entsättigte Töne: `fog`, `denim`, `dusk`, `fern`, `moss`, `sage`, `sand`, `clay`, `dust`, `mauve`, `blush`, `lavender`). Die schrillen/satten Farben bleiben in `theme.css`/`themes.js` **definiert** (kein Crash, Presets funktionieren), werden aber nicht mehr angeboten (`ALL_COLORS` kuratiert). `themes.test` erzwingt: jede angebotene Farbe hat eine gültige Palette.
+   - **8c-Nachtrag (umgesetzt): ruhige Farbpalette.** Der Farbpicker bietet jetzt eine **kuratierte gedämpfte/pastellige** Auswahl (neutrale Verläufe + entsättigte Töne: `fog`, `denim`, `dusk`, `fern`, `moss`, `sage`, `sand`, `clay`, `dust`, `mauve`, `blush`, `lavender`). Die schrillen/satten Farben bleiben in `theme.css`/`themes.js` **definiert** (kein Crash für bestehende Configs), werden aber nicht mehr angeboten (`ALL_COLORS` kuratiert). `themes.test` erzwingt: jede angebotene Farbe hat eine gültige Palette.
    - **8g Presets entschärfen (umgesetzt):** Die benannten `THEME_PRESETS` in `utils/config/theme-presets.js` nutzen jetzt gedämpfte/pastellige Farben aus der kuratierten Palette statt der zuvor kräftigen Neon-/Cherry-/Dracula-Varianten. `themes.test.js` stellt zusätzlich sicher, dass Preset-Farben in `ALL_COLORS` enthalten sind und eine gültige Palette besitzen.
+   - **8h UI-Finishing (umgesetzt):** `settings.cardRadius` wird über `/api/config/theme-vars` als CSS-Variable `--card-radius` in `_app.jsx` gesetzt und in `globals.css` für Karten, Suche, Admin-Buttons und Tabs genutzt. Font ist global JetBrains Mono (`@fontsource-variable/jetbrains-mono`); die Admin-Navigation ist als flache Unterstrich-Tabs vereinheitlicht.
    - **Neue yaml-edit-Helfer:** `setBackgroundField(raw, field, value)` + `removeBackground(raw)` für nested `background.*` in `settings.yaml`.
 
 #### Phase 1/2 – read-only, mit den Leitplanken vereinbar
@@ -210,7 +220,7 @@ Per Playwright-Chromium gegen `pnpm dev` getrieben; alle Punkte **bestanden**:
 - **Services – strukturierte Bearbeitung (M5 5a), PASS (Browser-E2E + Unit-Tests grün):** Edit ändert Felder bzw. ergänzt fehlende; Description, Inline-Kommentare, Leerzeilen, 4/8-Einrückung und `---` bleiben erhalten; Delete entfernt nur den Zieleintrag (geleerte Gruppe bleibt als `[]`); Änderungen landen **nur im Editor** (Disk unverändert bis Save); bare-unquotete `{{HOMEPAGE_*}}` werden abgelehnt.
 - **Bookmarks/Widgets/Settings – strukturierte Bearbeitung (M5 5b), PASS (Browser-E2E + 28 yaml-edit-Unit-Tests, 1481 Tests gesamt grün):** Bookmark-Edit (abbr GH→GHB) erhält Nesting + Kommentare; Widget-Edit ändert nur das geänderte Feld (provider→google), andere Widgets/Optionen byte-gleich, Widget-Delete per Index; Settings zeigt `providers` als `{…:"[redacted]"}` (Namen sichtbar) **ohne** Edit-Button (nur Delete); Secrets bleiben byte-gleich und `[redacted]` wird nie geschrieben; Disk unverändert bis Save.
 - **Verschieben/Umsortieren (M5c), PASS (Browser-E2E + Move-Unit-Tests, gesamt grün):** services — Gruppe ▲ (My Second Group nach oben), Cross-Group (My First Service ans Ende von My Third Group, Quellgruppe `[]`, **Block-Stil** nach Fix M5c-1), Eintrag ▲/▼ in Gruppe; Kommentare + 😎 erhalten. widgets — ▲/▼ per Index, **keine** Gruppen-/„→ Gruppe"-Controls. settings — keine Move-Controls. Disk unverändert bis Save. (Hinweis M5c-2: `commentBefore`-Kommentare wandern beim Reorder mit dem Knoten.)
-- **Header-Navigation:** Dashboard-Header mit **Home** (links), rollenbasiertem **Admin**-Button (nur `admin`) und Logout; „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server braucht `HOMEPAGE_SESSION_SECRET` im `env`-Feld von `.claude/launch.json`.
+- **Header-Navigation:** Dashboard-Header mit **Home** (links), rollenbasiertem **Admin**-Button (nur `admin`) und Logout; „← Dashboard"-Rücklink in der Admin-Shell. Preview-Server braucht `HOMEPAGE_SESSION_SECRET` im `env`-Feld von `.Codex/launch.json`.
 - **Tabs/Layout-Verwaltung (M6 v1), PASS (Browser-E2E + 15 Layout-Unit-Tests, 1507 gesamt grün):** `/admin/layout` lädt Gruppen aus services+bookmarks (Cross-File); Nav-Highlight href-basiert (nur „Layout"); Tab anlegen (Inline-Formular) erzeugt `layout:`-Block (Kommentar + `providers` erhalten), 2. Gruppe zuweisen, Tab umbenennen (Inline), Tab löschen (`confirm`, Einträge geprunt → `layout: []`); Disk unverändert bis Save; andere Admin-Seiten unverändert. **Fix:** `window.prompt` durch Inline-Eingaben ersetzt (Turbopack-Runtime unterstützt `prompt()` nicht). **Kosmetik:** leeres `layout: []` bleibt, wenn alle Gruppen entfernt werden.
 - **Drag & Drop (M5d), PASS (Browser-E2E + 7 Index-Move-Unit-Tests, 1527 gesamt grün):** `/admin/config` rendert die `DndPreview` mit Drag-Handles je Karte/Gruppe **neben** den Hoch/Runter-Buttons. Synthetische Pointer-Drags verifiziert: Eintrag **Cross-Group** an Zielindex (`My First Service` → `My Third Group` Pos. 0; Quellgruppe wird `[]`, Block-Stil + 😎 + Kommentare erhalten) und **Gruppen-Reorder** (Third über Second). Mutation **nur im Editor** (Disk unverändert bis Save); bei bare `{{HOMEPAGE_*}}` ist DnD aus (wie M5c). @dnd-kit-Deps ergänzt. **Hinweis:** echte Drag-Simulation via Pointer-Events funktioniert; within-group-Reorder teilt denselben Pfad.
 - **Per-Gruppe-Anzeige & globale Anordnung (M6b), PASS (Browser-E2E + Unit-Tests, gesamt grün):** in `/admin/layout` je Gruppe Ausrichtung (`style: row`), `columns` (nur bei row aktiv) und Checkboxen `header`/`initiallyCollapsed`/`useEqualHeights`; global `maxGroupColumns` (4–8, schreibt Top-Level, entfernt `fiveColumns`). Felder werden **in place** ergänzt/geändert (andere Optionen, Kommentare, `providers` byte-gleich erhalten), Default-Wechsel **löscht** das Feld (leert `style`→ auch `columns`), Eintrag bleibt solange noch Optionen da sind. Save schreibt korrektes YAML + Backup; Disk unverändert bis Save; Dashboard rendert die Layout-Optionen fehlerfrei. `setGroupLayoutField` lehnt Skalar-`layout:` und bare `{{HOMEPAGE_*}}` ab. **Hinweis:** stale `.next`-Cache nach Edits führte zu hängendem „Loading…" → `rm -rf .next` + Server-Neustart behob es (Doku-Hinweis weiter unten).
@@ -235,8 +245,8 @@ Per Vitest/Lint, Component-Tests und lokale HTTP-Smoke-Checks gegen `pnpm dev` m
 
 - **`/admin/theme`** erreichbar für Admin; Nav-Tab „Theme" in allen Admin-Seiten sichtbar.
 - **Presets:** 25 Karten, jede mit Farbvorschau-Balken + Dark/Light-Badge; Aktiv-Markierung via `border-blue-500`.
-- **Farbpalette:** 34 Farben (inkl. 11 neue Custom-Farben), alle visuell in Grid mit Skalierung auf Auswahl.
-- **Hell/Dunkel-Toggle**, **Card-Blur-Dropdown** schreiben via yaml-edit in `settings.yaml`.
+- **Farbpalette:** inzwischen kuratierte ruhige Auswahl (`ALL_COLORS`) mit neutralen und gedämpften/pastelligen Tönen; grelle Legacy-Farben bleiben in `theme.css`/`themes.js` definiert, werden aber nicht angeboten.
+- **Hell/Dunkel-Toggle**, **Card-Blur-Dropdown** und **Ecken-Rundung (`cardRadius`)** schreiben via yaml-edit in `settings.yaml`.
 - **Hintergrund:** URL-Eingabe + Datei-Upload (base64, max. 10 MB, Vorschau), Regler Deckkraft/Blur/Sättigung/Helligkeit.
 - **Custom CSS:** Textarea + Backup-Write via `css-writer.js`.
 - **Export:** JSON ohne `background.image` und ohne Secrets. **Import:** JSON → sofort auf State anwenden.
@@ -248,6 +258,7 @@ Per Code-/Test-Stand bestätigt:
 
 - **M7b User-Management-UI umgesetzt:** `/admin/users`, `/api/users`, `src/utils/config/users.js` mit `updateUser`/`deleteUser`/`setUserPassword` sowie Tests für API, Seite und User-Store vorhanden. Leitplanken erfüllt: `users.yaml` bleibt außerhalb `EDITABLE_CONFIGS`, API gibt keine Passwort-Hashes zurück, letzter Admin ist geschützt.
 - **8g Presets entschärft umgesetzt:** `THEME_PRESETS` in `src/utils/config/theme-presets.js` nutzt gedämpfte/pastellige Farben; `src/utils/styles/themes.test.js` prüft Preset-Farben gegen `ALL_COLORS` und gültige Theme-Paletten.
+- **M6/M8 UI-Nachträge umgesetzt:** `/admin/layout` steuert globale Gruppen-Reihenfolge über `layout:`; Services-/Bookmarks-Editoren blenden irreführendes Gruppen-Reorder bei aktivem Layout aus. `settings.cardRadius` wirkt global über `/api/config/theme-vars`; JetBrains Mono ist self-hosted eingebunden.
 
 ## Vorgemerkte spätere Komfort-Features
 

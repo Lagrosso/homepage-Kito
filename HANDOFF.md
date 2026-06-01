@@ -1,8 +1,9 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: HEAD `001b3265` auf `main` (== `origin/main`). Diese Datei ist die kompakte Übergabe für die
+Stand: HEAD `6f7a8958` auf `main` (== `origin/main`). Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
-**`CLAUDE.md`** — bei Widerspruch gilt `CLAUDE.md`.
+**`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
+zwischen Doku und Code gilt der aktuelle Code-Stand.
 
 ## Projektkontext
 `homepage-Kito` ist ein **eigenständiger Fork** von gethomepage/homepage (GPLv3), der das
@@ -23,7 +24,7 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`001b3265`**, lokal == `origin/main` (gepusht).
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == `origin/main` (gepusht).
 
 ## Seit der letzten Übergabe umgesetzt
 1. **M8 Theming komplett** (`/admin/theme`): Presets, Hintergrund-Upload, visueller Editor,
@@ -43,6 +44,14 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`001b3265`**, lokal == 
    (`components/admin/use-layout-governs.js`) und zeigt einen Hinweis-Link.
 7. **Add-Service-Dialog:** Beschreibungsfeld auch im Add-Modus (`config.jsx`, `yaml-insert.js`).
 8. **Docker-Deployment** (siehe unten).
+9. **M7b User-Management-UI:** `/admin/users` + Admin-only `/api/users` zum Anlegen, Bearbeiten,
+   Löschen und Passwort-Zurücksetzen von Nutzern; `users.yaml` bleibt außerhalb des Raw-Editors,
+   Passwort-Hashes werden nie zurückgegeben, letzter Admin ist geschützt.
+10. **8g Presets entschärft:** `THEME_PRESETS` nutzt gedämpfte/pastellige Farben aus der kuratierten
+    Palette; Test deckt Preset-Farben gegen `ALL_COLORS` und gültige Paletten ab.
+
+Hinweis zur Doku: `AGENTS.md` wurde mit diesen Nachträgen ergänzt, damit Codex denselben Projektstand
+wie diese Übergabe sieht.
 
 ## ⚠️ Wichtige Stolperfallen
 - **Production-Build bricht an Test-Dateien unter `src/pages/`** (außer `pages/api/**`): `next build`
@@ -77,12 +86,6 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`001b3265`**, lokal == 
 
 ## Offene Punkte / nächste Meilensteine (Details in `CLAUDE.md`)
 **Klein & naheliegend (vorgemerkt):**
-- **M7b – User-Management-UI** (`/admin/users`): Nutzer anlegen/bearbeiten/löschen, Rolle setzen,
-  Passwort (re)setzen. Nutzt `users.js` (`addUser`) + `password.js`; neu `updateUser`/`deleteUser`/
-  `setPassword` + Admin-API `/api/users`. Leitplanken: `users.yaml` **nicht** in `EDITABLE_CONFIGS`;
-  Passwörter nie im Klartext; letzten Admin schützen.
-- **8g – Presets entschärfen:** `THEME_PRESETS` in `theme-presets.js` auf gedämpfte Farben umstellen
-  (reine Daten-Änderung).
 - **Admin-Sammeltab „Alle Services & Bookmarks"** (nur Admins; braucht Render-Pfad-Änderung → gehört zu M10).
 
 **Phase 2 (read-only, Top ★🔥):** M9 (Status/Health pro Dienst), M18 (Config-Health-Checks),

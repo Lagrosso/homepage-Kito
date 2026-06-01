@@ -16,13 +16,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import LogoutButton from "components/admin/logout-button";
 import yaml from "js-yaml";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
+import LogoutButton from "components/admin/logout-button";
+
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 // Tabs shown in the editor header so the config pages cross-link. The active tab
@@ -36,6 +37,7 @@ export const CONFIG_TABS = [
   { label: "Settings", href: "/admin/settings" },
   { label: "Layout", href: "/admin/layout" },
   { label: "Theme", href: "/admin/theme" },
+  { label: "Health", href: "/admin/health" },
   { label: "Users", href: "/admin/users" },
 ];
 
@@ -60,6 +62,70 @@ export function shortenUrl(url) {
 
 export const inputClass =
   "w-full rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-900 px-3 py-2 text-sm";
+
+export function HealthResults({ report, file = null, filter = "all" }) {
+  if (!report) {
+    return null;
+  }
+
+  const files = file ? { [file]: report.files?.[file] } : (report.files ?? {});
+  const visible = Object.entries(files)
+    .filter(([, fileReport]) => fileReport)
+    .map(([filename, fileReport]) => [
+      filename,
+      {
+        ...fileReport,
+        checks: (fileReport.checks ?? []).filter((check) => filter === "all" || check.severity === filter),
+      },
+    ]);
+
+  if (visible.every(([, fileReport]) => fileReport.checks.length === 0)) {
+    return <p className="text-xs text-green-600 dark:text-green-400">No health findings for this view.</p>;
+  }
+
+  const badgeClass = (severity) =>
+    severity === "error"
+      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+      : severity === "warning"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+
+  return (
+    <div className="space-y-3">
+      {visible.map(([filename, fileReport]) => {
+        if (!fileReport.checks.length) {
+          return null;
+        }
+        return (
+          <section key={filename} className="space-y-2">
+            {!file && <h3 className="text-sm font-semibold">{filename}</h3>}
+            {fileReport.checks.map((check) => (
+              <article
+                key={check.id}
+                className="rounded-md border border-theme-200 dark:border-theme-700 bg-white/70 dark:bg-theme-900/60 p-3 text-xs"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded px-1.5 py-0.5 font-semibold uppercase ${badgeClass(check.severity)}`}>
+                    {check.severity}
+                  </span>
+                  <span className="font-mono text-theme-500 dark:text-theme-400">{check.path}</span>
+                  {check.line && (
+                    <span className="text-theme-400">
+                      line {check.line}
+                      {check.column ? `, column ${check.column}` : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-theme-800 dark:text-theme-100">{check.message}</p>
+                {check.suggestion && <p className="mt-1 text-theme-500 dark:text-theme-400">{check.suggestion}</p>}
+              </article>
+            ))}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 // Labelled form field used inside the quick-add dialogs.
 export function Field({ label, required, children }) {
@@ -502,6 +568,8 @@ export default function ConfigEditor({
   const [currentUser, setCurrentUser] = useState(null);
   const [loadState, setLoadState] = useState("loading"); // loading | ready | disabled | error
   const [status, setStatus] = useState(null); // { type: "success"|"error"|"info", message }
+  const [healthReport, setHealthReport] = useState(null);
+  const [healthOpen, setHealthOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null); // { group, entry } | null
 
@@ -745,6 +813,33 @@ export default function ConfigEditor({
     }
   }, [apiUrl, content]);
 
+  const onHealthCheck = useCallback(async () => {
+    setStatus({ type: "info", message: "Running health check…" });
+    try {
+      const res = await fetch("/api/config/health", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ file: configFile, content }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus({ type: "error", message: `Health check failed — ${data.error || `error ${res.status}`}` });
+        return;
+      }
+      setHealthReport(data);
+      setHealthOpen(true);
+      const summary = data.summary ?? { errors: 0, warnings: 0, info: 0 };
+      setStatus({
+        type: summary.errors ? "error" : summary.warnings ? "info" : "success",
+        message: `Health: ${summary.errors} errors, ${summary.warnings} warnings, ${summary.info} info.`,
+      });
+    } catch (e) {
+      setStatus({ type: "error", message: `Health check failed — ${e.message}` });
+    }
+  }, [configFile, content]);
+
   const statusColor =
     status?.type === "error" ? "text-red-500" : status?.type === "success" ? "text-green-600" : "text-theme-500";
 
@@ -816,8 +911,37 @@ export default function ConfigEditor({
                 >
                   Save
                 </button>
+                <button
+                  type="button"
+                  onClick={onHealthCheck}
+                  className="rounded-md bg-theme-200 dark:bg-theme-700 px-4 py-2 text-sm font-medium hover:bg-theme-300 dark:hover:bg-theme-600"
+                >
+                  Health check
+                </button>
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
+
+              {healthReport && (
+                <div className="mb-3 rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setHealthOpen((open) => !open)}
+                    className="flex w-full items-center justify-between text-left text-sm font-medium"
+                    aria-expanded={healthOpen}
+                  >
+                    <span>
+                      Health findings for {configFile}: {healthReport.summary.errors} errors,{" "}
+                      {healthReport.summary.warnings} warnings, {healthReport.summary.info} info
+                    </span>
+                    <span className="text-theme-500">{healthOpen ? "Hide" : "Show"}</span>
+                  </button>
+                  {healthOpen && (
+                    <div className="mt-3">
+                      <HealthResults report={healthReport} file={configFile} />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {(canEdit || canDelete || canMove) && placeholderBlocked && (
                 <div className="mb-3 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950 p-3 text-xs">
