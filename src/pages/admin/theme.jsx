@@ -404,7 +404,7 @@ export default function AdminTheme() {
                         onClick={() => applyPreset(p)}
                         title={`${p.label} · ${p.theme === "dark" ? "Dark" : "Light"}${p.cardBlur ? ` · blur-${p.cardBlur}` : ""}`}
                         className={classNames(
-                          "rounded-md overflow-hidden text-left border transition-all hover:scale-[1.04]",
+                          "theme-preset-card rounded-md overflow-hidden text-left border transition-all hover:scale-[1.04]",
                           active
                             ? "border-blue-500 ring-1 ring-blue-400/40"
                             : "border-transparent hover:border-theme-300 dark:hover:border-theme-600",

@@ -106,10 +106,16 @@ dialog ::-webkit-scrollbar {
 .service-card,
 .bookmark > a,
 .information-widget-search input,
-.admin-shell button,
+.admin-shell button:not(.theme-preset-card),
 .admin-shell select,
 .admin-shell input {
   border-radius: var(--card-radius, 0.375rem);
+}
+
+/* Preset preview cards keep their own fixed rounding regardless of the
+   configured --card-radius (otherwise the color bar gets clipped oddly). */
+.admin-shell .theme-preset-card {
+  border-radius: 0.375rem;
 }
 
 .bookmark-icon {
