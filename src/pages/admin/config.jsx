@@ -1,5 +1,6 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/config-editor";
+import { useLayoutGoverns } from "components/admin/use-layout-governs";
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
@@ -296,6 +297,9 @@ const reorderServiceTo = (raw, { group, name }, toIndex) => moveEntryToIndex(raw
 const reorderServiceGroupTo = (raw, { group }, toIndex) => moveGroupToIndex(raw, { group }, toIndex);
 
 export default function AdminServicesConfig() {
+  // When a settings.yaml `layout:` governs group order, group reordering here has
+  // no dashboard effect — manage it in /admin/layout instead (and hide it here).
+  const layoutGoverns = useLayoutGoverns();
   return (
     <ConfigEditor
       configFile="services.yaml"
@@ -308,10 +312,11 @@ export default function AdminServicesConfig() {
       editEntry={updateServiceEntry}
       deleteEntry={deleteServiceEntry}
       reorderEntry={moveEntryInGroup}
-      reorderGroup={moveGroup}
       moveToGroup={moveServiceToGroup}
       reorderEntryTo={reorderServiceTo}
-      reorderGroupTo={reorderServiceGroupTo}
+      {...(layoutGoverns
+        ? { groupReorderHint: "Gruppen-Reihenfolge wird über die Layout-Verwaltung gesteuert →" }
+        : { reorderGroup: moveGroup, reorderGroupTo: reorderServiceGroupTo })}
     />
   );
 }

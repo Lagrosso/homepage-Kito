@@ -1,5 +1,6 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/config-editor";
+import { useLayoutGoverns } from "components/admin/use-layout-governs";
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
@@ -267,6 +268,9 @@ const reorderBookmarkTo = (raw, { group, name }, toIndex) => moveEntryToIndex(ra
 const reorderBookmarkGroupTo = (raw, { group }, toIndex) => moveGroupToIndex(raw, { group }, toIndex);
 
 export default function AdminBookmarksConfig() {
+  // Group order is governed by settings.yaml `layout:` when present — then hide
+  // group reordering here and point to /admin/layout.
+  const layoutGoverns = useLayoutGoverns();
   return (
     <ConfigEditor
       configFile="bookmarks.yaml"
@@ -280,10 +284,11 @@ export default function AdminBookmarksConfig() {
       editEntry={updateBookmarkEntry}
       deleteEntry={deleteBookmarkEntry}
       reorderEntry={moveEntryInGroup}
-      reorderGroup={moveGroup}
       moveToGroup={moveBookmarkToGroup}
       reorderEntryTo={reorderBookmarkTo}
-      reorderGroupTo={reorderBookmarkGroupTo}
+      {...(layoutGoverns
+        ? { groupReorderHint: "Gruppen-Reihenfolge wird über die Layout-Verwaltung gesteuert →" }
+        : { reorderGroup: moveGroup, reorderGroupTo: reorderBookmarkGroupTo })}
     />
   );
 }

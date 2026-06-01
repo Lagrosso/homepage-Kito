@@ -480,6 +480,7 @@ export default function ConfigEditor({
   moveToGroup = null,
   reorderEntryTo = null,
   reorderGroupTo = null,
+  groupReorderHint = null,
   PreviewPanel = null,
 }) {
   const router = useRouter();
@@ -853,6 +854,13 @@ export default function ConfigEditor({
                   <span className="block text-sm font-medium mb-1">
                     {PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}
                   </span>
+                  {groupReorderHint && (
+                    <p className="mb-1 text-xs text-theme-400">
+                      <Link href="/admin/layout" className="underline hover:text-theme-600 dark:hover:text-theme-200">
+                        {groupReorderHint}
+                      </Link>
+                    </p>
+                  )}
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
                     {PreviewPanel ? (
                       <PreviewPanel content={content} setContent={setContent} setStatus={setStatus} />
