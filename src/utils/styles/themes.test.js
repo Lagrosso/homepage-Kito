@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ALL_COLORS } from "utils/config/theme-presets";
+import { ALL_COLORS, THEME_PRESETS } from "utils/config/theme-presets";
 
 import themes from "./themes";
 
@@ -31,6 +31,12 @@ describe("utils/styles/themes", () => {
           iconEnd: expect.stringMatching(/^#[0-9a-f]{6}$/i),
         }),
       );
+    });
+  });
+
+  it("only uses picker colors in theme presets", () => {
+    THEME_PRESETS.forEach((preset) => {
+      expect(ALL_COLORS, `${preset.id} uses unavailable color "${preset.color}"`).toContain(preset.color);
     });
   });
 });
