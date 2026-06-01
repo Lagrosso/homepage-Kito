@@ -606,3 +606,55 @@ export function deleteTab(rawText, { tab }) {
   pruneEmptyLayoutEntries(layout);
   return doc.toString();
 }
+
+// Resolve the reorderable container of the `layout:` block and an index lookup
+// by group name. Works on the list form (preferred) and the mapping form.
+function locateLayoutForReorder(rawText) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const layout = root.get("layout", true);
+  if (isSeq(layout)) {
+    return {
+      doc,
+      items: layout.items,
+      indexOf: (g) =>
+        layout.items.findIndex((it) => isMap(it) && it.items.length > 0 && String(it.items[0].key) === g),
+    };
+  }
+  if (isMap(layout)) {
+    return { doc, items: layout.items, indexOf: (g) => layout.items.findIndex((p) => String(p.key) === g) };
+  }
+  throw new Error("`layout` is not a list/mapping — edit it in the raw editor.");
+}
+
+// Move a group within the settings.yaml `layout:` block to an arbitrary index.
+// The dashboard renders groups in `layout` order (per tab, that order filtered
+// to the tab), so this is what actually controls group order. The group must
+// already have a layout entry (assign a tab/option first); throws otherwise.
+export function moveLayoutGroupToIndex(rawText, { group }, toIndex) {
+  const { doc, items, indexOf } = locateLayoutForReorder(rawText);
+  const index = indexOf(group);
+  if (index === -1) {
+    throw new Error(`Group "${group}" is not in the layout`);
+  }
+  arrayMoveInPlace(items, index, toIndex);
+  return doc.toString();
+}
+
+// Move a group up/down by one position within the `layout:` block.
+export function moveLayoutGroup(rawText, { group }, direction) {
+  const { doc, items, indexOf } = locateLayoutForReorder(rawText);
+  const index = indexOf(group);
+  if (index === -1) {
+    throw new Error(`Group "${group}" is not in the layout`);
+  }
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= items.length) {
+    return doc.toString();
+  }
+  arrayMoveInPlace(items, index, target);
+  return doc.toString();
+}

@@ -14,6 +14,8 @@ import {
   moveEntryToIndex,
   moveGroup,
   moveGroupToIndex,
+  moveLayoutGroup,
+  moveLayoutGroupToIndex,
   moveWidget,
   moveWidgetToIndex,
   removeBackground,
@@ -653,5 +655,69 @@ describe("setGroupLayoutField", () => {
   it("refuses when a bare placeholder is present", () => {
     const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
     expect(() => setGroupLayoutField(bare, { group: "A", field: "style" }, "row")).toThrow(/unquoted/i);
+  });
+});
+
+describe("moveLayoutGroup / moveLayoutGroupToIndex", () => {
+  const THREE = `---
+layout:
+  - Media:
+      tab: Apps
+  - Admin:
+      tab: Ops
+  - Misc:
+      tab: Apps
+`;
+
+  it("moves a group up within the list form", () => {
+    const out = moveLayoutGroup(THREE, { group: "Admin" }, "up");
+    expect(out.indexOf("- Admin:")).toBeLessThan(out.indexOf("- Media:"));
+    expect(yaml.load(out).layout.map((i) => Object.keys(i)[0])).toEqual(["Admin", "Media", "Misc"]);
+  });
+
+  it("moves a group down within the list form", () => {
+    const out = moveLayoutGroup(THREE, { group: "Media" }, "down");
+    expect(yaml.load(out).layout.map((i) => Object.keys(i)[0])).toEqual(["Admin", "Media", "Misc"]);
+  });
+
+  it("is a no-op past the boundaries", () => {
+    expect(moveLayoutGroup(THREE, { group: "Media" }, "up")).toBe(THREE);
+    expect(moveLayoutGroup(THREE, { group: "Misc" }, "down")).toBe(THREE);
+  });
+
+  it("moves to an arbitrary index and preserves options + comments", () => {
+    const withComment = `---
+# my layout
+layout:
+  - Media:
+      tab: Apps
+      style: row
+  - Admin:
+      tab: Ops
+`;
+    const out = moveLayoutGroupToIndex(withComment, { group: "Admin" }, 0);
+    expect(out.indexOf("- Admin:")).toBeLessThan(out.indexOf("- Media:"));
+    expect(out).toContain("# my layout");
+    expect(out).toContain("style: row");
+  });
+
+  it("works on the mapping form", () => {
+    const obj = `---
+layout:
+  Media:
+    tab: Apps
+  Admin:
+    tab: Ops
+`;
+    const out = moveLayoutGroup(obj, { group: "Admin" }, "up");
+    expect(Object.keys(yaml.load(out).layout)).toEqual(["Admin", "Media"]);
+  });
+
+  it("throws for a group not in the layout", () => {
+    expect(() => moveLayoutGroup(THREE, { group: "Nope" }, "up")).toThrow(/not in the layout/i);
+  });
+
+  it("throws for a scalar layout", () => {
+    expect(() => moveLayoutGroup("layout: nope\n", { group: "A" }, "up")).toThrow(/list\/mapping|raw editor/i);
   });
 });

@@ -3,7 +3,8 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCenter,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -200,6 +201,32 @@ function parseDndId(id) {
   return { type, gi: Number(gi), ei: ei === undefined ? undefined : Number(ei) };
 }
 
+// Pointer-based collision detection that respects the nested group/entry
+// contexts. closestCenter compares element centers, so dropping an entry into a
+// (possibly empty) target group often snapped to the nearest entry of an
+// adjacent group instead. Here we look at what's actually under the pointer and
+// pick the right droppable for the kind of item being dragged:
+//  - dragging a group → only consider group droppables (`g:`)
+//  - dragging an entry → prefer an entry droppable (`e:`) under the pointer,
+//    otherwise fall back to the group droppable (so empty groups accept drops).
+function dndCollisionDetection(args) {
+  const activeType = String(args.active?.id ?? "")[0];
+  const pointer = pointerWithin(args);
+  const collisions = pointer.length > 0 ? pointer : rectIntersection(args);
+
+  if (activeType === "g") {
+    const groups = collisions.filter((c) => String(c.id).startsWith("g:"));
+    return groups.length > 0 ? groups : collisions;
+  }
+
+  const entry = collisions.find((c) => String(c.id).startsWith("e:"));
+  if (entry) {
+    return [entry];
+  }
+  const group = collisions.find((c) => String(c.id).startsWith("g:"));
+  return group ? [group] : collisions;
+}
+
 function DragHandle({ attributes, listeners, label }) {
   return (
     <button
@@ -382,7 +409,12 @@ function DndPreview({
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={dndCollisionDetection}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
       <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-5">
           {groups.map((group, gi) => (

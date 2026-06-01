@@ -1,10 +1,11 @@
 import ConfigEditor, { inputClass } from "components/admin/config-editor";
 import { useEffect, useMemo, useState } from "react";
-import { MdCheck, MdClose, MdDelete, MdEdit } from "react-icons/md";
+import { MdCheck, MdClose, MdDelete, MdEdit, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import {
   assignGroupToTab,
   deleteSetting,
   deleteTab,
+  moveLayoutGroup,
   renameTab,
   setGroupLayoutField,
   updateSetting,
@@ -45,11 +46,14 @@ function LayoutManager({ content, setContent, setStatus }) {
   const tabByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e.tab])), [layout]);
   const optsByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e])), [layout]);
   const tabs = useMemo(() => [...new Set(layout.map((e) => e.tab).filter(Boolean))], [layout]);
+  // The dashboard renders groups in `layout:` order, so list layout groups first
+  // (in that order), followed by any remaining groups not yet in the layout.
+  const layoutOrder = useMemo(() => layout.map((e) => e.group), [layout]);
+  const layoutGroupSet = useMemo(() => new Set(layoutOrder), [layoutOrder]);
   const allGroups = useMemo(() => {
-    const set = new Set(groupNames);
-    layout.forEach((e) => set.add(e.group));
-    return [...set];
-  }, [groupNames, layout]);
+    const rest = groupNames.filter((g) => !layoutGroupSet.has(g));
+    return [...layoutOrder, ...rest];
+  }, [groupNames, layoutOrder, layoutGroupSet]);
   const global = useMemo(() => parseGlobalLayout(content), [content]);
   const maxColsValue = global.fiveColumns ? "5" : global.maxGroupColumns != null ? String(global.maxGroupColumns) : "";
 
@@ -142,6 +146,15 @@ function LayoutManager({ content, setContent, setStatus }) {
         next = updateSetting(next, { key: "maxGroupColumns" }, Number(value));
       }
       apply(next, `Max. Gruppen nebeneinander: ${value || "Standard (4)"} — review and Save.`);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // Reorder a group within the `layout:` block (controls dashboard group order).
+  const onMoveGroup = (group, direction) => {
+    try {
+      apply(moveLayoutGroup(content, { group }, direction), `"${group}" verschoben (im Editor) — review and Save.`);
     } catch (e) {
       fail(e);
     }
@@ -266,7 +279,12 @@ function LayoutManager({ content, setContent, setStatus }) {
       </section>
 
       <section>
-        <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen-Anzeige</h3>
+        <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen-Reihenfolge &amp; Anzeige</h3>
+        <p className="mb-2 text-xs text-theme-400">
+          Die Reihenfolge hier bestimmt die Reihenfolge der Gruppen auf dem Dashboard (innerhalb eines Tabs in
+          dieser Reihenfolge gefiltert). Mit ▲/▼ verschieben. Gruppen ohne Tab-/Layout-Eintrag erscheinen unten und
+          lassen sich erst nach einer Tab-Zuweisung umsortieren.
+        </p>
         {allGroups.length === 0 ? (
           <p className="text-theme-500 text-xs">Keine Gruppen in services.yaml / bookmarks.yaml gefunden.</p>
         ) : (
@@ -274,12 +292,40 @@ function LayoutManager({ content, setContent, setStatus }) {
             {allGroups.map((group) => {
               const opts = optsByGroup.get(group) ?? {};
               const isRow = opts.style === "row";
+              const inLayout = layoutGroupSet.has(group);
+              const layoutIndex = layoutOrder.indexOf(group);
               return (
                 <li
                   key={group}
                   className="flex flex-col gap-2 rounded-md border border-theme-200 dark:border-theme-700 p-2"
                 >
-                  <span className="font-medium min-w-0 truncate">{group}</span>
+                  <div className="flex items-center gap-1">
+                    {inLayout && (
+                      <span className="shrink-0 flex flex-col -my-1">
+                        <button
+                          type="button"
+                          onClick={() => onMoveGroup(group, "up")}
+                          disabled={layoutIndex <= 0}
+                          title="Nach oben"
+                          aria-label={`Move ${group} up`}
+                          className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <MdKeyboardArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMoveGroup(group, "down")}
+                          disabled={layoutIndex === -1 || layoutIndex >= layoutOrder.length - 1}
+                          title="Nach unten"
+                          aria-label={`Move ${group} down`}
+                          className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <MdKeyboardArrowDown className="w-4 h-4" />
+                        </button>
+                      </span>
+                    )}
+                    <span className="font-medium min-w-0 truncate">{group}</span>
+                  </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <label className="flex items-center gap-1">
                       <span className="text-theme-500 text-xs">Tab</span>
