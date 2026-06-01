@@ -19,7 +19,7 @@ import { isMap, isScalar, isSeq, parseDocument } from "yaml";
 
 import { REDACTED, SECRET_VALUE_CONTAINERS, isSensitiveKey } from "./secret-mask";
 
-export const EDITABLE_SERVICE_FIELDS = ["href", "icon", "description", "server"];
+export const EDITABLE_SERVICE_FIELDS = ["href", "icon", "description", "server", "container"];
 export const EDITABLE_BOOKMARK_FIELDS = ["abbr", "href", "icon", "description"];
 
 const SECRET_CONTAINER_LOOKUP = new Set(SECRET_VALUE_CONTAINERS.map((f) => f.toLowerCase()));

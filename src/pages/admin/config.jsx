@@ -1,10 +1,11 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/config-editor";
-import { useLayoutGoverns } from "components/admin/use-layout-governs";
-import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
 import { MdDelete, MdEdit } from "react-icons/md";
+import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/config-editor";
+import ResolvedIcon from "components/resolvedicon";
+
+import { useLayoutGoverns } from "components/admin/use-layout-governs";
 import {
   deleteServiceEntry,
   moveEntryInGroup,
@@ -42,6 +43,7 @@ function parseServices(content) {
             description: value?.description,
             icon: value?.icon,
             server: value?.server ?? value?.widget?.server,
+            container: value?.container ?? value?.widget?.container,
             accessGroups: Array.isArray(value?.access?.groups) ? value.access.groups : [],
           };
         });
@@ -91,6 +93,13 @@ function ServiceCard({ entry, onEdit, onDelete }) {
             </span>
           </div>
         )}
+        {entry.container && (
+          <div className="shrink-0 self-start m-1">
+            <span className="inline-block rounded bg-theme-300/40 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-theme-600 dark:text-theme-300">
+              {entry.container}
+            </span>
+          </div>
+        )}
         {entry.accessGroups?.length > 0 && (
           <div className="shrink-0 self-start m-1">
             <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
@@ -129,7 +138,16 @@ function ServiceCard({ entry, onEdit, onDelete }) {
   );
 }
 
-const EMPTY_FORM = { group: "", name: "", href: "", icon: "", description: "", server: "", accessGroups: "" };
+const EMPTY_FORM = {
+  group: "",
+  name: "",
+  href: "",
+  icon: "",
+  description: "",
+  server: "",
+  container: "",
+  accessGroups: "",
+};
 
 // Modal that collects fields for a single service and hands the values back to
 // the editor. It never writes to disk — Save stays manual. Works in two modes:
@@ -152,6 +170,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             icon: initial?.icon ?? "",
             description: initial?.description ?? "",
             server: initial?.server ?? "",
+            container: initial?.container ?? "",
             accessGroups: Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "",
           }
         : EMPTY_FORM,
@@ -174,15 +193,16 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         description: form.description.trim(),
         icon: form.icon.trim(),
         server: form.server.trim(),
+        container: form.container.trim(),
         accessGroups: form.accessGroups.trim(),
       });
       return;
     }
     // Edit mode: send the name plus only fields that actually changed, so
     // untouched fields stay byte-identical and no derived value (e.g. a service's
-    // widget.server shown in `server`) is written back as a new top-level field.
+    // widget.server/container shown here) is written back as a new top-level field.
     const values = { name: form.name.trim() };
-    ["href", "icon", "description", "server"].forEach((field) => {
+    ["href", "icon", "description", "server", "container"].forEach((field) => {
       if (form[field].trim() !== String(initial?.[field] ?? "")) {
         values[field] = form[field].trim();
       }
@@ -217,7 +237,6 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                       onChange={setField("group")}
                       placeholder="Existing or new group"
                       className={inputClass}
-                      // eslint-disable-next-line jsx-a11y/no-autofocus
                       autoFocus
                     />
                     <datalist id="config-existing-groups">
@@ -260,6 +279,14 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   value={form.server}
                   onChange={setField("server")}
                   placeholder="my-docker"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Container (optional)">
+                <input
+                  value={form.container}
+                  onChange={setField("container")}
+                  placeholder="sonarr"
                   className={inputClass}
                 />
               </Field>

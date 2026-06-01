@@ -29,15 +29,17 @@ describe("buildServiceEntry", () => {
     expect(entry).toBe(['    - Sonarr:', '        href: "http://localhost/"'].join("\n"));
   });
 
-  it("includes icon and server when present", () => {
+  it("includes icon, server and container when present", () => {
     const entry = buildServiceEntry({
       name: "Radarr",
       href: "http://radarr/",
       icon: "radarr.png",
       server: "my-docker",
+      container: "radarr",
     });
     expect(entry).toContain("icon: radarr.png");
     expect(entry).toContain("server: my-docker");
+    expect(entry).toContain("container: radarr");
   });
 
   it("includes the description after href when present", () => {

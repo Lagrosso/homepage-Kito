@@ -49,6 +49,10 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
    Passwort-Hashes werden nie zurückgegeben, letzter Admin ist geschützt.
 10. **8g Presets entschärft:** `THEME_PRESETS` nutzt gedämpfte/pastellige Farben aus der kuratierten
     Palette; Test deckt Preset-Farben gegen `ALL_COLORS` und gültige Paletten ab.
+11. **M18 Config-Health v1:** statische read-only Health-Checks für `services.yaml`, `bookmarks.yaml`,
+    `widgets.yaml`, `settings.yaml`; Admin-only `/api/config/health`, neue Seite `/admin/health` mit
+    Severity-Filtern und `Health check`-Button in den bestehenden Config-Editoren. Keine Netzwerkchecks,
+    keine Auto-Fixes, Save bleibt nur durch YAML-Syntax blockiert. `pnpm test` grün: 551 Dateien / 1640 Tests.
 
 Hinweis zur Doku: `AGENTS.md` wurde mit diesen Nachträgen ergänzt, damit Codex denselben Projektstand
 wie diese Übergabe sieht.
@@ -88,8 +92,8 @@ wie diese Übergabe sieht.
 **Klein & naheliegend (vorgemerkt):**
 - **Admin-Sammeltab „Alle Services & Bookmarks"** (nur Admins; braucht Render-Pfad-Änderung → gehört zu M10).
 
-**Phase 2 (read-only, Top ★🔥):** M9 (Status/Health pro Dienst), M18 (Config-Health-Checks),
-M17 (Backup/Restore/Rollback), M10 (Profile/Ansichts-Modi), M11 (Command Palette),
+**Phase 2 (read-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
+M10 (Profile/Ansichts-Modi), M11 (Command Palette),
 M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M19.
 
 **Phase 3 (Vision, erst nach Auth/Audit):** M20–M25 (Service-Aktionen, Autodiscovery, Setup-Assistent,

@@ -178,7 +178,7 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 15. **M15 – Service-Doku in der Kachel (P2):** Info-Panel (Zweck/Server/Backup/Admin/Notiz/„was tun bei Fehler"). (F17)
 16. **M16 – Mobile-first & PWA (P2, 🔥🔥):** untere Nav, große Suche, Favoriten oben, Swipe, kompakte Karten, „nur Favoriten", Long-Press-Aktionen, PWA, Offline-Fallback, QR. (F10; erweitert Backlog „Mobile-Optimierung")
 17. **M17 – Backup, Restore & Änderungsverlauf/Rollback (P1/P2, ★, 🔥🔥):** Backups anzeigen/ansehen/Diff/Restore/Download, Verlauf (wann/was/wer), Kommentar, Rollback. (F15; bündelt Backlog „Backup-/Restore-UI" + „Audit-Log")
-18. **M18 – Konfigurations-Health-Checks (P1/P2, 🔥🔥🔥):** über Syntax hinaus (fehlende `href`/Pflichtfelder, doppelte Namen/URLs, Icon existiert?, Widget-Typ?, Secret sichtbar?, Einrückung/Gruppen); präzise Meldungen (Datei/Gruppe/Dienst/Feld), Reparaturvorschläge, Vorher/Nachher, Backup. (F7; erweitert Backlog „Config-Health-Checks")
+18. **M18 – Konfigurations-Health-Checks v1 (umgesetzt):** statische, read-only Health-Checks für `services.yaml`, `bookmarks.yaml`, `widgets.yaml` und `settings.yaml`; Admin-only API `/api/config/health` (`GET` Gesamtprüfung, `POST` aktueller Editor-Inhalt), neue Admin-Seite `/admin/health` mit Severity-Filtern und kompakter Health-Check-Button in den bestehenden Config-Editoren. Prüft u. a. YAML-Syntax/-Shape, Tabs in Einrückung, fehlende/duplizierte `href`s, unbekannte `access.groups`, plaintext-sensitive Felder ohne `{{HOMEPAGE_*}}`, Layout-/Theme-Werte und auffällige Asset-Pfade. Keine Netzwerkchecks, keine automatischen Fixes, Save bleibt nur durch YAML-Syntax blockiert. (F7)
 19. **M19 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
 
 #### Phase 3 – Vision / Runtime / Infra
@@ -248,6 +248,14 @@ Per Code-/Test-Stand bestätigt:
 
 - **M7b User-Management-UI umgesetzt:** `/admin/users`, `/api/users`, `src/utils/config/users.js` mit `updateUser`/`deleteUser`/`setUserPassword` sowie Tests für API, Seite und User-Store vorhanden. Leitplanken erfüllt: `users.yaml` bleibt außerhalb `EDITABLE_CONFIGS`, API gibt keine Passwort-Hashes zurück, letzter Admin ist geschützt.
 - **8g Presets entschärft umgesetzt:** `THEME_PRESETS` in `src/utils/config/theme-presets.js` nutzt gedämpfte/pastellige Farben; `src/utils/styles/themes.test.js` prüft Preset-Farben gegen `ALL_COLORS` und gültige Theme-Paletten.
+
+### Verifikationsstatus (M18 Config-Health v1, 2026-06-01)
+
+`pnpm test` grün (551 Testdateien / 1640 Tests). Gezielt ergänzt:
+
+- **Config-Health-Utility:** `src/utils/config/config-health.js` mit Unit-Tests für minimale Configs, YAML-Syntaxfehler inkl. Zeile/Spalte, fehlende/duplizierte URLs, unbekannte Access-Gruppen, Secret-Leak-Vermeidung, Homepage-Platzhalter sowie Settings-Checks (`layout`, `maxGroupColumns`, `theme`, `color`).
+- **API:** `/api/config/health` ist Admin-only; `GET` prüft alle editierbaren Config-Dateien, `POST` prüft den aktuellen Editor-Text und lehnt nicht editierbare Dateien ab.
+- **UI:** `/admin/health` lädt die Gesamtprüfung und filtert nach `All`/`Errors`/`Warnings`/`Info`; `ConfigEditor` hat einen `Health check`-Button mit einklappbarer Ergebnisliste. Health-Meldungen blockieren Save nicht.
 
 ## Vorgemerkte spätere Komfort-Features
 

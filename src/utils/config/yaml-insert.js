@@ -52,7 +52,7 @@ function appendAccessGroups(lines, groups, indent = "        ") {
 
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, description, icon, server, accessGroups }) {
+export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
@@ -65,6 +65,9 @@ export function buildServiceEntry({ name, href, description, icon, server, acces
   }
   if (server) {
     lines.push(`        server: ${quoteScalar(server)}`);
+  }
+  if (container) {
+    lines.push(`        container: ${quoteScalar(container)}`);
   }
   appendAccessGroups(lines, accessGroups);
   return lines.join("\n");
@@ -147,8 +150,12 @@ export function insertEntry(rawText, group, entry) {
 }
 
 // Insert a service into a raw services.yaml string.
-export function insertService(rawText, { group, name, href, description, icon, server, accessGroups }) {
-  return insertEntry(rawText, group, buildServiceEntry({ name, href, description, icon, server, accessGroups }));
+export function insertService(rawText, { group, name, href, description, icon, server, container, accessGroups }) {
+  return insertEntry(
+    rawText,
+    group,
+    buildServiceEntry({ name, href, description, icon, server, container, accessGroups }),
+  );
 }
 
 // Insert a bookmark into a raw bookmarks.yaml string.

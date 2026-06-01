@@ -123,6 +123,14 @@ describe("updateServiceEntry", () => {
     expect(out).not.toMatch(/\n {8}server:/); // no new top-level service `server:`
   });
 
+  it("updates top-level Docker server and container fields", () => {
+    const src = "- G:\n    - S:\n        href: http://x\n        server: old\n        container: old-container\n";
+    const out = updateServiceEntry(src, { group: "G", name: "S" }, { server: "docker-a", container: "sonarr" });
+    const service = yaml.load(out)[0].G[0].S;
+    expect(service.server).toBe("docker-a");
+    expect(service.container).toBe("sonarr");
+  });
+
   it("adds and removes access groups", () => {
     const withGroups = updateServiceEntry(
       SRC,
