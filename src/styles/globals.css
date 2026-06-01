@@ -128,3 +128,10 @@ dialog ::-webkit-scrollbar {
   border-top-right-radius: var(--card-radius, 0.375rem);
   border-bottom-right-radius: var(--card-radius, 0.375rem);
 }
+
+/* Tab bar (above the groups) follows the configured radius too. */
+#myTab,
+#myTab li,
+#myTab button {
+  border-radius: var(--card-radius, 0.375rem);
+}

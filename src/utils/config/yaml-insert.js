@@ -33,10 +33,13 @@ export function quoteScalar(value) {
 
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, icon, server }) {
+export function buildServiceEntry({ name, href, description, icon, server }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
+  }
+  if (description) {
+    lines.push(`        description: ${quoteScalar(description)}`);
   }
   if (icon) {
     lines.push(`        icon: ${quoteScalar(icon)}`);
@@ -123,8 +126,8 @@ export function insertEntry(rawText, group, entry) {
 }
 
 // Insert a service into a raw services.yaml string.
-export function insertService(rawText, { group, name, href, icon, server }) {
-  return insertEntry(rawText, group, buildServiceEntry({ name, href, icon, server }));
+export function insertService(rawText, { group, name, href, description, icon, server }) {
+  return insertEntry(rawText, group, buildServiceEntry({ name, href, description, icon, server }));
 }
 
 // Insert a bookmark into a raw bookmarks.yaml string.

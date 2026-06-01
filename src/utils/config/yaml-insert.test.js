@@ -39,6 +39,18 @@ describe("buildServiceEntry", () => {
     expect(entry).toContain("icon: radarr.png");
     expect(entry).toContain("server: my-docker");
   });
+
+  it("includes the description after href when present", () => {
+    const entry = buildServiceEntry({
+      name: "Sonarr",
+      href: "http://sonarr/",
+      description: "Series manager",
+      icon: "sonarr.png",
+    });
+    expect(entry).toContain("description: Series manager");
+    expect(entry.indexOf("href:")).toBeLessThan(entry.indexOf("description:"));
+    expect(entry.indexOf("description:")).toBeLessThan(entry.indexOf("icon:"));
+  });
 });
 
 describe("insertService", () => {

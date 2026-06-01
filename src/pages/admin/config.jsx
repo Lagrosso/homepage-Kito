@@ -162,6 +162,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         group: form.group.trim(),
         name: form.name.trim(),
         href: form.href.trim(),
+        description: form.description.trim(),
         icon: form.icon.trim(),
         server: form.server.trim(),
       });
@@ -233,16 +234,14 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   className={inputClass}
                 />
               </Field>
-              {isEdit && (
-                <Field label="Description">
-                  <input
-                    value={form.description}
-                    onChange={setField("description")}
-                    placeholder="Short description"
-                    className={inputClass}
-                  />
-                </Field>
-              )}
+              <Field label="Description">
+                <input
+                  value={form.description}
+                  onChange={setField("description")}
+                  placeholder="Short description"
+                  className={inputClass}
+                />
+              </Field>
               <Field label="Server (optional)">
                 <input
                   value={form.server}
