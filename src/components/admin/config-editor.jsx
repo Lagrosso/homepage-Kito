@@ -36,6 +36,7 @@ export const CONFIG_TABS = [
   { label: "Settings", href: "/admin/settings" },
   { label: "Layout", href: "/admin/layout" },
   { label: "Theme", href: "/admin/theme" },
+  { label: "Users", href: "/admin/users" },
 ];
 
 // Parse a YAML error into a readable line/column message. Shared by every

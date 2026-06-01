@@ -1,7 +1,7 @@
 import { getSession, isAuthenticatedSession } from "utils/config/session";
 
 function safeUser(user) {
-  return { username: user.username, role: user.role };
+  return { username: user.username, role: user.role, groups: user.groups ?? [] };
 }
 
 export default async function handler(req, res) {

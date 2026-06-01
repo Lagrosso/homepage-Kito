@@ -2,7 +2,7 @@ import { getSession } from "utils/config/session";
 import { addUser, hasUsers } from "utils/config/users";
 
 function safeUser(user) {
-  return { username: user.username, role: user.role };
+  return { username: user.username, role: user.role, groups: user.groups ?? [] };
 }
 
 function isValidSetupInput(username, password) {

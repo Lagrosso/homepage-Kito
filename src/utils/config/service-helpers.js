@@ -4,6 +4,7 @@ import path from "path";
 import Docker from "dockerode";
 import yaml from "js-yaml";
 
+import { isVisibleForUser } from "utils/config/access";
 import checkAndCopyConfig, { CONF_DIR, getSettings, substituteEnvironmentVars } from "utils/config/config";
 import getDockerArguments from "utils/config/docker";
 import { getKubeConfig } from "utils/config/kubernetes";
@@ -751,9 +752,12 @@ export async function getServiceItem(group, service) {
   return false;
 }
 
-export default async function getServiceWidget(group, service, index) {
+export default async function getServiceWidget(group, service, index, user) {
   const serviceItem = await getServiceItem(group, service);
   if (serviceItem) {
+    if (user && !isVisibleForUser(serviceItem, user)) {
+      return false;
+    }
     const { widget, widgets } = serviceItem;
     return index > -1 && widgets ? widgets[index] : widget;
   }

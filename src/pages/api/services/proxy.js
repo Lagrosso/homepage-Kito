@@ -1,4 +1,6 @@
 import getServiceWidget from "utils/config/service-helpers";
+import { getSession } from "utils/config/session";
+import { findUser } from "utils/config/users";
 import createLogger from "utils/logger";
 import { formatApiCall } from "utils/proxy/api-helpers";
 import genericProxyHandler from "utils/proxy/handlers/generic";
@@ -10,7 +12,11 @@ const logger = createLogger("servicesProxy");
 export default async function handler(req, res) {
   try {
     const { service, group, index } = req.query;
-    const serviceWidget = await getServiceWidget(group, service, index);
+    const session = await getSession(req, res);
+    const user = session?.user?.username
+      ? (findUser(session.user.username) ?? session.user)
+      : { role: "viewer", groups: [] };
+    const serviceWidget = await getServiceWidget(group, service, index, user);
     let type = serviceWidget?.type;
 
     // exceptions

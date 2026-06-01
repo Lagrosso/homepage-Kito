@@ -78,16 +78,16 @@ describe("/api/auth/setup", () => {
 
   it("creates the first admin user and starts a session", async () => {
     mocks.hasUsers.mockReturnValue(false);
-    mocks.addUser.mockResolvedValue({ passwordHash: "scrypt$secret", role: "admin", username: "admin" });
+    mocks.addUser.mockResolvedValue({ groups: [], passwordHash: "scrypt$secret", role: "admin", username: "admin" });
     const res = createMockRes();
 
     await setupHandler(createReq("POST", { password: "secret", username: "admin" }), res);
 
     expect(mocks.addUser).toHaveBeenCalledWith({ password: "secret", role: "admin", username: "admin" });
-    expect(session.user).toEqual({ role: "admin", username: "admin" });
+    expect(session.user).toEqual({ groups: [], role: "admin", username: "admin" });
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.body).toEqual({ user: { role: "admin", username: "admin" } });
+    expect(res.body).toEqual({ user: { groups: [], role: "admin", username: "admin" } });
     expectNoPasswordHash(res.body);
   });
 
@@ -127,7 +127,12 @@ describe("/api/auth/login", () => {
   });
 
   it("logs in with valid credentials and starts a session", async () => {
-    mocks.findUser.mockReturnValue({ passwordHash: "scrypt$secret", role: "admin", username: "admin" });
+    mocks.findUser.mockReturnValue({
+      groups: ["media"],
+      passwordHash: "scrypt$secret",
+      role: "admin",
+      username: "admin",
+    });
     mocks.verifyPassword.mockResolvedValue(true);
     const res = createMockRes();
 
@@ -135,10 +140,10 @@ describe("/api/auth/login", () => {
 
     expect(mocks.findUser).toHaveBeenCalledWith("admin");
     expect(mocks.verifyPassword).toHaveBeenCalledWith("secret", "scrypt$secret");
-    expect(session.user).toEqual({ role: "admin", username: "admin" });
+    expect(session.user).toEqual({ groups: ["media"], role: "admin", username: "admin" });
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.body).toEqual({ user: { role: "admin", username: "admin" } });
+    expect(res.body).toEqual({ user: { groups: ["media"], role: "admin", username: "admin" } });
     expectNoPasswordHash(res.body);
   });
 
@@ -202,14 +207,14 @@ describe("/api/auth/me", () => {
 
   it("returns safe user data for the current session", async () => {
     mocks.getSession.mockResolvedValue({
-      user: { passwordHash: "scrypt$secret", role: "viewer", username: "viewer" },
+      user: { groups: ["media"], passwordHash: "scrypt$secret", role: "viewer", username: "viewer" },
     });
     const res = createMockRes();
 
     await meHandler(createReq("GET"), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.body).toEqual({ authenticated: true, user: { role: "viewer", username: "viewer" } });
+    expect(res.body).toEqual({ authenticated: true, user: { groups: ["media"], role: "viewer", username: "viewer" } });
     expectNoPasswordHash(res.body);
   });
 });

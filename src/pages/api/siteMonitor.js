@@ -1,6 +1,9 @@
 import { performance } from "perf_hooks";
 
+import { isVisibleForUser } from "utils/config/access";
 import { getServiceItem } from "utils/config/service-helpers";
+import { getSession } from "utils/config/session";
+import { findUser } from "utils/config/users";
 import createLogger from "utils/logger";
 import { httpProxy } from "utils/proxy/http";
 
@@ -8,12 +11,17 @@ const logger = createLogger("siteMonitor");
 
 export default async function handler(req, res) {
   const { groupName, serviceName } = req.query;
+  const session = await getSession(req, res);
+  const user = session?.user?.username ? (findUser(session.user.username) ?? session.user) : { role: "viewer", groups: [] };
   const serviceItem = await getServiceItem(groupName, serviceName);
   if (!serviceItem) {
     logger.debug(`No service item found for group ${groupName} named ${serviceName}`);
     return res.status(400).send({
       error: "Unable to find service, see log for details.",
     });
+  }
+  if (!isVisibleForUser(serviceItem, user)) {
+    return res.status(403).send({ error: "Service is not visible for this user." });
   }
 
   const { siteMonitor: monitorURL } = serviceItem;

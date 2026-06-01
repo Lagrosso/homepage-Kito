@@ -28,7 +28,7 @@ describe("users store", () => {
   it("stores users in users.yaml outside EDITABLE_CONFIGS", async () => {
     const result = await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
 
-    expect(result).toEqual({ username: "alice", role: "admin" });
+    expect(result).toEqual({ username: "alice", role: "admin", groups: [] });
     expect(writerMod.EDITABLE_CONFIGS).not.toContain("users.yaml");
     expect(writerMod.isEditableConfig("users.yaml")).toBe(false);
     expect(existsSync(join(confDir, "users.yaml"))).toBe(true);
@@ -49,6 +49,13 @@ describe("users store", () => {
     expect(usersMod.findUser("alice")).toEqual(users[0]);
   });
 
+  it("lists safe users without password hashes", async () => {
+    await usersMod.addUser({ username: "alice", password: "secret", role: "admin", groups: [" media ", "media", "kids"] });
+
+    expect(usersMod.listSafeUsers()).toEqual([{ username: "alice", role: "admin", groups: ["media", "kids"] }]);
+    expect(JSON.stringify(usersMod.listSafeUsers())).not.toContain("passwordHash");
+  });
+
   it("writes users.yaml atomically with owner-only permissions", async () => {
     await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
 
@@ -61,7 +68,7 @@ describe("users store", () => {
 
   it("appends users and rejects duplicates", async () => {
     await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
-    await usersMod.addUser({ username: "bob", password: "secret", role: "viewer" });
+    await usersMod.addUser({ username: "bob", password: "secret", role: "viewer", groups: "family, media, family" });
 
     expect(usersMod.loadUsers().map((user) => user.username)).toEqual(["alice", "bob"]);
     await expect(usersMod.addUser({ username: "alice", password: "secret", role: "viewer" })).rejects.toThrow(
@@ -69,10 +76,54 @@ describe("users store", () => {
     );
   });
 
+  it("updates roles and password hashes", async () => {
+    await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
+    await usersMod.addUser({ username: "bob", password: "secret", role: "viewer", groups: "family, media, family" });
+    const before = usersMod.findUser("bob").passwordHash;
+
+    expect(usersMod.updateUserRole("bob", "admin")).toEqual({
+      username: "bob",
+      role: "admin",
+      groups: ["family", "media"],
+    });
+    expect(usersMod.updateUser("bob", { groups: ["kids", "", "kids"] })).toEqual({
+      username: "bob",
+      role: "admin",
+      groups: ["kids"],
+    });
+    await expect(usersMod.setUserPassword("bob", "changed")).resolves.toEqual({
+      username: "bob",
+      role: "admin",
+      groups: ["kids"],
+    });
+
+    expect(usersMod.findUser("bob").role).toBe("admin");
+    expect(usersMod.findUser("bob").groups).toEqual(["kids"]);
+    expect(usersMod.findUser("bob").passwordHash).toMatch(/^scrypt\$/);
+    expect(usersMod.findUser("bob").passwordHash).not.toBe(before);
+  });
+
+  it("deletes users", async () => {
+    await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
+    await usersMod.addUser({ username: "bob", password: "secret", role: "viewer" });
+
+    expect(usersMod.deleteUser("bob")).toEqual({ username: "bob" });
+    expect(usersMod.loadUsers().map((user) => user.username)).toEqual(["alice"]);
+  });
+
+  it("keeps at least one admin", async () => {
+    await usersMod.addUser({ username: "alice", password: "secret", role: "admin" });
+
+    expect(() => usersMod.updateUserRole("alice", "viewer")).toThrow("at least one admin user is required");
+    expect(() => usersMod.deleteUser("alice")).toThrow("at least one admin user is required");
+    expect(usersMod.findUser("alice")).toMatchObject({ username: "alice", role: "admin" });
+  });
+
   it("validates roles and required fields", async () => {
     expect(usersMod.isValidRole("admin")).toBe(true);
     expect(usersMod.isValidRole("viewer")).toBe(true);
     expect(usersMod.isValidRole("editor")).toBe(false);
+    expect(usersMod.normalizeGroups("family, media, family, ")).toEqual(["family", "media"]);
 
     await expect(usersMod.addUser({ username: "", password: "secret", role: "admin" })).rejects.toThrow(
       "username is required",
@@ -83,6 +134,9 @@ describe("users store", () => {
     await expect(usersMod.addUser({ username: "alice", password: "secret", role: "editor" })).rejects.toThrow(
       "invalid role: editor",
     );
+    expect(() => usersMod.updateUserRole("missing", "admin")).toThrow("user not found");
+    expect(() => usersMod.updateUserRole("alice", "editor")).toThrow("invalid role: editor");
+    await expect(usersMod.setUserPassword("alice", "")).rejects.toThrow("password is required");
   });
 
   it("rejects malformed users.yaml", () => {

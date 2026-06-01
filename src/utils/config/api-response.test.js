@@ -86,6 +86,23 @@ describe("utils/config/api-response", () => {
     expect(res.map((g) => g.name)).toEqual(["A", "C"]);
   });
 
+  it("bookmarksResponse filters entries by access groups", async () => {
+    fs.readFile.mockResolvedValueOnce("ignored");
+    config.getSettings.mockResolvedValueOnce({});
+    yaml.load.mockReturnValueOnce([
+      {
+        Links: [
+          { Global: [{ href: "global" }] },
+          { Media: [{ href: "media", access: { groups: ["media"] } }] },
+          { Kids: [{ href: "kids", access: { groups: ["kids"] } }] },
+        ],
+      },
+    ]);
+
+    const res = await bookmarksResponse({ username: "viewer", role: "viewer", groups: ["media"] });
+    expect(res[0].bookmarks.map((bookmark) => bookmark.name)).toEqual(["Global", "Media"]);
+  });
+
   it("widgetsResponse returns sanitized configured widgets", async () => {
     widgetHelpers.widgetsFromConfig.mockResolvedValueOnce([{ type: "search", options: { url: "x" } }]);
     widgetHelpers.cleanWidgetGroups.mockResolvedValueOnce([{ type: "search", options: { index: 0 } }]);
@@ -130,6 +147,44 @@ describe("utils/config/api-response", () => {
     const groups = await servicesResponse();
     expect(groups.map((g) => g.name)).toEqual(["GroupA"]);
     expect(groups[0].services.map((s) => s.name)).toEqual(["d", "c", "a", "b"]);
+  });
+
+  it("servicesResponse filters services by access groups", async () => {
+    serviceHelpers.findGroupByName.mockImplementation((groups, name) => groups.find((g) => g.name === name) ?? null);
+    serviceHelpers.servicesFromDocker.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromKubernetes.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromConfig.mockResolvedValueOnce([
+      {
+        name: "GroupA",
+        services: [
+          { name: "global", weight: 10 },
+          { name: "media", weight: 20, access: { groups: ["media"] } },
+          { name: "kids", weight: 30, access: { groups: ["kids"] } },
+        ],
+        groups: [],
+      },
+    ]);
+    config.getSettings.mockResolvedValueOnce({});
+
+    const groups = await servicesResponse({ username: "viewer", role: "viewer", groups: ["media"] });
+    expect(groups[0].services.map((service) => service.name)).toEqual(["global", "media"]);
+  });
+
+  it("servicesResponse lets admins see restricted services", async () => {
+    serviceHelpers.findGroupByName.mockImplementation((groups, name) => groups.find((g) => g.name === name) ?? null);
+    serviceHelpers.servicesFromDocker.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromKubernetes.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromConfig.mockResolvedValueOnce([
+      {
+        name: "GroupA",
+        services: [{ name: "restricted", weight: 10, access: { groups: ["private"] } }],
+        groups: [],
+      },
+    ]);
+    config.getSettings.mockResolvedValueOnce({});
+
+    const groups = await servicesResponse({ username: "admin", role: "admin", groups: [] });
+    expect(groups[0].services.map((service) => service.name)).toEqual(["restricted"]);
   });
 
   it("servicesResponse logs when no docker services are discovered", async () => {

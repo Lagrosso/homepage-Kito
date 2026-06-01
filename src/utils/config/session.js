@@ -64,7 +64,8 @@ export function isValidSessionUser(user) {
     typeof user === "object" &&
     typeof user.username === "string" &&
     user.username.length > 0 &&
-    isValidSessionRole(user.role)
+    isValidSessionRole(user.role) &&
+    (user.groups === undefined || Array.isArray(user.groups))
   );
 }
 

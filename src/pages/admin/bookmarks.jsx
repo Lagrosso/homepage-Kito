@@ -40,6 +40,7 @@ function parseBookmarks(content) {
             href: props.href,
             icon: props.icon,
             description: props.description,
+            accessGroups: Array.isArray(props.access?.groups) ? props.access.groups : [],
           };
         });
       return { name, entries };
@@ -66,6 +67,13 @@ function BookmarkCard({ entry, onEdit, onDelete }) {
           <div className="shrink truncate px-2 py-2 text-theme-500 dark:text-theme-300 text-xs" title={entry.href}>
             {entry.description || shortenUrl(entry.href)}
           </div>
+          {entry.accessGroups?.length > 0 && (
+            <div className="shrink-0 self-center pr-2">
+              <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+                {entry.accessGroups.join(", ")}
+              </span>
+            </div>
+          )}
         </div>
         {(onEdit || onDelete) && (
           <div className="shrink-0 self-center flex gap-1 pr-2">
@@ -98,7 +106,7 @@ function BookmarkCard({ entry, onEdit, onDelete }) {
   );
 }
 
-const EMPTY_FORM = { group: "", name: "", href: "", icon: "", abbr: "", description: "" };
+const EMPTY_FORM = { group: "", name: "", href: "", icon: "", abbr: "", description: "", accessGroups: "" };
 
 // Modal that collects fields for a single bookmark and hands the values back to
 // the editor. It never writes to disk — Save stays manual. In "edit" mode the
@@ -120,6 +128,7 @@ function BookmarkFormDialog({ mode = "add", open, onClose, onSubmit, initial, gr
             icon: initial?.icon ?? "",
             abbr: initial?.abbr ?? "",
             description: initial?.description ?? "",
+            accessGroups: Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "",
           }
         : EMPTY_FORM,
     );
@@ -141,6 +150,7 @@ function BookmarkFormDialog({ mode = "add", open, onClose, onSubmit, initial, gr
         icon: form.icon.trim(),
         abbr: form.abbr.trim(),
         description: form.description.trim(),
+        accessGroups: form.accessGroups.trim(),
       });
       return;
     }
@@ -152,6 +162,9 @@ function BookmarkFormDialog({ mode = "add", open, onClose, onSubmit, initial, gr
         values[field] = form[field].trim();
       }
     });
+    if (form.accessGroups.trim() !== (Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "")) {
+      values.accessGroups = form.accessGroups.trim();
+    }
     onSubmit(values);
   };
 
@@ -219,6 +232,14 @@ function BookmarkFormDialog({ mode = "add", open, onClose, onSubmit, initial, gr
                   value={form.description}
                   onChange={setField("description")}
                   placeholder="Code hosting"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Access groups">
+                <input
+                  value={form.accessGroups}
+                  onChange={setField("accessGroups")}
+                  placeholder="family, media"
                   className={inputClass}
                 />
               </Field>

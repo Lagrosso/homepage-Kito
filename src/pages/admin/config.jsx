@@ -42,6 +42,7 @@ function parseServices(content) {
             description: value?.description,
             icon: value?.icon,
             server: value?.server ?? value?.widget?.server,
+            accessGroups: Array.isArray(value?.access?.groups) ? value.access.groups : [],
           };
         });
       return { name, entries };
@@ -90,6 +91,13 @@ function ServiceCard({ entry, onEdit, onDelete }) {
             </span>
           </div>
         )}
+        {entry.accessGroups?.length > 0 && (
+          <div className="shrink-0 self-start m-1">
+            <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+              {entry.accessGroups.join(", ")}
+            </span>
+          </div>
+        )}
         {(onEdit || onDelete) && (
           <div className="shrink-0 self-start flex gap-1 m-1">
             {onEdit && (
@@ -121,7 +129,7 @@ function ServiceCard({ entry, onEdit, onDelete }) {
   );
 }
 
-const EMPTY_FORM = { group: "", name: "", href: "", icon: "", description: "", server: "" };
+const EMPTY_FORM = { group: "", name: "", href: "", icon: "", description: "", server: "", accessGroups: "" };
 
 // Modal that collects fields for a single service and hands the values back to
 // the editor. It never writes to disk — Save stays manual. Works in two modes:
@@ -144,6 +152,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             icon: initial?.icon ?? "",
             description: initial?.description ?? "",
             server: initial?.server ?? "",
+            accessGroups: Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "",
           }
         : EMPTY_FORM,
     );
@@ -165,6 +174,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         description: form.description.trim(),
         icon: form.icon.trim(),
         server: form.server.trim(),
+        accessGroups: form.accessGroups.trim(),
       });
       return;
     }
@@ -177,6 +187,9 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         values[field] = form[field].trim();
       }
     });
+    if (form.accessGroups.trim() !== (Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "")) {
+      values.accessGroups = form.accessGroups.trim();
+    }
     onSubmit(values);
   };
 
@@ -247,6 +260,14 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   value={form.server}
                   onChange={setField("server")}
                   placeholder="my-docker"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Access groups">
+                <input
+                  value={form.accessGroups}
+                  onChange={setField("accessGroups")}
+                  placeholder="family, media"
                   className={inputClass}
                 />
               </Field>

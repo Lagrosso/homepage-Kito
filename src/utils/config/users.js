@@ -14,6 +14,17 @@ export function isValidRole(role) {
   return ROLES.includes(role);
 }
 
+export function normalizeGroups(groups) {
+  if (typeof groups === "string") {
+    return normalizeGroups(groups.split(","));
+  }
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+
+  return [...new Set(groups.map((group) => String(group).trim()).filter((group) => group.length > 0))];
+}
+
 function assertValidUsername(username) {
   if (typeof username !== "string" || username.trim().length === 0) {
     throw new Error("username is required");
@@ -42,7 +53,7 @@ function normalizeUser(user) {
     throw new Error("passwordHash is required");
   }
 
-  return { username, role, passwordHash };
+  return { username, role, passwordHash, groups: normalizeGroups(user.groups) };
 }
 
 export function loadUsers() {
@@ -66,6 +77,10 @@ export function findUser(username) {
   return loadUsers().find((user) => user.username === username) ?? null;
 }
 
+export function listSafeUsers() {
+  return loadUsers().map(({ username, role, groups }) => ({ username, role, groups }));
+}
+
 function writeUsers(users) {
   if (!existsSync(CONF_DIR)) {
     mkdirSync(CONF_DIR, { recursive: true });
@@ -77,7 +92,17 @@ function writeUsers(users) {
   renameSync(tmpPath, USERS_FILE);
 }
 
-export async function addUser({ username, password, role }) {
+function assertAdminWouldRemain(users) {
+  if (!users.some((user) => user.role === "admin")) {
+    throw new Error("at least one admin user is required");
+  }
+}
+
+function safeUser(user) {
+  return { username: user.username, role: user.role, groups: user.groups };
+}
+
+export async function addUser({ username, password, role, groups }) {
   assertValidUsername(username);
   assertValidPassword(password);
 
@@ -94,10 +119,78 @@ export async function addUser({ username, password, role }) {
   const user = {
     username: normalizedUsername,
     role,
+    groups: normalizeGroups(groups),
     passwordHash: await hashPassword(password),
   };
 
   writeUsers([...users, user]);
 
-  return { username: user.username, role: user.role };
+  return safeUser(user);
+}
+
+export function updateUser(username, values = {}) {
+  assertValidUsername(username);
+
+  if (values.role !== undefined && !isValidRole(values.role)) {
+    throw new Error(`invalid role: ${values.role}`);
+  }
+
+  const normalizedUsername = username.trim();
+  const users = loadUsers();
+  const index = users.findIndex((user) => user.username === normalizedUsername);
+  if (index === -1) {
+    throw new Error("user not found");
+  }
+
+  const nextUsers = users.map((user, userIndex) =>
+    userIndex === index
+      ? {
+          ...user,
+          ...(values.role !== undefined ? { role: values.role } : {}),
+          ...(values.groups !== undefined ? { groups: normalizeGroups(values.groups) } : {}),
+        }
+      : user,
+  );
+  assertAdminWouldRemain(nextUsers);
+  writeUsers(nextUsers);
+
+  return safeUser(nextUsers[index]);
+}
+
+export function updateUserRole(username, role) {
+  return updateUser(username, { role });
+}
+
+export async function setUserPassword(username, password) {
+  assertValidUsername(username);
+  assertValidPassword(password);
+
+  const normalizedUsername = username.trim();
+  const users = loadUsers();
+  const index = users.findIndex((user) => user.username === normalizedUsername);
+  if (index === -1) {
+    throw new Error("user not found");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const nextUsers = users.map((user, userIndex) => (userIndex === index ? { ...user, passwordHash } : user));
+  writeUsers(nextUsers);
+
+  return safeUser(nextUsers[index]);
+}
+
+export function deleteUser(username) {
+  assertValidUsername(username);
+
+  const normalizedUsername = username.trim();
+  const users = loadUsers();
+  if (!users.some((user) => user.username === normalizedUsername)) {
+    throw new Error("user not found");
+  }
+
+  const nextUsers = users.filter((user) => user.username !== normalizedUsername);
+  assertAdminWouldRemain(nextUsers);
+  writeUsers(nextUsers);
+
+  return { username: normalizedUsername };
 }

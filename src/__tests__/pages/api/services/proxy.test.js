@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { state, getServiceWidget, calendarProxy } = vi.hoisted(() => ({
+const { state, getServiceWidget, calendarProxy, getSession, findUser } = vi.hoisted(() => ({
+  findUser: vi.fn(),
+  getSession: vi.fn(),
   state: {
     genericResult: { ok: true },
   },
@@ -13,6 +15,8 @@ vi.mock("utils/logger", () => ({
 }));
 
 vi.mock("utils/config/service-helpers", () => ({ default: getServiceWidget }));
+vi.mock("utils/config/session", () => ({ getSession }));
+vi.mock("utils/config/users", () => ({ findUser }));
 
 const handlerFn = vi.hoisted(() => ({ handler: vi.fn() }));
 vi.mock("utils/proxy/handlers/generic", () => ({ default: handlerFn.handler }));
@@ -89,6 +93,8 @@ function createMockRes() {
 describe("pages/api/services/proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getSession.mockResolvedValue({ user: { username: "viewer", role: "viewer", groups: ["media"] } });
+    findUser.mockReturnValue({ username: "viewer", role: "viewer", groups: ["media"] });
   });
 
   it("maps opaque endpoints using widget.mappings and calls the handler", async () => {
@@ -100,6 +106,11 @@ describe("pages/api/services/proxy", () => {
 
     await servicesProxy(req, res);
 
+    expect(getServiceWidget).toHaveBeenCalledWith("g", "s", "0", {
+      username: "viewer",
+      role: "viewer",
+      groups: ["media"],
+    });
     expect(handlerFn.handler).toHaveBeenCalled();
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ endpoint: "collections" });

@@ -31,9 +31,28 @@ export function quoteScalar(value) {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
+function normalizeGroups(groups) {
+  if (typeof groups === "string") {
+    return normalizeGroups(groups.split(","));
+  }
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+  return [...new Set(groups.map((group) => String(group).trim()).filter((group) => group.length > 0))];
+}
+
+function appendAccessGroups(lines, groups, indent = "        ") {
+  const normalizedGroups = normalizeGroups(groups);
+  if (normalizedGroups.length === 0) {
+    return;
+  }
+  lines.push(`${indent}access:`);
+  lines.push(`${indent}  groups: [${normalizedGroups.map(quoteScalar).join(", ")}]`);
+}
+
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, description, icon, server }) {
+export function buildServiceEntry({ name, href, description, icon, server, accessGroups }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
@@ -47,13 +66,14 @@ export function buildServiceEntry({ name, href, description, icon, server }) {
   if (server) {
     lines.push(`        server: ${quoteScalar(server)}`);
   }
+  appendAccessGroups(lines, accessGroups);
   return lines.join("\n");
 }
 
 // Build the indented YAML for one bookmark entry. Bookmarks nest one extra
 // level: the properties live in a single-item list under the name, with the
 // first property carrying the `- ` list marker (matches the skeleton).
-export function buildBookmarkEntry({ name, abbr, href, icon, description }) {
+export function buildBookmarkEntry({ name, abbr, href, icon, description, accessGroups }) {
   const props = [];
   if (abbr) {
     props.push(["abbr", abbr]);
@@ -74,6 +94,7 @@ export function buildBookmarkEntry({ name, abbr, href, icon, description }) {
     const prefix = i === 0 ? "        - " : "          ";
     lines.push(`${prefix}${key}: ${quoteScalar(value)}`);
   });
+  appendAccessGroups(lines, accessGroups, "          ");
   return lines.join("\n");
 }
 
@@ -126,11 +147,11 @@ export function insertEntry(rawText, group, entry) {
 }
 
 // Insert a service into a raw services.yaml string.
-export function insertService(rawText, { group, name, href, description, icon, server }) {
-  return insertEntry(rawText, group, buildServiceEntry({ name, href, description, icon, server }));
+export function insertService(rawText, { group, name, href, description, icon, server, accessGroups }) {
+  return insertEntry(rawText, group, buildServiceEntry({ name, href, description, icon, server, accessGroups }));
 }
 
 // Insert a bookmark into a raw bookmarks.yaml string.
-export function insertBookmark(rawText, { group, name, abbr, href, icon, description }) {
-  return insertEntry(rawText, group, buildBookmarkEntry({ name, abbr, href, icon, description }));
+export function insertBookmark(rawText, { group, name, abbr, href, icon, description, accessGroups }) {
+  return insertEntry(rawText, group, buildBookmarkEntry({ name, abbr, href, icon, description, accessGroups }));
 }

@@ -51,6 +51,16 @@ describe("buildServiceEntry", () => {
     expect(entry.indexOf("href:")).toBeLessThan(entry.indexOf("description:"));
     expect(entry.indexOf("description:")).toBeLessThan(entry.indexOf("icon:"));
   });
+
+  it("includes access groups when present", () => {
+    const entry = buildServiceEntry({
+      name: "Jellyfin",
+      href: "http://jellyfin/",
+      accessGroups: "family, media, family",
+    });
+    expect(entry).toContain("access:");
+    expect(entry).toContain("groups: [family, media]");
+  });
 });
 
 describe("insertService", () => {
@@ -106,6 +116,12 @@ describe("buildBookmarkEntry", () => {
     const entry = buildBookmarkEntry({ name: "Github", href: "https://github.com/", icon: "github.png" });
     expect(entry).toContain('        - href: "https://github.com/"');
     expect(entry).toContain("          icon: github.png");
+  });
+
+  it("includes access groups under bookmark props", () => {
+    const entry = buildBookmarkEntry({ name: "School", href: "https://example.test", accessGroups: ["kids"] });
+    expect(entry).toContain("          access:");
+    expect(entry).toContain("            groups: [kids]");
   });
 });
 

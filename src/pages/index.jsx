@@ -23,7 +23,7 @@ import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
 
-import { bookmarksResponse, servicesResponse, widgetsResponse } from "utils/config/api-response";
+import { widgetsResponse } from "utils/config/api-response";
 import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
@@ -72,8 +72,6 @@ export async function getStaticProps() {
     logger = createLogger("index");
     const { providers, ...settings } = getSettings();
 
-    const services = await servicesResponse();
-    const bookmarks = await bookmarksResponse();
     const widgets = await widgetsResponse();
     const language = normalizeLanguage(settings.language);
 
@@ -81,8 +79,8 @@ export async function getStaticProps() {
       props: {
         initialSettings: settings,
         fallback: {
-          "/api/services": services,
-          "/api/bookmarks": bookmarks,
+          "/api/services": [],
+          "/api/bookmarks": [],
           "/api/widgets": widgets,
           "/api/hash": false,
         },

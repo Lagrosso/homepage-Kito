@@ -122,6 +122,25 @@ describe("updateServiceEntry", () => {
     expect(out).toContain("          server: my-docker"); // stays nested under widget
     expect(out).not.toMatch(/\n {8}server:/); // no new top-level service `server:`
   });
+
+  it("adds and removes access groups", () => {
+    const withGroups = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { accessGroups: "family, media, family" },
+    );
+    expect(yaml.load(withGroups)[0]["My First Group"][0]["My First Service"].access.groups).toEqual([
+      "family",
+      "media",
+    ]);
+
+    const withoutGroups = updateServiceEntry(
+      withGroups,
+      { group: "My First Group", name: "My First Service" },
+      { accessGroups: "" },
+    );
+    expect(yaml.load(withoutGroups)[0]["My First Group"][0]["My First Service"].access).toBeUndefined();
+  });
 });
 
 describe("hasBarePlaceholder", () => {
@@ -185,6 +204,11 @@ describe("updateBookmarkEntry", () => {
     const out = updateBookmarkEntry(BOOKMARKS, { group: "Developer", name: "Docs" }, { name: "Documentation" });
     expect(out).toContain("- Documentation:");
     expect(out).not.toContain("- Docs:");
+  });
+
+  it("adds access groups to a bookmark", () => {
+    const out = updateBookmarkEntry(BOOKMARKS, { group: "Developer", name: "Docs" }, { accessGroups: ["kids"] });
+    expect(yaml.load(out)[0].Developer[1].Docs[0].access.groups).toEqual(["kids"]);
   });
 });
 

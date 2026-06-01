@@ -189,8 +189,8 @@ describe("pages/index getStaticProps", () => {
     const result = await getStaticProps();
 
     expect(result.props.initialSettings).toEqual({ language: "en", title: "Homepage" });
-    expect(result.props.fallback["/api/services"]).toEqual([{ name: "svc" }]);
-    expect(result.props.fallback["/api/bookmarks"]).toEqual([{ name: "bm" }]);
+    expect(result.props.fallback["/api/services"]).toEqual([]);
+    expect(result.props.fallback["/api/bookmarks"]).toEqual([]);
     expect(result.props.fallback["/api/widgets"]).toEqual([{ type: "search" }]);
     expect(result.props.fallback["/api/hash"]).toBe(false);
     expect(serverSideTranslations).toHaveBeenCalledWith("en");
@@ -207,7 +207,7 @@ describe("pages/index getStaticProps", () => {
 
   it("falls back to empty settings and en translations on errors", async () => {
     getSettings.mockReturnValueOnce({ providers: {}, language: "de" });
-    state.throwIn = "services";
+    state.throwIn = "widgets";
 
     const { getStaticProps } = await import("pages/index.jsx");
     const result = await getStaticProps();

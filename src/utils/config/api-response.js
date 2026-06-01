@@ -3,6 +3,7 @@ import path from "path";
 
 import yaml from "js-yaml";
 
+import { filterBookmarkGroupsByUser, filterServiceGroupsByUser } from "utils/config/access";
 import checkAndCopyConfig, { CONF_DIR, getSettings, substituteEnvironmentVars } from "utils/config/config";
 import {
   cleanServiceGroups,
@@ -24,7 +25,7 @@ function compareServices(service1, service2) {
   return service1.name.localeCompare(service2.name);
 }
 
-export async function bookmarksResponse() {
+export async function bookmarksResponse(user) {
   checkAndCopyConfig("bookmarks.yaml");
 
   const bookmarksYaml = path.join(CONF_DIR, "bookmarks.yaml");
@@ -67,7 +68,7 @@ export async function bookmarksResponse() {
     }
   });
 
-  return [...sortedGroups.filter((g) => g), ...unsortedGroups];
+  return filterBookmarkGroupsByUser([...sortedGroups.filter((g) => g), ...unsortedGroups], user);
 }
 
 export async function widgetsResponse() {
@@ -155,7 +156,7 @@ function mergeLayoutGroupsIntoConfigured(configuredGroups, layoutGroups) {
   }
 }
 
-export async function servicesResponse() {
+export async function servicesResponse(user) {
   let discoveredDockerServices;
   let discoveredKubernetesServices;
   let configuredServices;
@@ -252,5 +253,5 @@ export async function servicesResponse() {
   });
 
   const allGroups = [...sortedGroups.filter((g) => g), ...unsortedGroups];
-  return pruneEmptyGroups(allGroups);
+  return filterServiceGroupsByUser(pruneEmptyGroups(allGroups), user);
 }

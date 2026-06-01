@@ -122,6 +122,46 @@ function applyScalarField(map, field, raw) {
   }
 }
 
+function normalizeAccessGroups(groups) {
+  if (typeof groups === "string") {
+    return normalizeAccessGroups(groups.split(","));
+  }
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+  return [...new Set(groups.map((group) => String(group).trim()).filter((group) => group.length > 0))];
+}
+
+function applyAccessGroups(doc, map, rawGroups) {
+  if (rawGroups === undefined) {
+    return;
+  }
+
+  const groups = normalizeAccessGroups(rawGroups);
+  let accessMap = map.get("access", true);
+
+  if (groups.length === 0) {
+    if (isMap(accessMap)) {
+      accessMap.delete("groups");
+      if (accessMap.items.length === 0) {
+        map.delete("access");
+      }
+    }
+    return;
+  }
+
+  if (!isMap(accessMap)) {
+    accessMap = doc.createNode({});
+    accessMap.flow = false;
+    map.set("access", accessMap);
+    accessMap = map.get("access", true);
+  }
+
+  if (isMap(accessMap)) {
+    accessMap.set("groups", groups);
+  }
+}
+
 // Edit an existing service's fields and/or rename it. Only the keys present in
 // `values` are touched; an empty string removes that field; unknown/nested
 // fields (widget:, ping:, …) on the entry are left untouched. Returns new raw text.
@@ -137,6 +177,7 @@ export function updateServiceEntry(rawText, { group, name }, values) {
 
   applyRename(pair, name, values.name);
   EDITABLE_SERVICE_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
+  applyAccessGroups(doc, propsMap, values.accessGroups);
 
   return doc.toString();
 }
@@ -172,6 +213,7 @@ export function updateBookmarkEntry(rawText, { group, name }, values) {
 
   applyRename(pair, name, values.name);
   EDITABLE_BOOKMARK_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
+  applyAccessGroups(doc, propsMap, values.accessGroups);
 
   return doc.toString();
 }

@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import createMockRes from "test-utils/create-mock-res";
 
-const { getServiceItem, httpProxy, perf, logger } = vi.hoisted(() => ({
+const { getServiceItem, httpProxy, perf, logger, getSession, findUser } = vi.hoisted(() => ({
+  findUser: vi.fn(),
   getServiceItem: vi.fn(),
+  getSession: vi.fn(),
   httpProxy: vi.fn(),
   perf: { now: vi.fn() },
   logger: { debug: vi.fn() },
@@ -16,6 +18,8 @@ vi.mock("perf_hooks", () => ({
 vi.mock("utils/config/service-helpers", () => ({
   getServiceItem,
 }));
+vi.mock("utils/config/session", () => ({ getSession }));
+vi.mock("utils/config/users", () => ({ findUser, normalizeGroups: (groups) => (Array.isArray(groups) ? groups : []) }));
 
 vi.mock("utils/proxy/http", () => ({
   httpProxy,
@@ -30,6 +34,8 @@ import handler from "pages/api/siteMonitor";
 describe("pages/api/siteMonitor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getSession.mockResolvedValue({ user: { username: "viewer", role: "viewer", groups: ["media"] } });
+    findUser.mockReturnValue({ username: "viewer", role: "viewer", groups: ["media"] });
   });
 
   it("returns 400 when the service item is missing", async () => {
@@ -54,6 +60,18 @@ describe("pages/api/siteMonitor", () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toBe("No http monitor URL given");
+  });
+
+  it("returns 403 when the service is hidden from the user", async () => {
+    getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://example.com", access: { groups: ["kids"] } });
+
+    const req = { query: { groupName: "g", serviceName: "s" } };
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(httpProxy).not.toHaveBeenCalled();
   });
 
   it("uses HEAD and returns status + latency when the response is OK", async () => {

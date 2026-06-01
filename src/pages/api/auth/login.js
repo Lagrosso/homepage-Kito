@@ -5,7 +5,7 @@ import { findUser } from "utils/config/users";
 const INVALID_CREDENTIALS_ERROR = "Invalid username or password";
 
 function safeUser(user) {
-  return { username: user.username, role: user.role };
+  return { username: user.username, role: user.role, groups: user.groups ?? [] };
 }
 
 export default async function handler(req, res) {
