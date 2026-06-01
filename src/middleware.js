@@ -24,7 +24,12 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 function isPublicPath(pathname) {
-  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/api/auth/");
+  return (
+    PUBLIC_PATHS.has(pathname) ||
+    pathname === "/api/healthcheck" ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/auth/")
+  );
 }
 
 function unauthorizedApi() {

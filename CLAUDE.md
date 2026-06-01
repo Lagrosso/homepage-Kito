@@ -48,6 +48,28 @@ pnpm test:watch      # Vitest Watch-Mode
 pnpm test:coverage   # Vitest mit Coverage
 ```
 
+## Docker-Deployment
+
+Empfohlener Weg (Details in **`DOCKER.md`**): **auf dem PC bauen → Docker Hub (öffentlich) → Server zieht nur.**
+
+```bash
+# PC: einmal `docker login`, .env mit DOCKERHUB_IMAGE füllen, dann:
+./scripts/docker-build-push.sh           # docker build + push
+# Server: docker-compose.yml + .env (HOMEPAGE_SESSION_SECRET!), dann:
+docker compose pull && docker compose up -d   # → http://server:3000 → /setup
+```
+
+- `docker-compose.yml` (Repo-Root) zieht nur `${DOCKERHUB_IMAGE}` (kein Build auf dem Server);
+  `.env.example` als Vorlage; `.env` ist gitignored.
+- **`HOMEPAGE_SESSION_SECRET` ist Pflicht** (≥32 Zeichen), sonst startet die App nicht.
+  `HOMEPAGE_ALLOWED_HOSTS` setzen, sobald der Zugriff nicht über `localhost:3000` läuft.
+- Der Healthcheck nutzt `GET /api/healthcheck` — dieser Pfad ist in `middleware.js` **vor** der Login-Wall
+  freigeschaltet (sonst meldet Docker den Container fälschlich „unhealthy").
+- **Wichtig (Next-Build):** Test-Dateien dürfen **nicht** direkt unter `src/pages/` (außer `pages/api/**`)
+  liegen — `next build` behandelt sie sonst als Seite und bricht ab. Seiten-Tests gehören nach
+  `src/__tests__/pages/` (z. B. `auth-pages.test.jsx`). `pnpm dev`/`pnpm test` zeigen das nicht, nur der
+  Production-Build (`pnpm build`).
+
 ## Architektur-Landkarte
 
 ```

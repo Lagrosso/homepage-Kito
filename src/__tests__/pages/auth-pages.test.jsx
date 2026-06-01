@@ -17,8 +17,8 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/router", () => ({ useRouter: () => router }));
 
-import LoginPage from "./login";
-import SetupPage from "./setup";
+import LoginPage from "pages/login";
+import SetupPage from "pages/setup";
 
 function fetchResponse(body, status = 200) {
   return {

@@ -1,0 +1,27 @@
+# homepage-Kito – Server-Compose (zieht nur das fertige Image, baut nicht selbst).
+# Auf dem Server brauchst du nur diese Datei + eine .env (siehe .env.example).
+#   docker compose pull && docker compose up -d
+# Erststart: http://<server>:3000 -> /setup -> ersten Admin anlegen.
+services:
+  homepage:
+    image: ${DOCKERHUB_IMAGE:?Bitte DOCKERHUB_IMAGE in .env setzen, z. B. deinuser/homepage-kito:latest}
+    container_name: homepage-kito
+    pull_policy: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Pflicht: verschlüsselt das Login-Cookie. 32+ Zeichen, z. B. `openssl rand -hex 32`.
+      - HOMEPAGE_SESSION_SECRET=${HOMEPAGE_SESSION_SECRET:?Bitte HOMEPAGE_SESSION_SECRET in .env setzen (32+ Zeichen)}
+      # Nötig, sobald der Zugriff NICHT über localhost:3000 läuft (Host-Header-Prüfung).
+      # In .env z. B. auf "192.168.14.10:3000" setzen, oder "*" zum Deaktivieren.
+      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS:-localhost:3000}
+      # Optional: als bestimmter Benutzer laufen (Dateirechte im config-Volume).
+      # - PUID=1000
+      # - PGID=1000
+    volumes:
+      # Persistente Configs (services.yaml, users.yaml, .backups, …) liegen hier.
+      # Auf SELinux-Systemen (Fedora/RHEL/CentOS) stattdessen "./config:/app/config:z".
+      - ./config:/app/config
+      # Optional: für Docker-Integrationen (Container-Status etc.)
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

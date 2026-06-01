@@ -91,7 +91,14 @@ describe("middleware", () => {
     expect(res).toEqual({ type: "next" });
   });
 
-  it.each(["/login", "/setup", "/api/auth/state", "/_next/static/chunk.js", "/favicon-32x32.png"])(
+  it.each([
+    "/login",
+    "/setup",
+    "/api/auth/state",
+    "/api/healthcheck",
+    "/_next/static/chunk.js",
+    "/favicon-32x32.png",
+  ])(
     "allows public path %s without a session",
     async (path) => {
       const res = await middleware(createReq("localhost:3000", `http://localhost:3000${path}`));
