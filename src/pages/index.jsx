@@ -326,7 +326,7 @@ function Home({ initialSettings }) {
           <div key="tabs" id="tabs" className="m-5 sm:m-9 sm:mt-4 sm:mb-0">
             <ul
               className={classNames(
-                "sm:flex rounded-md bg-theme-100/20 dark:bg-white/5",
+                "sm:flex gap-1 overflow-hidden rounded-md bg-theme-100/20 dark:bg-white/5 p-1",
                 settings.cardBlur !== undefined &&
                   `backdrop-blur${settings.cardBlur.length ? "-" : ""}${settings.cardBlur}`,
               )}

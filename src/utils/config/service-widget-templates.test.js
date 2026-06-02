@@ -8,6 +8,7 @@ import {
   SERVICE_WIDGET_TEMPLATE_BY_TYPE,
   SERVICE_WIDGET_TEMPLATES,
   SERVICE_WIDGET_TYPES,
+  validateServiceWidgetFields,
 } from "./service-widget-templates";
 
 const componentsSource = fs.readFileSync(path.join(process.cwd(), "src/widgets/components.js"), "utf8");
@@ -78,5 +79,33 @@ describe("service widget templates", () => {
   it("marks known secret fields", () => {
     SERVICE_WIDGET_SECRET_FIELDS.forEach((field) => expect(isServiceWidgetSecretField(field)).toBe(true));
     expect(isServiceWidgetSecretField("url")).toBe(false);
+  });
+
+  it("exposes allowed display fields for the curated widgets", () => {
+    expect(SERVICE_WIDGET_TEMPLATE_BY_TYPE.audiobookshelf.allowedFields).toEqual([
+      "podcasts",
+      "podcastsDuration",
+      "books",
+      "booksDuration",
+    ]);
+    expect(SERVICE_WIDGET_TEMPLATE_BY_TYPE.jellyfin.allowedFields).toEqual(["movies", "series", "episodes", "songs"]);
+    expect(SERVICE_WIDGET_TEMPLATE_BY_TYPE.nextcloud.allowedFields).toContain("freespace");
+  });
+
+  it("validates allowed fields and max field counts", () => {
+    const dockhand = SERVICE_WIDGET_TEMPLATE_BY_TYPE.dockhand;
+    expect(validateServiceWidgetFields(dockhand, ["running", "total", "cpu", "memory"]).valid).toBe(true);
+    expect(validateServiceWidgetFields(dockhand, ["running", "total", "cpu", "memory", "images"])).toMatchObject({
+      valid: false,
+      tooMany: true,
+    });
+    expect(validateServiceWidgetFields(dockhand, ["running", "nope"])).toMatchObject({
+      valid: false,
+      invalidFields: ["nope"],
+    });
+
+    ["dockhand", "karakeep", "fritzbox", "nextcloud", "romm"].forEach((type) => {
+      expect(SERVICE_WIDGET_TEMPLATE_BY_TYPE[type].maxFields).toBe(4);
+    });
   });
 });

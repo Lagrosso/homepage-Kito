@@ -1,16 +1,17 @@
 import ConfigEditor, { inputClass } from "components/admin/config-editor";
 import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdClose, MdDelete, MdEdit, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
+import { groupNamesFromRaw, parseGlobalLayout, parseLayout } from "utils/config/layout-preview";
 import {
   assignGroupToTab,
   deleteSetting,
   deleteTab,
   moveLayoutGroup,
+  moveLayoutTab,
   renameTab,
   setGroupLayoutField,
   updateSetting,
 } from "utils/config/yaml-edit";
-import { groupNamesFromRaw, parseGlobalLayout, parseLayout } from "utils/config/layout-preview";
 
 // Tab/layout manager rendered inside the ConfigEditor shell (configFile=settings.yaml).
 // It edits only the editor text (via setContent); Save/Validate/Backup stay manual.
@@ -65,7 +66,10 @@ function LayoutManager({ content, setContent, setStatus }) {
 
   const onAssign = (group, tab) => {
     try {
-      apply(assignGroupToTab(content, { group, tab }), `"${group}" → ${tab || "kein Tab"} (im Editor) — review and Save.`);
+      apply(
+        assignGroupToTab(content, { group, tab }),
+        `"${group}" → ${tab || "kein Tab"} (im Editor) — review and Save.`,
+      );
     } catch (e) {
       fail(e);
     }
@@ -108,10 +112,21 @@ function LayoutManager({ content, setContent, setStatus }) {
     }
   };
 
+  const onMoveTab = (tab, direction) => {
+    try {
+      apply(moveLayoutTab(content, { tab }, direction), `Tab "${tab}" verschoben (im Editor) — review and Save.`);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   // Per-group layout option (style/columns/header/…). "" clears the field.
   const onSetField = (group, field, value) => {
     try {
-      apply(setGroupLayoutField(content, { group, field }, value), `"${group}" aktualisiert (im Editor) — review and Save.`);
+      apply(
+        setGroupLayoutField(content, { group, field }, value),
+        `"${group}" aktualisiert (im Editor) — review and Save.`,
+      );
     } catch (e) {
       fail(e);
     }
@@ -173,7 +188,11 @@ function LayoutManager({ content, setContent, setStatus }) {
             placeholder="Tab-Name"
             className={`${inputClass} flex-1 min-w-[8rem]`}
           />
-          <select value={newGroup} onChange={(e) => setNewGroup(e.target.value)} className={`${inputClass} flex-1 min-w-[8rem]`}>
+          <select
+            value={newGroup}
+            onChange={(e) => setNewGroup(e.target.value)}
+            className={`${inputClass} flex-1 min-w-[8rem]`}
+          >
             <option value="">Gruppe wählen…</option>
             {allGroups.map((g) => (
               <option key={g} value={g}>
@@ -189,7 +208,9 @@ function LayoutManager({ content, setContent, setStatus }) {
             Anlegen
           </button>
         </form>
-        <p className="mt-1 text-xs text-theme-400">Ein Tab erscheint, sobald ihm mindestens eine Gruppe zugewiesen ist.</p>
+        <p className="mt-1 text-xs text-theme-400">
+          Ein Tab erscheint, sobald ihm mindestens eine Gruppe zugewiesen ist.
+        </p>
       </section>
 
       <section>
@@ -198,7 +219,7 @@ function LayoutManager({ content, setContent, setStatus }) {
           <p className="text-theme-500 text-xs">Noch keine Tabs.</p>
         ) : (
           <ul className="flex flex-col gap-1">
-            {tabs.map((tab) => (
+            {tabs.map((tab, index) => (
               <li
                 key={tab}
                 className="flex items-center justify-between gap-2 rounded-md bg-theme-100/40 dark:bg-white/5 px-2 py-1"
@@ -215,16 +236,47 @@ function LayoutManager({ content, setContent, setStatus }) {
                     <button type="submit" title="Speichern" aria-label="Save rename" className={iconBtn}>
                       <MdCheck className="w-4 h-4" />
                     </button>
-                    <button type="button" onClick={() => setRenaming(null)} title="Abbrechen" aria-label="Cancel rename" className={iconBtn}>
+                    <button
+                      type="button"
+                      onClick={() => setRenaming(null)}
+                      title="Abbrechen"
+                      aria-label="Cancel rename"
+                      className={iconBtn}
+                    >
                       <MdClose className="w-4 h-4" />
                     </button>
                   </form>
                 ) : (
                   <>
+                    <span className="shrink-0 flex flex-col -my-1">
+                      <button
+                        type="button"
+                        onClick={() => onMoveTab(tab, "up")}
+                        disabled={index <= 0}
+                        title="Tab nach oben"
+                        aria-label={`Move tab ${tab} up`}
+                        className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                      >
+                        <MdKeyboardArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveTab(tab, "down")}
+                        disabled={index >= tabs.length - 1}
+                        title="Tab nach unten"
+                        aria-label={`Move tab ${tab} down`}
+                        className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                      >
+                        <MdKeyboardArrowDown className="w-4 h-4" />
+                      </button>
+                    </span>
                     <span className="min-w-0 truncate">
                       <span className="font-medium">{tab}</span>
                       <span className="ml-2 text-theme-500 text-xs">
-                        {layout.filter((e) => e.tab === tab).map((e) => e.group).join(", ") || "—"}
+                        {layout
+                          .filter((e) => e.tab === tab)
+                          .map((e) => e.group)
+                          .join(", ") || "—"}
                       </span>
                     </span>
                     <span className="shrink-0 flex gap-1">
@@ -253,6 +305,10 @@ function LayoutManager({ content, setContent, setStatus }) {
             ))}
           </ul>
         )}
+        <p className="mt-1 text-xs text-theme-400">
+          ▲/▼ verschiebt den ganzen Tab-Block in der <code>layout:</code>-Reihenfolge. Das bestimmt die sichtbare
+          Tab-Reihenfolge auf dem Dashboard.
+        </p>
       </section>
 
       <section>
@@ -281,9 +337,9 @@ function LayoutManager({ content, setContent, setStatus }) {
       <section>
         <h3 className="font-medium mb-2 text-theme-800 dark:text-theme-200">Gruppen-Reihenfolge &amp; Anzeige</h3>
         <p className="mb-2 text-xs text-theme-400">
-          Die Reihenfolge hier bestimmt die Reihenfolge der Gruppen auf dem Dashboard (innerhalb eines Tabs in
-          dieser Reihenfolge gefiltert). Mit ▲/▼ verschieben. Gruppen ohne Tab-/Layout-Eintrag erscheinen unten und
-          lassen sich erst nach einer Tab-Zuweisung umsortieren.
+          Die Reihenfolge hier bestimmt die Reihenfolge der Gruppen auf dem Dashboard (innerhalb eines Tabs in dieser
+          Reihenfolge gefiltert). Mit ▲/▼ verschieben. Gruppen ohne Tab-/Layout-Eintrag erscheinen unten und lassen sich
+          erst nach einer Tab-Zuweisung umsortieren.
         </p>
         {allGroups.length === 0 ? (
           <p className="text-theme-500 text-xs">Keine Gruppen in services.yaml / bookmarks.yaml gefunden.</p>
@@ -361,7 +417,9 @@ function LayoutManager({ content, setContent, setStatus }) {
                         aria-label={`Services pro Reihe für ${group}`}
                         value={opts.columns != null ? String(opts.columns) : ""}
                         disabled={!isRow}
-                        onChange={(e) => onSetField(group, "columns", e.target.value === "" ? "" : Number(e.target.value))}
+                        onChange={(e) =>
+                          onSetField(group, "columns", e.target.value === "" ? "" : Number(e.target.value))
+                        }
                         className={`${inputClass} max-w-[7rem] disabled:opacity-50`}
                       >
                         <option value="">Auto</option>
@@ -410,5 +468,7 @@ function LayoutManager({ content, setContent, setStatus }) {
 }
 
 export default function AdminLayoutConfig() {
-  return <ConfigEditor configFile="settings.yaml" title="Layout & Tabs" parse={() => []} PreviewPanel={LayoutManager} />;
+  return (
+    <ConfigEditor configFile="settings.yaml" title="Layout & Tabs" parse={() => []} PreviewPanel={LayoutManager} />
+  );
 }

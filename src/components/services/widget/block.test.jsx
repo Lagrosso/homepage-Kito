@@ -16,6 +16,14 @@ describe("components/services/widget/block", () => {
     expect(container.textContent).toContain("some.label");
   });
 
+  it("uses the configurable card radius for service widget blocks", () => {
+    const { container } = renderWithProviders(<Block label="some.label" value="42" />, { settings: {} });
+
+    const el = container.querySelector(".service-block");
+    expect(el).not.toBeNull();
+    expect(el.className).toContain("rounded-[var(--card-radius,0.375rem)]");
+  });
+
   it("sets highlight metadata when a rule matches", () => {
     const highlightConfig = {
       levels: { danger: "danger-class" },

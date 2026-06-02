@@ -337,20 +337,37 @@ export function updateWidgetOptions(rawText, { index }, values) {
     throw new Error(`Widget #${index} has no editable options`);
   }
 
-  Object.entries(values).forEach(([key, raw]) => {
-    if (raw === undefined) {
-      return;
-    }
-    const value = typeof raw === "string" ? raw.trim() : raw;
-    if (value === REDACTED) {
-      return; // never persist the redaction marker
-    }
-    if (value === "" && isSensitiveKey(key)) {
-      return; // keep an untouched secret rather than deleting it
-    }
-    applyScalarField(optionsMap, key, value);
-  });
+  Object.entries(values).forEach(([key, raw]) => setWidgetOption(doc, optionsMap, key, raw));
 
+  return doc.toString();
+}
+
+export function addInfoWidget(rawText, values = {}) {
+  const doc = parseConfigDoc(rawText);
+  if (!values.type || typeof values.type !== "string") {
+    throw new Error("Widget type is required");
+  }
+
+  if (!doc.contents) {
+    doc.contents = doc.createNode([]);
+  }
+  const top = doc.contents;
+  if (!isSeq(top)) {
+    throw new Error("widgets.yaml is not a list");
+  }
+
+  const item = doc.createNode({ [values.type.trim()]: {} });
+  item.flow = false;
+  const optionsMap = item.get(values.type.trim(), true);
+  if (isMap(optionsMap)) {
+    optionsMap.flow = false;
+    Object.entries(values).forEach(([key, raw]) => {
+      if (key !== "name") {
+        setWidgetOption(doc, optionsMap, key, raw);
+      }
+    });
+  }
+  top.items.push(item);
   return doc.toString();
 }
 
@@ -753,6 +770,15 @@ function locateLayoutForReorder(rawText) {
   throw new Error("`layout` is not a list/mapping — edit it in the raw editor.");
 }
 
+function layoutItemTab(item) {
+  const value = isMap(item) && item.items.length > 0 ? item.items[0].value : item?.value;
+  if (!isMap(value)) {
+    return "";
+  }
+  const tabNode = value.get("tab", true);
+  return isScalar(tabNode) && tabNode.value != null ? String(tabNode.value) : "";
+}
+
 // Move a group within the settings.yaml `layout:` block to an arbitrary index.
 // The dashboard renders groups in `layout` order (per tab, that order filtered
 // to the tab), so this is what actually controls group order. The group must
@@ -779,5 +805,46 @@ export function moveLayoutGroup(rawText, { group }, direction) {
     return doc.toString();
   }
   arrayMoveInPlace(items, index, target);
+  return doc.toString();
+}
+
+// Move a complete tab block up/down. Tabs are represented by contiguous groups
+// with the same `layout[group].tab` value. To make the visible tab order user
+// controlled, move all entries for that tab together in the layout order.
+export function moveLayoutTab(rawText, { tab }, direction) {
+  const { doc, items } = locateLayoutForReorder(rawText);
+  const targetTab = typeof tab === "string" ? tab.trim() : "";
+  if (!targetTab) {
+    throw new Error("Tab name is required");
+  }
+
+  const ranges = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const itemTab = layoutItemTab(items[i]);
+    if (!itemTab) {
+      continue;
+    }
+    const previous = ranges[ranges.length - 1];
+    if (previous && previous.tab === itemTab && previous.end === i) {
+      previous.end = i + 1;
+    } else {
+      ranges.push({ tab: itemTab, start: i, end: i + 1 });
+    }
+  }
+
+  const index = ranges.findIndex((range) => range.tab === targetTab);
+  if (index === -1) {
+    throw new Error(`Tab "${targetTab}" not found`);
+  }
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= ranges.length) {
+    return doc.toString();
+  }
+
+  const range = ranges[index];
+  const targetRange = ranges[targetIndex];
+  const block = items.splice(range.start, range.end - range.start);
+  const insertAt = direction === "up" ? targetRange.start : targetRange.end - block.length;
+  items.splice(insertAt, 0, ...block);
   return doc.toString();
 }

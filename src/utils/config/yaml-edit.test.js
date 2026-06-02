@@ -2,6 +2,7 @@ import yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import {
+  addInfoWidget,
   assignGroupToTab,
   deleteBookmarkEntry,
   deleteServiceEntry,
@@ -17,6 +18,7 @@ import {
   moveGroupToIndex,
   moveLayoutGroup,
   moveLayoutGroupToIndex,
+  moveLayoutTab,
   moveWidget,
   moveWidgetToIndex,
   removeBackground,
@@ -271,6 +273,26 @@ describe("updateServiceWidget", () => {
     expect(widget.key).toBe("plain-secret");
   });
 
+  it("updates service widget display fields as a YAML list", () => {
+    const out = updateServiceWidget(
+      SRC,
+      { group: "My Second Group", name: "My Second Service" },
+      {
+        type: "sonarr",
+        fields: ["queue", "wanted"],
+      },
+    );
+    const widget = yaml.load(out)[1]["My Second Group"][0]["My Second Service"].widget;
+    expect(widget.fields).toEqual(["queue", "wanted"]);
+  });
+
+  it("removes service widget display fields when submitted empty", () => {
+    const withFields =
+      "- G:\n    - S:\n        widget:\n          type: jellyfin\n          fields:\n            - movies\n            - series\n";
+    const out = updateServiceWidget(withFields, { group: "G", name: "S" }, { type: "jellyfin", fields: "" });
+    expect(yaml.load(out)[0].G[0].S.widget.fields).toBeUndefined();
+  });
+
   it("deletes only the widget block", () => {
     const out = deleteServiceWidget(SRC, { group: "My Second Group", name: "My Second Service" });
     const service = yaml.load(out)[1]["My Second Group"][0]["My Second Service"];
@@ -364,6 +386,40 @@ describe("updateWidgetOptions", () => {
     const out = updateWidgetOptions(WIDGETS, { index: 2 }, { password: "[redacted]" });
     expect(out).toContain("password: super-secret");
     expect(out).not.toContain("[redacted]");
+  });
+
+  it("keeps typed booleans, numbers and arrays when editing options", () => {
+    const out = updateWidgetOptions(WIDGETS, { index: 0 }, { cpu: false, refresh: 3000, disk: ["/mnt/a", "/mnt/b"] });
+    const resources = yaml.load(out)[0].resources;
+    expect(resources.cpu).toBe(false);
+    expect(resources.refresh).toBe(3000);
+    expect(resources.disk).toEqual(["/mnt/a", "/mnt/b"]);
+  });
+});
+
+describe("addInfoWidget", () => {
+  it("adds a block-style info widget and keeps comments", () => {
+    const out = addInfoWidget(WIDGETS, {
+      type: "resources",
+      cpu: true,
+      memory: true,
+      refresh: 3000,
+      disk: ["/mnt/storage", "/mnt/backup"],
+    });
+    const widgets = yaml.load(out);
+    expect(widgets[3].resources).toEqual({
+      cpu: true,
+      memory: true,
+      refresh: 3000,
+      disk: ["/mnt/storage", "/mnt/backup"],
+    });
+    expect(out).toContain("# info widgets");
+    expect(out).toContain("- resources:\n    cpu: true");
+  });
+
+  it("creates a widgets list when the file is empty", () => {
+    const out = addInfoWidget("", { type: "search", name: "search", provider: "duckduckgo", focus: true });
+    expect(yaml.load(out)).toEqual([{ search: { provider: "duckduckgo", focus: true } }]);
   });
 });
 
@@ -849,5 +905,66 @@ layout:
 
   it("throws for a scalar layout", () => {
     expect(() => moveLayoutGroup("layout: nope\n", { group: "A" }, "up")).toThrow(/list\/mapping|raw editor/i);
+  });
+});
+
+describe("moveLayoutTab", () => {
+  const TABS = `---
+layout:
+  - Media:
+      tab: Test
+  - Proxmox:
+      tab: Test
+  - Social:
+      tab: Kitohome
+  - Entertainment:
+      tab: Kitohome
+  - Admin:
+      tab: Ops
+`;
+
+  it("moves a complete tab block down", () => {
+    const out = moveLayoutTab(TABS, { tab: "Test" }, "down");
+    expect(yaml.load(out).layout.map((i) => Object.keys(i)[0])).toEqual([
+      "Social",
+      "Entertainment",
+      "Media",
+      "Proxmox",
+      "Admin",
+    ]);
+  });
+
+  it("moves a complete tab block up", () => {
+    const out = moveLayoutTab(TABS, { tab: "Ops" }, "up");
+    expect(yaml.load(out).layout.map((i) => Object.keys(i)[0])).toEqual([
+      "Media",
+      "Proxmox",
+      "Admin",
+      "Social",
+      "Entertainment",
+    ]);
+  });
+
+  it("is a no-op at the boundaries", () => {
+    expect(moveLayoutTab(TABS, { tab: "Test" }, "up")).toBe(TABS);
+    expect(moveLayoutTab(TABS, { tab: "Ops" }, "down")).toBe(TABS);
+  });
+
+  it("works on mapping-form layout order", () => {
+    const obj = `---
+layout:
+  Media:
+    tab: Test
+  Social:
+    tab: Kitohome
+  Admin:
+    tab: Ops
+`;
+    const out = moveLayoutTab(obj, { tab: "Kitohome" }, "up");
+    expect(Object.keys(yaml.load(out).layout)).toEqual(["Social", "Media", "Admin"]);
+  });
+
+  it("throws when the tab does not exist", () => {
+    expect(() => moveLayoutTab(TABS, { tab: "Nope" }, "up")).toThrow(/not found/i);
   });
 });

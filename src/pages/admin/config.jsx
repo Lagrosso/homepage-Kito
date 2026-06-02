@@ -3,7 +3,7 @@ import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/co
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
-import { MdDelete, MdEdit } from "react-icons/md";
+import { MdDelete, MdEdit, MdSearch } from "react-icons/md";
 
 import { useLayoutGoverns } from "components/admin/use-layout-governs";
 import { isPlaceholder, maskValue } from "utils/config/secret-mask";
@@ -11,6 +11,7 @@ import {
   SERVICE_WIDGET_TEMPLATES,
   SERVICE_WIDGET_TEMPLATE_BY_TYPE,
   isServiceWidgetSecretField,
+  validateServiceWidgetFields,
 } from "utils/config/service-widget-templates";
 import {
   deleteServiceEntry,
@@ -209,17 +210,38 @@ function widgetOptionsFromInitial(widget) {
   return options;
 }
 
-function parseWidgetOption(field, raw) {
-  const value = typeof raw === "string" ? raw.trim() : raw;
-  if (field === "fields") {
-    if (typeof value === "string" && value === "") {
+function parseDisplayFields(raw) {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (Array.isArray(raw)) {
+    return uniqueFields(raw.map((item) => String(item).trim()));
+  }
+  if (typeof raw === "string") {
+    const value = raw.trim();
+    if (value === "") {
       return "";
     }
-    return typeof value === "string"
-      ? uniqueFields(value.split(",").map((item) => item.trim()))
-      : Array.isArray(value)
-        ? uniqueFields(value)
-        : [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return uniqueFields(parsed.map((item) => String(item).trim()));
+      }
+    } catch {
+      // fall through to comma parsing
+    }
+    return uniqueFields(value.split(",").map((item) => item.trim()));
+  }
+  return [];
+}
+
+function parseWidgetOption(field, raw) {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const value = typeof raw === "string" ? raw.trim() : raw;
+  if (field === "fields") {
+    return parseDisplayFields(value);
   }
   if (field === "metrics") {
     if (!value) {
@@ -237,14 +259,44 @@ function parseWidgetOption(field, raw) {
     }
     return numericValue;
   }
+  if (
+    [
+      "allowScrolling",
+      "chart",
+      "enableBlocks",
+      "enableNowPlaying",
+      "enableUser",
+      "enableMediaControl",
+      "showEpisodeNumber",
+      "expandOneStreamToTwoRows",
+      "enableTaskList",
+    ].includes(field)
+  ) {
+    if (value === "") {
+      return "";
+    }
+    if (typeof value === "boolean") {
+      return value;
+    }
+    return value === "true";
+  }
   return value;
 }
 
 function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
   const template = SERVICE_WIDGET_TEMPLATE_BY_TYPE[type] ?? SERVICE_WIDGET_TEMPLATES[0];
-  const fields = uniqueFields([...(template.fields ?? []), template.displayFields ? "fields" : null]);
+  const optionFields = template.optionFields ?? template.fields ?? [];
+  const selectedFields = parseDisplayFields(options.fields) || [];
+  const validation = validateServiceWidgetFields(template, selectedFields);
   const existingKeys = existingWidget?.fields?.map((field) => field.key) ?? [];
-  const unknownKeys = existingKeys.filter((key) => key !== "type" && !fields.includes(key));
+  const knownKeys = uniqueFields([...optionFields, "fields"]);
+  const unknownKeys = existingKeys.filter((key) => key !== "type" && !knownKeys.includes(key));
+  const toggleDisplayField = (field) => {
+    const next = selectedFields.includes(field)
+      ? selectedFields.filter((item) => item !== field)
+      : [...selectedFields, field];
+    onChange("widgetOption", "fields", next);
+  };
 
   return (
     <div className="rounded-md border border-theme-200 dark:border-theme-700 p-3 space-y-3">
@@ -257,17 +309,27 @@ function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
           ))}
         </select>
       </Field>
-      {fields.map((field) => {
+      {optionFields.map((field) => {
         const isSecret = isServiceWidgetSecretField(field);
-        const label = field === "fields" ? "Display fields" : field;
         const placeholder =
           field === "metrics"
             ? '[{"label":"Requests","query":"sum(rate(http_requests_total[5m]))"}]'
             : isSecret
               ? "Leave blank to keep existing secret"
               : "";
+        const isBoolean = [
+          "allowScrolling",
+          "chart",
+          "enableBlocks",
+          "enableNowPlaying",
+          "enableUser",
+          "enableMediaControl",
+          "showEpisodeNumber",
+          "expandOneStreamToTwoRows",
+          "enableTaskList",
+        ].includes(field);
         return (
-          <Field key={field} label={label}>
+          <Field key={field} label={field}>
             {field === "metrics" ? (
               <textarea
                 value={options[field] ?? ""}
@@ -276,6 +338,16 @@ function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
                 spellCheck={false}
                 className={`${inputClass} min-h-20 font-mono`}
               />
+            ) : isBoolean ? (
+              <label className="flex items-center gap-2 rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={options[field] === true || options[field] === "true"}
+                  onChange={(e) => onChange("widgetOption", field, e.target.checked)}
+                  className="rounded border-theme-300 dark:border-theme-700"
+                />
+                enabled
+              </label>
             ) : (
               <input
                 value={options[field] ?? ""}
@@ -291,14 +363,40 @@ function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
                 possible.
               </p>
             )}
-            {field === "fields" && template.displayFields && (
-              <p className="mt-1 text-[11px] text-theme-400">
-                Suggested: <code>{template.displayFields.join(", ")}</code>
-              </p>
-            )}
           </Field>
         );
       })}
+      {template.allowedFields?.length > 0 && (
+        <Field label="Display fields">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 p-2">
+            {template.allowedFields.map((field) => (
+              <label key={field} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedFields.includes(field)}
+                  onChange={() => toggleDisplayField(field)}
+                  className="rounded border-theme-300 dark:border-theme-700"
+                />
+                <code className="text-xs">{field}</code>
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-theme-400">
+            {template.maxFields ? `Select up to ${template.maxFields} fields.` : "Empty selection removes fields."}
+          </p>
+          {!validation.valid && (
+            <p className="mt-1 text-[11px] text-red-500">
+              {validation.tooMany && `Too many fields selected. Maximum is ${template.maxFields}.`}
+              {validation.invalidFields.length > 0 && ` Invalid fields: ${validation.invalidFields.join(", ")}.`}
+            </p>
+          )}
+        </Field>
+      )}
+      {template.supportsRawMode && (
+        <p className="text-xs text-theme-400">
+          This widget has special options; advanced cases can still be edited in raw YAML.
+        </p>
+      )}
       {unknownKeys.length > 0 && (
         <p className="text-xs text-amber-600 dark:text-amber-300">
           Existing raw-only widget options are preserved: <code>{unknownKeys.join(", ")}</code>.
@@ -311,20 +409,62 @@ function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
   );
 }
 
+function IconSuggestionList({ suggestions, onSelect }) {
+  if (!suggestions.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-theme-200 dark:border-theme-700 bg-theme-50/40 dark:bg-white/5 p-2">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-theme-500">Icon suggestions</p>
+      <div className="grid gap-2">
+        {suggestions.map((suggestion) => (
+          <button
+            key={`${suggestion.source}:${suggestion.icon}`}
+            type="button"
+            onClick={() => onSelect(suggestion.icon)}
+            className="flex items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-theme-200/60 dark:hover:bg-white/10"
+          >
+            <span className="shrink-0 flex h-9 w-9 items-center justify-center rounded bg-white/60 dark:bg-black/20">
+              <ResolvedIcon icon={suggestion.icon} width={28} height={28} alt={suggestion.label} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{suggestion.label || suggestion.icon}</span>
+              <span className="block truncate text-[11px] text-theme-500">
+                {suggestion.source} · {suggestion.reason}
+              </span>
+            </span>
+            <code className="hidden sm:block shrink-0 max-w-48 truncate rounded bg-theme-200/70 dark:bg-theme-900/60 px-1.5 py-0.5 text-[10px]">
+              {suggestion.icon}
+            </code>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Modal that collects fields for a single service and hands the values back to
 // the editor. It never writes to disk — Save stays manual. Works in two modes:
 //   - "add":  group is free-text (datalist of existing groups), no description.
 //   - "edit": group is fixed/read-only (no moving in v1), description is editable.
 function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, group, existingGroups = [] }) {
   const isEdit = mode === "edit";
+  const iconInputId = isEdit ? "service-edit-icon" : "service-add-icon";
   const [form, setForm] = useState(EMPTY_FORM);
   const [widgetError, setWidgetError] = useState(null);
+  const [iconSuggestions, setIconSuggestions] = useState([]);
+  const [iconSuggestionState, setIconSuggestionState] = useState("idle");
+  const [iconSuggestionError, setIconSuggestionError] = useState(null);
 
   useEffect(() => {
     if (!open) {
       return;
     }
     setWidgetError(null);
+    setIconSuggestions([]);
+    setIconSuggestionState("idle");
+    setIconSuggestionError(null);
     setForm(
       isEdit
         ? {
@@ -348,6 +488,10 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
   }, [open, isEdit, initial, group]);
 
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const setIconField = (value) => {
+    setIconSuggestionError(null);
+    setForm((f) => ({ ...f, icon: value }));
+  };
   const setWidgetField = (kind, key, value) => {
     setWidgetError(null);
     if (kind === "widgetType") {
@@ -357,6 +501,33 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     setForm((f) => ({ ...f, widgetOptions: { ...f.widgetOptions, [key]: value } }));
   };
   const canSubmit = form.group.trim() && form.name.trim() && (!form.widgetEnabled || form.widgetType);
+
+  const findIcons = async () => {
+    setIconSuggestionState("loading");
+    setIconSuggestionError(null);
+    try {
+      const response = await fetch("/api/config/icon-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          href: form.href,
+          widgetType: form.widgetEnabled ? form.widgetType : initial?.widget?.type,
+          currentIcon: form.icon,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not fetch icon suggestions");
+      }
+      setIconSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
+      setIconSuggestionState("done");
+    } catch (error) {
+      setIconSuggestions([]);
+      setIconSuggestionError(error.message);
+      setIconSuggestionState("error");
+    }
+  };
 
   const submit = (e) => {
     e.preventDefault();
@@ -393,11 +564,22 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     } else if (form.widgetEnabled) {
       const template = SERVICE_WIDGET_TEMPLATE_BY_TYPE[form.widgetType] ?? SERVICE_WIDGET_TEMPLATES[0];
       const widgetValues = { type: form.widgetType };
-      const fields = uniqueFields([...(template.fields ?? []), template.displayFields ? "fields" : null]);
+      const fields = uniqueFields([...(template.optionFields ?? template.fields ?? []), "fields"]);
       try {
         fields.forEach((field) => {
-          widgetValues[field] = parseWidgetOption(field, form.widgetOptions[field] ?? "");
+          const value = parseWidgetOption(field, form.widgetOptions[field]);
+          if (value !== undefined) {
+            widgetValues[field] = value;
+          }
         });
+        const validation = validateServiceWidgetFields(template, widgetValues.fields || []);
+        if (!validation.valid) {
+          const invalid = validation.invalidFields.length
+            ? ` Invalid fields: ${validation.invalidFields.join(", ")}.`
+            : "";
+          const tooMany = validation.tooMany ? ` Maximum is ${template.maxFields}.` : "";
+          throw new Error(`fields are invalid.${invalid}${tooMany}`);
+        }
       } catch (error) {
         setWidgetError(`Widget options are invalid — ${error.message}`);
         return;
@@ -411,7 +593,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-lg max-h-[90vh] overflow-auto rounded-lg bg-white dark:bg-theme-800 text-theme-800 dark:text-theme-200 shadow-xl">
+        <DialogPanel className="w-full max-w-3xl max-h-[90vh] overflow-auto rounded-lg bg-white dark:bg-theme-800 text-theme-800 dark:text-theme-200 shadow-xl">
           <form onSubmit={submit}>
             <DialogTitle className="text-lg font-bold px-5 pt-5">{isEdit ? "Edit Service" : "Add Service"}</DialogTitle>
             <p className="px-5 pt-1 text-xs text-theme-500">
@@ -452,14 +634,34 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   className={inputClass}
                 />
               </Field>
-              <Field label="Icon">
-                <input
-                  value={form.icon}
-                  onChange={setField("icon")}
-                  placeholder="sonarr.png / mdi-server / sh-sonarr"
-                  className={inputClass}
-                />
-              </Field>
+              <div className="block text-sm">
+                <label htmlFor={iconInputId} className="block font-medium mb-1">
+                  Icon
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id={iconInputId}
+                    value={form.icon}
+                    onChange={setField("icon")}
+                    placeholder="sonarr.png / mdi-server / sh-sonarr"
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    onClick={findIcons}
+                    disabled={iconSuggestionState === "loading" || !form.name.trim()}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-2 text-sm font-medium hover:bg-theme-300 dark:hover:bg-theme-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <MdSearch className="h-4 w-4" />
+                    {iconSuggestionState === "loading" ? "Searching" : "Find icon"}
+                  </button>
+                </div>
+                {iconSuggestionError && <p className="mt-1 text-xs text-red-500">{iconSuggestionError}</p>}
+                {iconSuggestionState === "done" && iconSuggestions.length === 0 && (
+                  <p className="mt-1 text-xs text-theme-400">No matching icon found in curated sources.</p>
+                )}
+                <IconSuggestionList suggestions={iconSuggestions} onSelect={setIconField} />
+              </div>
               <Field label="Description">
                 <input
                   value={form.description}

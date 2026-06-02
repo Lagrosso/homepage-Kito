@@ -24,6 +24,7 @@ describe("components/tab", () => {
 
     const btn = screen.getByRole("tab");
     expect(btn.getAttribute("aria-selected")).toBe("true");
+    expect(btn.className).toContain("leading-tight");
 
     fireEvent.click(btn);
     expect(setActiveTab).toHaveBeenCalledWith("my-tab");

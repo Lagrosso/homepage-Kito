@@ -181,23 +181,24 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 18. **M18 – Konfigurations-Health-Checks v1 (umgesetzt):** statische, read-only Health-Checks für `services.yaml`, `bookmarks.yaml`, `widgets.yaml` und `settings.yaml`; Admin-only API `/api/config/health` (`GET` Gesamtprüfung, `POST` aktueller Editor-Inhalt), neue Admin-Seite `/admin/health` mit Severity-Filtern und kompakter Health-Check-Button in den bestehenden Config-Editoren. Prüft u. a. YAML-Syntax/-Shape, Tabs in Einrückung, fehlende/duplizierte `href`s, unbekannte `access.groups`, plaintext-sensitive Felder ohne `{{HOMEPAGE_*}}`, Layout-/Theme-Werte und auffällige Asset-Pfade. Keine Netzwerkchecks, keine automatischen Fixes, Save bleibt nur durch YAML-Syntax blockiert. (F7)
 19. **M19 – Service-Widget-Konfiguration über `/admin/config` (umgesetzt):** kuratierter UI-Weg für 40 gewünschte Homepage-Service-Widgets direkt am Service-Eintrag in `services.yaml`. Der Service-Edit-Dialog kann `widget:`-Blöcke aktivieren, bearbeiten und entfernen; neue Registry `service-widget-templates.js`; neue YAML-Helfer `updateServiceWidget`/`deleteServiceWidget`; secret-aware (echte Secrets nie vorausgefüllt, leer = behalten, `[redacted]` wird nie geschrieben, `{{HOMEPAGE_*}}` bleibt sichtbar); unbekannte Widget-Optionen bleiben erhalten und Raw-YAML bleibt für Sonderfälle möglich. Dashboard-Render-Pfad bleibt unverändert.
 20. **M20 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
+21. **M21 – Icon- und Favicon-Helfer über `/admin/config` (umgesetzt):** Der Service-Dialog kann per „Find icon" kuratierte Icon-Vorschläge laden und den gewählten Wert direkt ins `icon:`-Feld übernehmen. Admin-only API `/api/config/icon-suggestions`; Utility `icon-suggestions.js` normalisiert Service-Namen/Hosts/Widget-Typen, prüft `homarr-labs/dashboard-icons`, ergänzt `sh-*`/`si-*`-Kandidaten und erkennt Favicons über `/favicon.ico` bzw. HTML-`<link rel="icon">`. Keine freie Websuche, keine lokalen Bilddownloads, keine Credential-Tests; Änderungen landen nur im Editor und der Dashboard-Render-Pfad bleibt unverändert.
 
 #### Phase 3 – Vision / Runtime / Infra
 
 Diese Meilensteine sind ausdrücklich **(Vision)**. Sie dürfen erst nach **M7 (Auth/Rollen) + Audit** umgesetzt werden, weil sie den reinen „Config-UI/read-only"-Rahmen verlassen.
 
-21. **M21 – (Vision) Service-Aktionen aus der Kachel (P3, 🔥🔥):** Öffnen/Admin/Logs/Neustart/Status; gefährliche Aktionen nur mit Bestätigung + Admin-Recht, protokolliert; „Nur anzeigen"-Modus. (F5)
-22. **M22 – (Vision) Autodiscovery & Integrationen Docker/Proxmox/Tailscale (P3, 🔥🔥):** Docker-Label-Discovery + Vorschläge + Compose-Snippet + Status/Neustart; Proxmox Nodes/VMs/LXC + Ressourcen + Console; Tailscale-Erreichbarkeit/Badges. (F6)
-23. **M23 – (Vision) Einrichtungsassistent (P3):** Sprache/Layout, Docker-Socket optional, Container scannen, Dienste/Gruppen vorschlagen, Icons automatisch. (F9; baut auf M22)
-24. **M24 – (Vision) Wartungs- & Update-Zentrale (P3):** Updates verfügbar, alte Images, ungenutzte/ohne Backup/Healthcheck/Icon, IP-statt-DNS-Hinweise. (F20)
-25. **M25 – (Vision) Notfall-Ansicht (P3):** kritische IPs/Zugänge, Backup-Orte, letzte funktionierende URLs, Hinweise, Export PDF/Markdown. (F14)
-26. **M26 – (Vision) Abhängigkeits- & Server-/Netzwerk-Überblick (P3):** strukturierter Baum pro Server, Ursachen-Hinweise bei Ausfall. (F13+F19)
+22. **M22 – (Vision) Service-Aktionen aus der Kachel (P3, 🔥🔥):** Öffnen/Admin/Logs/Neustart/Status; gefährliche Aktionen nur mit Bestätigung + Admin-Recht, protokolliert; „Nur anzeigen"-Modus. (F5)
+23. **M23 – (Vision) Autodiscovery & Integrationen Docker/Proxmox/Tailscale (P3, 🔥🔥):** Docker-Label-Discovery + Vorschläge + Compose-Snippet + Status/Neustart; Proxmox Nodes/VMs/LXC + Ressourcen + Console; Tailscale-Erreichbarkeit/Badges. (F6)
+24. **M24 – (Vision) Einrichtungsassistent (P3):** Sprache/Layout, Docker-Socket optional, Container scannen, Dienste/Gruppen vorschlagen, Icon-Helfer nutzen. (F9; baut auf M23)
+25. **M25 – (Vision) Wartungs- & Update-Zentrale (P3):** Updates verfügbar, alte Images, ungenutzte/ohne Backup/Healthcheck/Icon, IP-statt-DNS-Hinweise. (F20)
+26. **M26 – (Vision) Notfall-Ansicht (P3):** kritische IPs/Zugänge, Backup-Orte, letzte funktionierende URLs, Hinweise, Export PDF/Markdown. (F14)
+27. **M27 – (Vision) Abhängigkeits- & Server-/Netzwerk-Überblick (P3):** strukturierter Baum pro Server, Ursachen-Hinweise bei Ausfall. (F13+F19)
 
 **Phasen-Mapping:**
 
 - **Phase 1 (MVP):** ≈ bereits durch M1–M5 abgedeckt (UI-Editor + Move + Validierung + Backup); Rollback = M17.
-- **Phase 2 (Homelab-Mehrwert):** M9–M20 (read-only/config-only).
-- **Phase 3 (KitoDash/Runtime):** M7, M21–M26.
+- **Phase 2 (Homelab-Mehrwert):** M9–M21 (read-only/config-only).
+- **Phase 3 (KitoDash/Runtime):** M7, M22–M27.
 
 ### Verifikationsstatus (manuelle Browser-Prüfung, 2026-05-30)
 
@@ -267,11 +268,19 @@ Per Code-/Test-Stand bestätigt:
 - **UI:** `/admin/config` zeigt Widget-Badges in der Service-Preview und erweitert den Service-Edit-Dialog um „Enable service widget", Typ-Auswahl, kuratierte Formularfelder, vorgeschlagene `fields` und Raw-YAML-Hinweis für Sonderoptionen. Bestehende unbekannte Widget-Optionen bleiben erhalten; Dashboard-Render-Pfad unverändert.
 - **Browser-Sichtprüfung:** temporärer Dev-Server mit isolierter Config zeigte `/admin/config`, Service-Dialog und alle 40 kuratierten Typen. Die In-App-Browser-Eingabe war durch dessen Clipboard-Sandbox eingeschränkt; die YAML-Mutation ist über Unit-Tests abgedeckt.
 
+### Verifikationsstatus (M21 Icon-/Favicon-Helfer, 2026-06-02)
+
+`pnpm test` grün (555 Testdateien / 1662 Tests), `pnpm build` grün. Gezielt ergänzt:
+
+- **Icon-Vorschlagslogik:** `src/utils/config/icon-suggestions.js` normalisiert Service-Namen, Hostnamen, Widget-Typen und bestehende Icons; prüft `homarr-labs/dashboard-icons` per `svg`/`webp`/`png`; ergänzt `sh-*`/`si-*`; erkennt Favicons über `/favicon.ico` und HTML-Icon-Links. Lookup ist best-effort mit Timeout und fällt auf lokale Syntax-Vorschläge zurück.
+- **API:** `/api/config/icon-suggestions` ist Admin-only, akzeptiert nur `name`, `href`, `widgetType`, `currentIcon` und gibt bei Lookup-Fehlern eine leere Vorschlagsliste statt 500 zurück. Secrets/Roh-YAML werden nicht angenommen oder ausgegeben.
+- **UI:** `/admin/config` ergänzt das bestehende `Icon`-Feld im Service-Dialog um „Find icon"; Vorschläge zeigen Quelle/Grund/Vorschau via `ResolvedIcon`; Auswahl schreibt nur den Icon-Wert ins Formular. Save bleibt manuell über die bestehende Config-Editor-Shell.
+
 ## Vorgemerkte spätere Komfort-Features
 
 Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Punkte sind inzwischen als Meilensteine in der Roadmap geführt; die Detail-Bullets bleiben als spätere Ausgestaltung erhalten. Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
 
-> **Hinweis:** Backup/Restore, Audit-Log, Service-Widgets, Import-Assistent, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19/M20** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation erhalten. Icon-/Favicon-Helfer bleibt weiterhin relevant für **M23**.
+> **Hinweis:** Backup/Restore, Audit-Log, Service-Widgets, Import-Assistent, Icon-/Favicon-Helfer, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19/M20/M21** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation bzw. spätere Ausgestaltung erhalten.
 
 ### Backup-/Restore-UI
 
@@ -284,11 +293,11 @@ Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Pun
 
 ### Icon- und Favicon-Helfer
 
-- Favicon aus URL ermitteln
-- passende Icons per KI vorschlagen — alternativ aus [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons/) (automatische Erkennung per Knopfdruck)
+- Favicon aus URL ermitteln (**M21 v1 umgesetzt**)
+- passende Icons aus [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons/) vorschlagen (**M21 v1 umgesetzt**); KI/freie Websuche bleibt später optional
 - lokale Icons nutzen
-- Icon-Vorschau anzeigen
-- dashboard-icons durchsuchen
+- Icon-Vorschau anzeigen (**M21 v1 umgesetzt**)
+- dashboard-icons durchsuchen (**M21 v1 kuratiert/heuristisch umgesetzt**)
 - Icons optional lokal cachen
 - fehlende Icons oder ungültige Icon-Pfade markieren
 
