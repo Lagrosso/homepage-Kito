@@ -189,24 +189,25 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 16. **M16 – Mobile-first & PWA (P2, 🔥🔥):** untere Nav, große Suche, Favoriten oben, Swipe, kompakte Karten, „nur Favoriten", Long-Press-Aktionen, PWA, Offline-Fallback, QR. (F10; erweitert Backlog „Mobile-Optimierung")
 17. **M17 – Backup, Restore & Änderungsverlauf/Rollback (P1/P2, ★, 🔥🔥):** Backups anzeigen/ansehen/Diff/Restore/Download, Verlauf (wann/was/wer), Kommentar, Rollback. (F15; bündelt Backlog „Backup-/Restore-UI" + „Audit-Log")
 18. **M18 – Konfigurations-Health-Checks v1 (umgesetzt):** statische, read-only Health-Checks für `services.yaml`, `bookmarks.yaml`, `widgets.yaml` und `settings.yaml`; Admin-only API `/api/config/health` (`GET` Gesamtprüfung, `POST` aktueller Editor-Inhalt), neue Admin-Seite `/admin/health` mit Severity-Filtern und kompakter Health-Check-Button in den bestehenden Config-Editoren. Prüft u. a. YAML-Syntax/-Shape, Tabs in Einrückung, fehlende/duplizierte `href`s, unbekannte `access.groups`, plaintext-sensitive Felder ohne `{{HOMEPAGE_*}}`, Layout-/Theme-Werte und auffällige Asset-Pfade. Keine Netzwerkchecks, keine automatischen Fixes, Save bleibt nur durch YAML-Syntax blockiert. (F7)
-19. **M19 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
+19. **M19 – Service-Widget-Konfiguration über `/admin/config` (umgesetzt):** kuratierter UI-Weg für 40 gewünschte Homepage-Service-Widgets direkt am Service-Eintrag in `services.yaml`. Der Service-Edit-Dialog kann `widget:`-Blöcke aktivieren, bearbeiten und entfernen; neue Registry `service-widget-templates.js`; neue YAML-Helfer `updateServiceWidget`/`deleteServiceWidget`; secret-aware (echte Secrets nie vorausgefüllt, leer = behalten, `[redacted]` wird nie geschrieben, `{{HOMEPAGE_*}}` bleibt sichtbar); unbekannte Widget-Optionen bleiben erhalten und Raw-YAML bleibt für Sonderfälle möglich. Dashboard-Render-Pfad bleibt unverändert.
+20. **M20 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
 
 #### Phase 3 – Vision / Runtime / Infra
 
 Diese Meilensteine sind ausdrücklich **(Vision)**. Sie dürfen erst nach **M7 (Auth/Rollen) + Audit** umgesetzt werden, weil sie den reinen „Config-UI/read-only"-Rahmen verlassen.
 
-20. **M20 – (Vision) Service-Aktionen aus der Kachel (P3, 🔥🔥):** Öffnen/Admin/Logs/Neustart/Status; gefährliche Aktionen nur mit Bestätigung + Admin-Recht, protokolliert; „Nur anzeigen"-Modus. (F5)
-21. **M21 – (Vision) Autodiscovery & Integrationen Docker/Proxmox/Tailscale (P3, 🔥🔥):** Docker-Label-Discovery + Vorschläge + Compose-Snippet + Status/Neustart; Proxmox Nodes/VMs/LXC + Ressourcen + Console; Tailscale-Erreichbarkeit/Badges. (F6)
-22. **M22 – (Vision) Einrichtungsassistent (P3):** Sprache/Layout, Docker-Socket optional, Container scannen, Dienste/Gruppen vorschlagen, Icons automatisch. (F9; baut auf M21)
-23. **M23 – (Vision) Wartungs- & Update-Zentrale (P3):** Updates verfügbar, alte Images, ungenutzte/ohne Backup/Healthcheck/Icon, IP-statt-DNS-Hinweise. (F20)
-24. **M24 – (Vision) Notfall-Ansicht (P3):** kritische IPs/Zugänge, Backup-Orte, letzte funktionierende URLs, Hinweise, Export PDF/Markdown. (F14)
-25. **M25 – (Vision) Abhängigkeits- & Server-/Netzwerk-Überblick (P3):** strukturierter Baum pro Server, Ursachen-Hinweise bei Ausfall. (F13+F19)
+21. **M21 – (Vision) Service-Aktionen aus der Kachel (P3, 🔥🔥):** Öffnen/Admin/Logs/Neustart/Status; gefährliche Aktionen nur mit Bestätigung + Admin-Recht, protokolliert; „Nur anzeigen"-Modus. (F5)
+22. **M22 – (Vision) Autodiscovery & Integrationen Docker/Proxmox/Tailscale (P3, 🔥🔥):** Docker-Label-Discovery + Vorschläge + Compose-Snippet + Status/Neustart; Proxmox Nodes/VMs/LXC + Ressourcen + Console; Tailscale-Erreichbarkeit/Badges. (F6)
+23. **M23 – (Vision) Einrichtungsassistent (P3):** Sprache/Layout, Docker-Socket optional, Container scannen, Dienste/Gruppen vorschlagen, Icons automatisch. (F9; baut auf M22)
+24. **M24 – (Vision) Wartungs- & Update-Zentrale (P3):** Updates verfügbar, alte Images, ungenutzte/ohne Backup/Healthcheck/Icon, IP-statt-DNS-Hinweise. (F20)
+25. **M25 – (Vision) Notfall-Ansicht (P3):** kritische IPs/Zugänge, Backup-Orte, letzte funktionierende URLs, Hinweise, Export PDF/Markdown. (F14)
+26. **M26 – (Vision) Abhängigkeits- & Server-/Netzwerk-Überblick (P3):** strukturierter Baum pro Server, Ursachen-Hinweise bei Ausfall. (F13+F19)
 
 **Phasen-Mapping:**
 
 - **Phase 1 (MVP):** ≈ bereits durch M1–M5 abgedeckt (UI-Editor + Move + Validierung + Backup); Rollback = M17.
-- **Phase 2 (Homelab-Mehrwert):** M9–M19 (read-only).
-- **Phase 3 (KitoDash/Runtime):** M7, M20–M25.
+- **Phase 2 (Homelab-Mehrwert):** M9–M20 (read-only/config-only).
+- **Phase 3 (KitoDash/Runtime):** M7, M21–M26.
 
 ### Verifikationsstatus (manuelle Browser-Prüfung, 2026-05-30)
 
@@ -268,11 +269,20 @@ Per Code-/Test-Stand bestätigt:
 - **API:** `/api/config/health` ist Admin-only; `GET` prüft alle editierbaren Config-Dateien, `POST` prüft den aktuellen Editor-Text und lehnt nicht editierbare Dateien ab.
 - **UI:** `/admin/health` lädt die Gesamtprüfung und filtert nach `All`/`Errors`/`Warnings`/`Info`; `ConfigEditor` hat einen `Health check`-Button mit einklappbarer Ergebnisliste. Health-Meldungen blockieren Save nicht.
 
+### Verifikationsstatus (M19 Service-Widgets per UI, 2026-06-02)
+
+`pnpm test` grün (552 Testdateien / 1651 Tests), `pnpm build` grün. Gezielt ergänzt:
+
+- **Service-Widget-Registry:** `src/utils/config/service-widget-templates.js` enthält die 40 gewünschten Widget-Typen; Tests prüfen Vollständigkeit, eindeutige Typen, gültige Labels und vorhandene Registrierung in `src/widgets/components.js`.
+- **YAML-Helfer:** `updateServiceWidget`/`deleteServiceWidget` in `yaml-edit.js` setzen/entfernen `widget:` kommentererhaltend direkt am Service. Nicht-sensitive leere Felder werden entfernt; Secret-Felder bleiben bei leerem Wert erhalten; `[redacted]` wird nie geschrieben; bare unquoted `{{HOMEPAGE_*}}` bleibt für strukturierte Edits gesperrt.
+- **UI:** `/admin/config` zeigt Widget-Badges in der Service-Preview und erweitert den Service-Edit-Dialog um „Enable service widget", Typ-Auswahl, kuratierte Formularfelder, vorgeschlagene `fields` und Raw-YAML-Hinweis für Sonderoptionen. Bestehende unbekannte Widget-Optionen bleiben erhalten; Dashboard-Render-Pfad unverändert.
+- **Browser-Sichtprüfung:** temporärer Dev-Server mit isolierter Config zeigte `/admin/config`, Service-Dialog und alle 40 kuratierten Typen. Die In-App-Browser-Eingabe war durch dessen Clipboard-Sandbox eingeschränkt; die YAML-Mutation ist über Unit-Tests abgedeckt.
+
 ## Vorgemerkte spätere Komfort-Features
 
 Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Punkte sind inzwischen als Meilensteine in der Roadmap geführt; die Detail-Bullets bleiben als spätere Ausgestaltung erhalten. Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
 
-> **Hinweis:** Backup/Restore, Audit-Log, Import-Assistent, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation erhalten. Icon-/Favicon-Helfer bleibt weiterhin relevant für **M22**.
+> **Hinweis:** Backup/Restore, Audit-Log, Service-Widgets, Import-Assistent, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19/M20** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation erhalten. Icon-/Favicon-Helfer bleibt weiterhin relevant für **M23**.
 
 ### Backup-/Restore-UI
 

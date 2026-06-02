@@ -14,7 +14,7 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 ## Projektregeln (zwingend)
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-- **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test` (aktuell **1599** grün).
+- **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test` (aktuell **1651** grün).
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -53,6 +53,11 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
     `widgets.yaml`, `settings.yaml`; Admin-only `/api/config/health`, neue Seite `/admin/health` mit
     Severity-Filtern und `Health check`-Button in den bestehenden Config-Editoren. Keine Netzwerkchecks,
     keine Auto-Fixes, Save bleibt nur durch YAML-Syntax blockiert. `pnpm test` grün: 551 Dateien / 1640 Tests.
+12. **M19 Service-Widgets per UI:** `/admin/config` erweitert den Service-Edit-Dialog um „Enable service widget"
+    für 40 kuratierte Homepage-Service-Widgets. Neue Registry `src/utils/config/service-widget-templates.js`;
+    neue YAML-Helfer `updateServiceWidget`/`deleteServiceWidget`; secret-aware (leer = bestehende Secrets
+    behalten, `[redacted]` nie schreiben, Platzhalter sichtbar). Unbekannte Widget-Optionen bleiben erhalten;
+    Dashboard-Render-Pfad bleibt unverändert. `pnpm test` grün: 552 Dateien / 1651 Tests; `pnpm build` grün.
 
 Hinweis zur Doku: `AGENTS.md` wurde mit diesen Nachträgen ergänzt, damit Codex denselben Projektstand
 wie diese Übergabe sieht.
@@ -92,15 +97,15 @@ wie diese Übergabe sieht.
 **Klein & naheliegend (vorgemerkt):**
 - **Admin-Sammeltab „Alle Services & Bookmarks"** (nur Admins; braucht Render-Pfad-Änderung → gehört zu M10).
 
-**Phase 2 (read-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
+**Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
 M10 (Profile/Ansichts-Modi), M11 (Command Palette),
-M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M19.
+M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M20 (Import-Assistent).
 
-**Phase 3 (Vision, erst nach Auth/Audit):** M20–M25 (Service-Aktionen, Autodiscovery, Setup-Assistent,
+**Phase 3 (Vision, erst nach Auth/Audit):** M21–M26 (Service-Aktionen, Autodiscovery, Setup-Assistent,
 Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 
 ## Verifikation
 ```bash
-pnpm lint && pnpm test          # muss grün sein (1599 Tests)
+pnpm lint && pnpm test          # muss grün sein (1651 Tests)
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
