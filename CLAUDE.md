@@ -183,7 +183,7 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 17. **M17 – Backup, Restore & Änderungsverlauf/Rollback (P1/P2, ★, 🔥🔥):** Backups anzeigen/ansehen/Diff/Restore/Download, Verlauf (wann/was/wer), Kommentar, Rollback. (F15; bündelt Backlog „Backup-/Restore-UI" + „Audit-Log")
 18. **M18 – Konfigurations-Health-Checks v1 (umgesetzt):** statische, read-only Health-Checks für `services.yaml`, `bookmarks.yaml`, `widgets.yaml` und `settings.yaml`; Admin-only API `/api/config/health` (`GET` Gesamtprüfung, `POST` aktueller Editor-Inhalt), neue Admin-Seite `/admin/health` mit Severity-Filtern und kompakter Health-Check-Button in den bestehenden Config-Editoren. Prüft u. a. YAML-Syntax/-Shape, Tabs in Einrückung, fehlende/duplizierte `href`s, unbekannte `access.groups`, plaintext-sensitive Felder ohne `{{HOMEPAGE_*}}`, Layout-/Theme-Werte und auffällige Asset-Pfade. Keine Netzwerkchecks, keine automatischen Fixes, Save bleibt nur durch YAML-Syntax blockiert. (F7)
 19. **M19 – Service-Widget-Konfiguration über `/admin/config` (umgesetzt):** kuratierter UI-Weg für 40 gewünschte Homepage-Service-Widgets direkt am Service-Eintrag in `services.yaml`. Der Service-Edit-Dialog kann `widget:`-Blöcke aktivieren, bearbeiten und entfernen; neue Registry `service-widget-templates.js`; neue YAML-Helfer `updateServiceWidget`/`deleteServiceWidget`; secret-aware (echte Secrets nie vorausgefüllt, leer = behalten, `[redacted]` wird nie geschrieben, `{{HOMEPAGE_*}}` bleibt sichtbar); unbekannte Widget-Optionen bleiben erhalten und Raw-YAML bleibt für Sonderfälle möglich. **M19b-Nachtrag (umgesetzt):** Die Registry ist jetzt eine Schema-Registry mit `optionFields`, `allowedFields`, `defaultFields`, `maxFields`, Typ- und Secret-Metadaten. `/admin/config` zeigt `fields` als Checkbox-Gruppe mit Max-Validierung statt Textfeld. `/admin/widgets` verwaltet strukturierte Info-Widgets für `datetime`, `greeting`, `logo`, `openmeteo`, `resources` und `search` über `info-widget-templates.js`; bekannte Widgets können hinzugefügt/bearbeitet/gelöscht/umsortiert werden, unbekannte bleiben Raw-YAML. `addInfoWidget` und typisierte `updateWidgetOptions` schreiben Booleans/Numbers als echte YAML-Typen. Dashboard-Render-Pfad bleibt unverändert.
-20. **M20 – Import-Assistent (P2/P3):** Import aus Homepage-YAML/Homarr/Dashy/Browser-Bookmarks/Docker-Compose/Uptime-Kuma/Traefik/NPM; Vorschau, Duplikaterkennung, Secrets nie im Klartext. (F16; erweitert Backlog „Import-Assistent")
+20. **M20 – Import-Assistent über `/admin/import` (umgesetzt, weitere Quellen geparkt):** Admin-only Import-Seite mit Preview-/Apply-APIs (`/api/config/import/preview`, `/api/config/import/apply`). V1 importiert bestehende Homepage-Konfiguration aus `services.yaml`, `bookmarks.yaml`, `widgets.yaml`, kuratierten `settings.yaml`-Keys und `docker.yaml`. V2 ergänzt Muximux-Import: aktive Apps werden zu Services, `order`/Gruppen/Collapse zu `settings.layout`, bekannte Icons zu Homepage-Icon-Werten, `health_check` zu `siteMonitor`, `open_mode` zu `target`, Rollenhinweise zu `access.groups` und Docker-Discovery zu `docker.yaml`. Apply schreibt nicht direkt auf Disk, sondern legt Import-Drafts für die bestehenden Editor-Seiten an; Save/Validate/Backup bleiben manuell. Preview gibt keine Rohdaten/Secrets zurück; bei deaktivierter Secret-Übernahme werden Widget-Secrets als `{{HOMEPAGE_VAR_*}}`-Platzhalter geschrieben. Andere Quellen wie Homarr, Dashy, Browser-Bookmarks, Docker-Compose, Uptime-Kuma, Traefik und NPM sind bewusst auf später verschoben. (F16; erweitert Backlog „Import-Assistent")
 21. **M21 – Icon- und Favicon-Helfer über `/admin/config` (umgesetzt):** Der Service-Dialog kann per „Find icon" kuratierte Icon-Vorschläge laden und den gewählten Wert direkt ins `icon:`-Feld übernehmen. Admin-only API `/api/config/icon-suggestions`; Utility `icon-suggestions.js` normalisiert Service-Namen/Hosts/Widget-Typen, prüft `homarr-labs/dashboard-icons`, ergänzt `sh-*`/`si-*`-Kandidaten und erkennt Favicons über `/favicon.ico` bzw. HTML-`<link rel="icon">`. Keine freie Websuche, keine lokalen Bilddownloads, keine Credential-Tests; Änderungen landen nur im Editor und der Dashboard-Render-Pfad bleibt unverändert.
 
 #### Phase 3 – Vision / Runtime / Infra
@@ -288,11 +288,20 @@ Volltest nach M19b: `pnpm test -- --runInBand` grün (556 Testdateien / 1672 Tes
 - **UI-Nachträge:** Service-Widget-Blöcke übernehmen `--card-radius`; der Service-Dialog ist breiter (`max-w-3xl`) und Icon-Vorschläge passen besser in den Dialog; `/admin/layout` kann Tabs per ▲/▼ selbst sortieren; Dashboard-Tabs sind mobil kompakter und behalten saubere Rundungen.
 - **Gezielte Checks:** Service-/Info-Widget-Registry + `yaml-edit` (104 Tests), `block.test.jsx`, `tab.test.jsx`, Prettier-Checks, `pnpm build` und Browser-Smokes für `/admin/widgets`, `/admin/config`, `/admin/layout` und mobile Dashboard-Tabs.
 
+### Verifikationsstatus (M20 Import-Assistent, 2026-06-02)
+
+Gezielte Tests und Build grün; ein erneuter Volltest wurde nach M20 wegen Kontingent nicht ausgeführt.
+
+- **Homepage-Import v1:** `services.yaml`, `bookmarks.yaml`, `widgets.yaml`, kuratierte `settings.yaml`-Keys und `docker.yaml` werden geparst, konfliktgeprüft und als Editor-Drafts bereitgestellt.
+- **Muximux-Import v2:** aktive Apps, Gruppen/Reihenfolge, Collapse-Status, einfache Theme-/Spracheinstellungen, Icon-Mapping, `siteMonitor`, `target`, `access.groups` und Docker-Discovery werden übernommen; deaktivierte oder nicht abbildbare Einträge erzeugen Warnungen statt stiller Migration.
+- **Secret- und Save-Verhalten:** Preview liefert keine Rohimporte zurück; `includeSecrets=false` ersetzt Widget-Secrets durch `{{HOMEPAGE_VAR_*}}`; `[redacted]` wird nie geschrieben. Apply speichert nur Session-Drafts, kein direkter Disk-Write.
+- **Gezielte Checks:** Import-Assistent, `config-writer`, Admin-Tabs und Import-Draft-Flow per Vitest (M20-Grundschnitt: 5 Dateien / 20 Tests; Muximux-v2-Nachtest: 3 Dateien / 14 Tests), `pnpm build` und `git diff --check` grün.
+
 ## Vorgemerkte spätere Komfort-Features
 
 Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Punkte sind inzwischen als Meilensteine in der Roadmap geführt; die Detail-Bullets bleiben als spätere Ausgestaltung erhalten. Es gelten durchgängig die **Leitplanken** am Ende dieses Abschnitts.
 
-> **Hinweis:** Backup/Restore, Audit-Log, Service-Widgets, Import-Assistent, Icon-/Favicon-Helfer, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19/M20/M21** geführt. Die folgenden Detail-Bullets bleiben als deren Spezifikation bzw. spätere Ausgestaltung erhalten.
+> **Hinweis:** Backup/Restore, Audit-Log, Service-Widgets, Import-Assistent, Icon-/Favicon-Helfer, Config-Health-Checks, Mobile-Optimierung, Such-/Filter und Service-Test werden inzwischen als Meilensteine **M9/M11/M16/M17/M18/M19/M20/M21** geführt. M20 deckt aktuell Homepage-YAML und Muximux ab; Homarr, Dashy, Browser-Bookmarks, Docker-Compose, Uptime-Kuma, Traefik und NPM bleiben spätere Importquellen. Die folgenden Detail-Bullets bleiben als deren Spezifikation bzw. spätere Ausgestaltung erhalten.
 
 ### Backup-/Restore-UI
 
@@ -315,12 +324,13 @@ Detail-Backlog und Spezifikationssammlung für spätere Ausbaustufen. Einige Pun
 
 ### Import-Assistent
 
-- Import aus Homepage-YAML
+- Import aus Homepage-YAML (**M20 v1 umgesetzt**)
+- Import aus Muximux-Konfiguration (**M20 v2 umgesetzt**)
 - Import aus Mafl-Konfiguration
-- Import aus Homarr-Export
-- Vorschau vor Übernahme
-- Duplikaterkennung
-- Secrets nie ungeprüft im Klartext importieren
+- Import aus Homarr-Export, Dashy, Browser-Bookmarks, Docker-Compose, Uptime-Kuma, Traefik und NPM (**später geparkt**)
+- Vorschau vor Übernahme (**M20 umgesetzt**)
+- Duplikaterkennung (**M20 umgesetzt**)
+- Secrets nie ungeprüft im Klartext importieren (**M20 umgesetzt; weitere Quellen später erneut prüfen**)
 
 ### Config-Health-Checks
 

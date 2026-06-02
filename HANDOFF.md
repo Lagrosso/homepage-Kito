@@ -15,7 +15,7 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
-  M19b-Stand: **556 Dateien / 1672 Tests** grün; spätere UI-Nachträge wurden gezielt getestet.
+  M19b-Stand: **556 Dateien / 1672 Tests** grün; spätere UI-Nachträge und M20 wurden gezielt getestet.
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -77,6 +77,15 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
     `/admin/layout` bietet ▲/▼ für selbst sortierbare Tabs (`moveLayoutTab`); Dashboard-Tabs sind mobil
     kompakter und klemmen Rundungen sauber. Gezielt getestet: Widget-/Layout-/Tab-Unit-Tests, Prettier,
     `pnpm build` und Browser-Smokes.
+16. **M20 Import-Assistent:** `/admin/import` mit Admin-only Preview-/Apply-APIs
+    (`/api/config/import/preview`, `/api/config/import/apply`). V1 importiert Homepage-YAML aus
+    `services.yaml`, `bookmarks.yaml`, `widgets.yaml`, kuratierten `settings.yaml`-Keys und `docker.yaml`.
+    V2 importiert Muximux: aktive Apps als Services, Gruppen/Reihenfolge/Collapse nach `settings.layout`,
+    Icon-Mapping, `siteMonitor`, `target`, `access.groups` und Docker-Discovery nach `docker.yaml`.
+    Apply schreibt nur Import-Drafts für die bestehenden Editor-Seiten; Save/Validate/Backup bleiben manuell.
+    Preview gibt keine Rohimporte/Secrets zurück; ohne Secret-Übernahme werden Widget-Secrets zu
+    `{{HOMEPAGE_VAR_*}}`-Platzhaltern. Weitere Quellen wie Homarr, Dashy, Browser-Bookmarks,
+    Docker-Compose, Uptime-Kuma, Traefik und NPM sind bewusst auf später verschoben.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -118,8 +127,9 @@ denselben Projektstand wie diese Übergabe sehen.
 
 **Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
 M10 (Profile/Ansichts-Modi), M11 (Command Palette),
-M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M20 (Import-Assistent). M19/M19b
-(Service-/Info-Widgets) und M21 (Icon-/Favicon-Helfer) sind umgesetzt.
+M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15. M19/M19b
+(Service-/Info-Widgets), M20 (Import-Assistent: Homepage-YAML + Muximux) und M21
+(Icon-/Favicon-Helfer) sind umgesetzt. Weitere Importquellen bleiben späterer Ausbau.
 
 **Phase 3 (Vision, erst nach Auth/Audit):** M22–M27 (Service-Aktionen, Autodiscovery, Setup-Assistent,
 Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
@@ -129,3 +139,15 @@ Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 556 Dateien / 1672 Tests
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
+
+M20 wurde gezielt geprüft:
+
+```bash
+pnpm exec vitest run src/utils/config/import-assistant.test.js src/utils/config/config-writer.test.js src/components/admin/admin-tabs.test.jsx src/components/admin/config-editor.import-draft.test.jsx src/components/admin/config-editor.auth.test.jsx
+pnpm exec vitest run src/utils/config/import-assistant.test.js src/utils/config/config-writer.test.js src/components/admin/config-editor.import-draft.test.jsx
+pnpm build
+git diff --check
+```
+
+Dabei waren der M20-Grundschnitt (5 Dateien / 20 Tests), der Muximux-v2-Nachtest (3 Dateien / 14 Tests),
+Build und Whitespace-Check grün. Ein erneuter Volltest nach M20 wurde wegen Kontingent nicht ausgeführt.
