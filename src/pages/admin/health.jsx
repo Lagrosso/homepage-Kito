@@ -1,3 +1,4 @@
+import AdminTabs from "components/admin/admin-tabs";
 import { CONFIG_TABS, HealthResults } from "components/admin/config-editor";
 import LogoutButton from "components/admin/logout-button";
 import Head from "next/head";
@@ -127,21 +128,7 @@ export default function AdminHealth() {
           <LogoutButton />
         </header>
 
-        <nav className="flex overflow-x-auto border-b border-theme-200 dark:border-theme-700 bg-white dark:bg-theme-900 px-2">
-          {CONFIG_TABS.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                tab.href === router.pathname
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-theme-500 dark:text-theme-400 hover:text-theme-700 dark:hover:text-theme-200"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminTabs tabs={CONFIG_TABS} activeHref={router.pathname} />
 
         <main className="mx-auto max-w-6xl px-4 py-6">
           <div className="mb-5">

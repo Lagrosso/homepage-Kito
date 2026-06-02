@@ -1,4 +1,5 @@
 import classNames from "classnames";
+import AdminTabs from "components/admin/admin-tabs";
 import { CONFIG_TABS, inputClass } from "components/admin/config-editor";
 import LogoutButton from "components/admin/logout-button";
 import yaml from "js-yaml";
@@ -366,23 +367,7 @@ export default function AdminTheme() {
           <LogoutButton />
         </header>
 
-        {/* Nav tabs */}
-        <nav className="flex overflow-x-auto border-b border-theme-200 dark:border-theme-700 bg-white dark:bg-theme-900 px-2">
-          {CONFIG_TABS.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={classNames(
-                "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
-                router.pathname === tab.href
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-theme-500 dark:text-theme-400 hover:text-theme-700 dark:hover:text-theme-200",
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminTabs tabs={CONFIG_TABS} activeHref={router.pathname} />
 
         {/* Content */}
         <main className="max-w-4xl mx-auto px-4 py-6 flex flex-col gap-8">

@@ -14,7 +14,8 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 ## Projektregeln (zwingend)
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-- **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test` (aktuell **1662** grün).
+- **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
+  M19b-Stand: **556 Dateien / 1672 Tests** grün; spätere UI-Nachträge wurden gezielt getestet.
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -33,8 +34,8 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
    (`ALL_COLORS` in `utils/config/theme-presets.js`); 10 neue entsättigte Paletten in
    `src/styles/theme.css` **und** `src/utils/styles/themes.js`. Schrille Farben bleiben definiert.
 3. **Ecken-Rundung** global (`settings.cardRadius`): CSS-Var `--card-radius` via
-   `/api/config/theme-vars` + `_app.jsx`; CSS in `globals.css` (Karten, Such-Box, Admin-Buttons, Tabs).
-   Shared Map: `utils/styles/card-radius.js`.
+   `/api/config/theme-vars` + `_app.jsx`; CSS in `globals.css` (Karten, Such-Box, Admin-Buttons, Tabs,
+   Service-Widget-Blöcke). Shared Map: `utils/styles/card-radius.js`.
 4. **Font** JetBrains Mono (self-hosted `@fontsource-variable/jetbrains-mono`); Manrope entfernt.
 5. **Admin-Nav vereinheitlicht** (flache Unterstrich-Tabs, `config-editor.jsx`).
 6. **DnD-Fix + Gruppen-Reihenfolge:** pointer-basierte Kollisionserkennung (`dndCollisionDetection`);
@@ -63,9 +64,22 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
     Vorschläge aus `homarr-labs/dashboard-icons`, `sh-*`/`si-*`-Syntax und Favicons aus Service-URLs.
     Auswahl schreibt nur ins Formular, Save bleibt manuell; keine freie Websuche, keine lokalen Bilddownloads,
     keine Credential-Tests. `pnpm test` grün: 555 Dateien / 1662 Tests; `pnpm build` grün.
+14. **M19b Widget-Schema & Info-Widget-UI:** `service-widget-templates.js` ist eine Schema-Registry mit
+    `allowedFields`/`defaultFields`/`maxFields`, `optionFields`, Typ- und Secret-Metadaten. `/admin/config`
+    zeigt Service-Widget-`fields` als Checkboxen mit Max-Validierung. Neue Registry
+    `src/utils/config/info-widget-templates.js` für `datetime`, `greeting`, `logo`, `openmeteo`,
+    `resources`, `search`; `/admin/widgets` kann bekannte Info-Widgets hinzufügen/bearbeiten/löschen/
+    umsortieren. `addInfoWidget` + typisierte `updateWidgetOptions` schreiben Booleans/Numbers als echte
+    YAML-Typen; unbekannte Widgets/Optionen bleiben Raw-YAML. Volltest nach M19b: 556 Dateien / 1672 Tests;
+    `pnpm build` grün.
+15. **UI-Nachbesserungen nach Browser-Feedback:** Service-Widget-Anzeigen in Kacheln übernehmen
+    `--card-radius`; Service-Edit-Dialog ist breiter (`max-w-3xl`) und Icon-Vorschläge passen besser hinein;
+    `/admin/layout` bietet ▲/▼ für selbst sortierbare Tabs (`moveLayoutTab`); Dashboard-Tabs sind mobil
+    kompakter und klemmen Rundungen sauber. Gezielt getestet: Widget-/Layout-/Tab-Unit-Tests, Prettier,
+    `pnpm build` und Browser-Smokes.
 
-Hinweis zur Doku: `AGENTS.md` wurde mit diesen Nachträgen ergänzt, damit Codex denselben Projektstand
-wie diese Übergabe sieht.
+Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
+denselben Projektstand wie diese Übergabe sehen.
 
 ## ⚠️ Wichtige Stolperfallen
 - **Production-Build bricht an Test-Dateien unter `src/pages/`** (außer `pages/api/**`): `next build`
@@ -104,14 +118,14 @@ wie diese Übergabe sieht.
 
 **Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
 M10 (Profile/Ansichts-Modi), M11 (Command Palette),
-M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M20 (Import-Assistent); M21
-(Icon-/Favicon-Helfer) ist umgesetzt.
+M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15/M20 (Import-Assistent). M19/M19b
+(Service-/Info-Widgets) und M21 (Icon-/Favicon-Helfer) sind umgesetzt.
 
 **Phase 3 (Vision, erst nach Auth/Audit):** M22–M27 (Service-Aktionen, Autodiscovery, Setup-Assistent,
 Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 
 ## Verifikation
 ```bash
-pnpm lint && pnpm test          # muss grün sein (1662 Tests)
+pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 556 Dateien / 1672 Tests
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
