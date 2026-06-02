@@ -11,7 +11,7 @@ const logger = createLogger("config-writer");
 // Only these files may be read/written through the admin config API.
 // Covers services.yaml, bookmarks.yaml, widgets.yaml and settings.yaml; all
 // share the same read/validate/backup/atomic-write path.
-export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml"];
+export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml", "docker.yaml"];
 
 const BACKUP_DIR = ".backups";
 

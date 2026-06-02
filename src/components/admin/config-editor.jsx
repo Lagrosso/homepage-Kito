@@ -25,6 +25,7 @@ import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from 
 import AdminTabs from "components/admin/admin-tabs";
 import LogoutButton from "components/admin/logout-button";
 
+import { clearImportDraft, getImportDraft } from "utils/config/import-drafts";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 // Tabs shown in the editor header so the config pages cross-link. The active tab
@@ -36,6 +37,8 @@ export const CONFIG_TABS = [
   { label: "Bookmarks", href: "/admin/bookmarks" },
   { label: "Widgets", href: "/admin/widgets" },
   { label: "Settings", href: "/admin/settings" },
+  { label: "Docker", href: "/admin/docker" },
+  { label: "Import", href: "/admin/import" },
   { label: "Layout", href: "/admin/layout" },
   { label: "Theme", href: "/admin/theme" },
   { label: "Health", href: "/admin/health" },
@@ -569,6 +572,8 @@ export default function ConfigEditor({
   const [currentUser, setCurrentUser] = useState(null);
   const [loadState, setLoadState] = useState("loading"); // loading | ready | disabled | error
   const [status, setStatus] = useState(null); // { type: "success"|"error"|"info", message }
+  const [serverContent, setServerContent] = useState("");
+  const [draftInfo, setDraftInfo] = useState(null);
   const [healthReport, setHealthReport] = useState(null);
   const [healthOpen, setHealthOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -626,7 +631,20 @@ export default function ConfigEditor({
           throw new Error(`Failed to load config (${res.status})`);
         }
         const data = await res.json();
-        setContent(data.content ?? "");
+        const rawContent = data.content ?? "";
+        setServerContent(rawContent);
+        const draft = getImportDraft(configFile);
+        if (draft?.content) {
+          setContent(draft.content);
+          setDraftInfo(draft);
+          setStatus({
+            type: "info",
+            message: `Imported draft loaded for ${configFile} — review it and click Save when ready.`,
+          });
+        } else {
+          setContent(rawContent);
+          setDraftInfo(null);
+        }
         setLoadState("ready");
       })
       .catch((e) => {
@@ -809,10 +827,20 @@ export default function ConfigEditor({
         type: "success",
         message: data.backupPath ? `Saved. Backup: ${data.backupPath}` : "Saved (no previous file to back up).",
       });
+      clearImportDraft(configFile);
+      setDraftInfo(null);
+      setServerContent(content);
     } catch (e) {
       setStatus({ type: "error", message: `Not saved — ${e.message}` });
     }
   }, [apiUrl, content]);
+
+  const onDiscardDraft = useCallback(() => {
+    clearImportDraft(configFile);
+    setDraftInfo(null);
+    setContent(serverContent);
+    setStatus({ type: "info", message: `Discarded imported draft for ${configFile}.` });
+  }, [configFile, serverContent]);
 
   const onHealthCheck = useCallback(async () => {
     setStatus({ type: "info", message: "Running health check…" });
@@ -934,6 +962,22 @@ export default function ConfigEditor({
                   Structured edit/delete is disabled because this file contains an unquoted{" "}
                   <code>{"{{HOMEPAGE_*}}"}</code> placeholder (it can&apos;t be round-tripped safely). Use the raw YAML
                   editor below, or quote the placeholder.
+                </div>
+              )}
+
+              {draftInfo && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-400 bg-blue-50 dark:bg-blue-950 p-3 text-xs">
+                  <div>
+                    Imported draft loaded from <span className="font-medium">{draftInfo.sourceType ?? "import"}</span>.
+                    This editor content is not on disk yet.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onDiscardDraft}
+                    className="rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-1 font-medium hover:bg-theme-300 dark:hover:bg-theme-600"
+                  >
+                    Discard draft
+                  </button>
                 </div>
               )}
 

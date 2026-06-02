@@ -42,7 +42,7 @@ describe("isEditableConfig", () => {
     expect(mod.isEditableConfig("bookmarks.yaml")).toBe(true);
     expect(mod.isEditableConfig("widgets.yaml")).toBe(true);
     expect(mod.isEditableConfig("settings.yaml")).toBe(true);
-    expect(mod.isEditableConfig("docker.yaml")).toBe(false);
+    expect(mod.isEditableConfig("docker.yaml")).toBe(true);
     expect(mod.isEditableConfig("../../etc/passwd")).toBe(false);
   });
 });
@@ -60,8 +60,8 @@ describe("readRawConfig", () => {
 });
 
 describe("writeRawConfig", () => {
-  it("refuses to write non-editable files", () => {
-    expect(() => mod.writeRawConfig("docker.yaml", "a: 1")).toThrow();
+  it("refuses to write non-editable arbitrary files", () => {
+    expect(() => mod.writeRawConfig("kubernetes.yaml", "a: 1")).toThrow();
   });
 
   it("rejects invalid YAML without writing", () => {
