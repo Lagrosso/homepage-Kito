@@ -18,6 +18,7 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
 
 import { REDACTED, SECRET_VALUE_CONTAINERS, isSensitiveKey } from "./secret-mask";
+import { isServiceWidgetSecretField } from "./service-widget-templates";
 
 export const EDITABLE_SERVICE_FIELDS = ["href", "icon", "description", "server", "container"];
 export const EDITABLE_BOOKMARK_FIELDS = ["abbr", "href", "icon", "description"];
@@ -182,6 +183,90 @@ export function updateServiceEntry(rawText, { group, name }, values) {
   return doc.toString();
 }
 
+function ensureMapField(doc, map, field) {
+  let child = map.get(field, true);
+  if (!isMap(child)) {
+    child = doc.createNode({});
+    child.flow = false;
+    map.set(field, child);
+    child = map.get(field, true);
+  }
+  return child;
+}
+
+function setWidgetOption(doc, widgetMap, field, raw) {
+  if (field === "type" || raw === undefined) {
+    return;
+  }
+
+  const existing = widgetMap.get(field, true);
+  const isSecret = isSensitiveKey(field) || isServiceWidgetSecretField(field);
+
+  if (raw === REDACTED) {
+    return;
+  }
+
+  if (typeof raw === "string") {
+    const value = raw.trim();
+    if (value === "") {
+      if (!isSecret) {
+        widgetMap.delete(field);
+      }
+      return;
+    }
+    if (isScalar(existing)) {
+      existing.value = value;
+    } else {
+      widgetMap.set(field, value);
+    }
+    return;
+  }
+
+  if (raw === null) {
+    if (!isSecret) {
+      widgetMap.delete(field);
+    }
+    return;
+  }
+
+  const node = doc.createNode(raw);
+  if (isMap(node) || isSeq(node)) {
+    node.flow = false;
+  }
+  widgetMap.set(field, node);
+}
+
+export function updateServiceWidget(rawText, { group, name }, values = {}) {
+  const doc = parseConfigDoc(rawText);
+  const { pair } = locate(doc, group, name);
+
+  if (!isMap(pair.value)) {
+    throw new Error(`"${name}" is not a simple service entry`);
+  }
+  if (!values.type || typeof values.type !== "string") {
+    throw new Error("Widget type is required");
+  }
+
+  const widgetMap = ensureMapField(doc, pair.value, "widget");
+  widgetMap.flow = false;
+  widgetMap.set("type", values.type.trim());
+
+  Object.entries(values).forEach(([field, raw]) => setWidgetOption(doc, widgetMap, field, raw));
+
+  return doc.toString();
+}
+
+export function deleteServiceWidget(rawText, { group, name }) {
+  const doc = parseConfigDoc(rawText);
+  const { pair } = locate(doc, group, name);
+
+  if (!isMap(pair.value)) {
+    throw new Error(`"${name}" is not a simple service entry`);
+  }
+  pair.value.delete("widget");
+  return doc.toString();
+}
+
 // Remove an existing service entry from its group. The group itself (even if it
 // becomes empty) and all other entries/comments are preserved. Returns new raw text.
 export function deleteServiceEntry(rawText, { group, name }) {
@@ -329,8 +414,7 @@ export function setBackgroundField(rawText, field, value) {
   if (!isMap(root)) {
     throw new Error("settings.yaml is not a mapping");
   }
-  const cleared =
-    value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+  const cleared = value === undefined || value === null || (typeof value === "string" && value.trim() === "");
 
   let bgNode = root.get("background", true);
 
@@ -373,9 +457,7 @@ function findGroupIndex(doc, groupName) {
   if (!isSeq(top)) {
     return -1;
   }
-  return top.items.findIndex(
-    (item) => isMap(item) && item.items.length > 0 && String(item.items[0].key) === groupName,
-  );
+  return top.items.findIndex((item) => isMap(item) && item.items.length > 0 && String(item.items[0].key) === groupName);
 }
 
 // Swap two entries of a (local) items array. `up`/`down` out of range = no-op.
@@ -662,8 +744,7 @@ function locateLayoutForReorder(rawText) {
     return {
       doc,
       items: layout.items,
-      indexOf: (g) =>
-        layout.items.findIndex((it) => isMap(it) && it.items.length > 0 && String(it.items[0].key) === g),
+      indexOf: (g) => layout.items.findIndex((it) => isMap(it) && it.items.length > 0 && String(it.items[0].key) === g),
     };
   }
   if (isMap(layout)) {

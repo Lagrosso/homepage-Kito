@@ -5,6 +5,7 @@ import {
   assignGroupToTab,
   deleteBookmarkEntry,
   deleteServiceEntry,
+  deleteServiceWidget,
   deleteSetting,
   deleteTab,
   deleteWidget,
@@ -24,6 +25,7 @@ import {
   setGroupLayoutField,
   updateBookmarkEntry,
   updateServiceEntry,
+  updateServiceWidget,
   updateSetting,
   updateWidgetOptions,
 } from "./yaml-edit";
@@ -55,7 +57,11 @@ const SRC = `---
 
 describe("updateServiceEntry", () => {
   it("changes a field in place and keeps the inline comment", () => {
-    const out = updateServiceEntry(SRC, { group: "My First Group", name: "My First Service" }, { href: "http://new:9000" });
+    const out = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { href: "http://new:9000" },
+    );
     expect(out).toContain("href: http://new:9000 # inline note");
     expect(out).toContain("description: Homepage is awesome");
   });
@@ -112,11 +118,14 @@ describe("updateServiceEntry", () => {
 
   it("throws for an unknown group or service", () => {
     expect(() => updateServiceEntry(SRC, { group: "Nope", name: "S" }, { icon: "x" })).toThrow(/not found/i);
-    expect(() => updateServiceEntry(SRC, { group: "My First Group", name: "Nope" }, { icon: "x" })).toThrow(/not found/i);
+    expect(() => updateServiceEntry(SRC, { group: "My First Group", name: "Nope" }, { icon: "x" })).toThrow(
+      /not found/i,
+    );
   });
 
   it("does not add a top-level server when it is not in values (widget.server preserved)", () => {
-    const src = "- G:\n    - S:\n        href: http://x\n        widget:\n          type: sonarr\n          server: my-docker\n";
+    const src =
+      "- G:\n    - S:\n        href: http://x\n        widget:\n          type: sonarr\n          server: my-docker\n";
     const out = updateServiceEntry(src, { group: "G", name: "S" }, { name: "S", href: "http://y" });
     expect(out).toContain("href: http://y");
     expect(out).toContain("          server: my-docker"); // stays nested under widget
@@ -184,6 +193,95 @@ describe("deleteServiceEntry", () => {
 
   it("throws for an unknown entry", () => {
     expect(() => deleteServiceEntry(SRC, { group: "My First Group", name: "Nope" })).toThrow(/not found/i);
+  });
+});
+
+describe("updateServiceWidget", () => {
+  it("adds a block-style widget to an existing service", () => {
+    const out = updateServiceWidget(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      {
+        type: "adguard",
+        url: "http://adguard",
+        username: "{{HOMEPAGE_VAR_ADGUARD_USER}}",
+        password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}",
+        fields: ["queries", "blocked"],
+      },
+    );
+    const service = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(service.widget).toEqual({
+      type: "adguard",
+      url: "http://adguard",
+      username: "{{HOMEPAGE_VAR_ADGUARD_USER}}",
+      password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}",
+      fields: ["queries", "blocked"],
+    });
+    expect(out).toContain("widget:\n          type: adguard");
+    expect(out).toContain("href: http://localhost/ # inline note");
+  });
+
+  it("changes a widget type and preserves unknown widget options", () => {
+    const out = updateServiceWidget(
+      SRC,
+      { group: "My Second Group", name: "My Second Service" },
+      {
+        type: "npm",
+        url: "http://npm",
+        username: "admin",
+        password: "",
+      },
+    );
+    const widget = yaml.load(out)[1]["My Second Group"][0]["My Second Service"].widget;
+    expect(widget.type).toBe("npm");
+    expect(widget.url).toBe("http://npm");
+    expect(widget.username).toBe("admin");
+    expect(widget.key).toBe("plain-secret");
+  });
+
+  it("keeps existing secrets when submitted blank and never writes redacted markers", () => {
+    const out = updateServiceWidget(
+      SRC,
+      { group: "My Second Group", name: "My Second Service" },
+      {
+        type: "sonarr",
+        url: "http://sonarr-new",
+        key: "[redacted]",
+        password: "",
+      },
+    );
+    const widget = yaml.load(out)[1]["My Second Group"][0]["My Second Service"].widget;
+    expect(widget.url).toBe("http://sonarr-new");
+    expect(widget.key).toBe("plain-secret");
+    expect(widget.password).toBeUndefined();
+    expect(out).not.toContain("[redacted]");
+  });
+
+  it("removes non-secret fields submitted blank", () => {
+    const out = updateServiceWidget(
+      SRC,
+      { group: "My Second Group", name: "My Second Service" },
+      {
+        type: "sonarr",
+        url: "",
+      },
+    );
+    const widget = yaml.load(out)[1]["My Second Group"][0]["My Second Service"].widget;
+    expect(widget.url).toBeUndefined();
+    expect(widget.key).toBe("plain-secret");
+  });
+
+  it("deletes only the widget block", () => {
+    const out = deleteServiceWidget(SRC, { group: "My Second Group", name: "My Second Service" });
+    const service = yaml.load(out)[1]["My Second Group"][0]["My Second Service"];
+    expect(service.widget).toBeUndefined();
+    expect(service.href).toBe("http://localhost/");
+    expect(out).toContain("- My Second Service:");
+  });
+
+  it("refuses widget edits when a bare unquoted placeholder exists", () => {
+    const bare = "- G:\n    - S:\n        key: {{HOMEPAGE_VAR_SECRET}}\n";
+    expect(() => updateServiceWidget(bare, { group: "G", name: "S" }, { type: "adguard" })).toThrow(/unquoted/i);
   });
 });
 
@@ -433,9 +531,9 @@ describe("moveEntryToGroup", () => {
   });
 
   it("throws when the target group is missing", () => {
-    expect(() =>
-      moveEntryToGroup(SRC, { fromGroup: "My First Group", name: "Embedded", toGroup: "Nope" }),
-    ).toThrow(/not found/i);
+    expect(() => moveEntryToGroup(SRC, { fromGroup: "My First Group", name: "Embedded", toGroup: "Nope" })).toThrow(
+      /not found/i,
+    );
   });
 
   it("moves into a previously-emptied group as block style (not inline flow)", () => {
