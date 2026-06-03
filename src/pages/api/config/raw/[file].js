@@ -29,12 +29,17 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const { content } = req.body ?? {};
+    const { action, comment, content, sourceBackupId } = req.body ?? {};
     if (typeof content !== "string") {
       return res.status(400).json({ error: "Request body must include a string 'content' field" });
     }
 
-    const result = writeRawConfig(file, content);
+    const result = writeRawConfig(file, content, {
+      actor: session.user,
+      action: action === "restore" ? "restore" : "save",
+      comment,
+      sourceBackupId: typeof sourceBackupId === "string" ? sourceBackupId : null,
+    });
     if (!result.written) {
       return res.status(422).json({ error: "Invalid YAML", detail: result.error });
     }

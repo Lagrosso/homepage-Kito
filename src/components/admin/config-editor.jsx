@@ -25,7 +25,7 @@ import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from 
 import AdminTabs from "components/admin/admin-tabs";
 import LogoutButton from "components/admin/logout-button";
 
-import { clearImportDraft, getImportDraft } from "utils/config/import-drafts";
+import { clearEditorDraft, getEditorDraft } from "utils/config/import-drafts";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 // Tabs shown in the editor header so the config pages cross-link. The active tab
@@ -42,6 +42,7 @@ export const CONFIG_TABS = [
   { label: "Layout", href: "/admin/layout" },
   { label: "Theme", href: "/admin/theme" },
   { label: "Health", href: "/admin/health" },
+  { label: "History", href: "/admin/history" },
   { label: "Users", href: "/admin/users" },
 ];
 
@@ -574,6 +575,7 @@ export default function ConfigEditor({
   const [status, setStatus] = useState(null); // { type: "success"|"error"|"info", message }
   const [serverContent, setServerContent] = useState("");
   const [draftInfo, setDraftInfo] = useState(null);
+  const [changeComment, setChangeComment] = useState("");
   const [healthReport, setHealthReport] = useState(null);
   const [healthOpen, setHealthOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -633,17 +635,22 @@ export default function ConfigEditor({
         const data = await res.json();
         const rawContent = data.content ?? "";
         setServerContent(rawContent);
-        const draft = getImportDraft(configFile);
+        const draft = getEditorDraft(configFile);
         if (draft?.content) {
           setContent(draft.content);
           setDraftInfo(draft);
+          setChangeComment(draft.comment ?? "");
           setStatus({
             type: "info",
-            message: `Imported draft loaded for ${configFile} — review it and click Save when ready.`,
+            message:
+              draft.kind === "restore"
+                ? `Restored version loaded for ${configFile} — review it and click Save when ready.`
+                : `Imported draft loaded for ${configFile} — review it and click Save when ready.`,
           });
         } else {
           setContent(rawContent);
           setDraftInfo(null);
+          setChangeComment("");
         }
         setLoadState("ready");
       })
@@ -809,7 +816,12 @@ export default function ConfigEditor({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          action: draftInfo?.kind === "restore" ? "restore" : "save",
+          comment: changeComment,
+          content,
+          sourceBackupId: draftInfo?.kind === "restore" ? draftInfo.sourceBackupId : null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -827,20 +839,28 @@ export default function ConfigEditor({
         type: "success",
         message: data.backupPath ? `Saved. Backup: ${data.backupPath}` : "Saved (no previous file to back up).",
       });
-      clearImportDraft(configFile);
+      clearEditorDraft(configFile);
       setDraftInfo(null);
+      setChangeComment("");
       setServerContent(content);
     } catch (e) {
       setStatus({ type: "error", message: `Not saved — ${e.message}` });
     }
-  }, [apiUrl, content]);
+  }, [apiUrl, changeComment, configFile, content, draftInfo]);
 
   const onDiscardDraft = useCallback(() => {
-    clearImportDraft(configFile);
+    clearEditorDraft(configFile);
     setDraftInfo(null);
     setContent(serverContent);
-    setStatus({ type: "info", message: `Discarded imported draft for ${configFile}.` });
-  }, [configFile, serverContent]);
+    setChangeComment("");
+    setStatus({
+      type: "info",
+      message:
+        draftInfo?.kind === "restore"
+          ? `Discarded restored draft for ${configFile}.`
+          : `Discarded imported draft for ${configFile}.`,
+    });
+  }, [configFile, draftInfo, serverContent]);
 
   const onHealthCheck = useCallback(async () => {
     setStatus({ type: "info", message: "Running health check…" });
@@ -935,6 +955,19 @@ export default function ConfigEditor({
                 {status && <span className={`text-sm ${statusColor}`}>{status.message}</span>}
               </div>
 
+              <div className="mb-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Change comment</span>
+                  <input
+                    type="text"
+                    value={changeComment}
+                    onChange={(event) => setChangeComment(event.target.value)}
+                    className={inputClass}
+                    placeholder="Optional note for this save"
+                  />
+                </label>
+              </div>
+
               {healthReport && (
                 <div className="mb-3 rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
                   <button
@@ -968,8 +1001,17 @@ export default function ConfigEditor({
               {draftInfo && (
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-400 bg-blue-50 dark:bg-blue-950 p-3 text-xs">
                   <div>
-                    Imported draft loaded from <span className="font-medium">{draftInfo.sourceType ?? "import"}</span>.
-                    This editor content is not on disk yet.
+                    {draftInfo.kind === "restore" ? (
+                      <>
+                        Version from history loaded for <span className="font-medium">{configFile}</span>. This editor
+                        content is not on disk yet.
+                      </>
+                    ) : (
+                      <>
+                        Imported draft loaded from <span className="font-medium">{draftInfo.sourceType ?? "import"}</span>.
+                        This editor content is not on disk yet.
+                      </>
+                    )}
                   </div>
                   <button
                     type="button"

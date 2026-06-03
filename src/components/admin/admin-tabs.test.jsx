@@ -23,6 +23,7 @@ const tabs = [
   { label: "Layout", href: "/admin/layout" },
   { label: "Theme", href: "/admin/theme" },
   { label: "Health", href: "/admin/health" },
+  { label: "History", href: "/admin/history" },
   { label: "Users", href: "/admin/users" },
 ];
 
@@ -56,6 +57,7 @@ describe("components/admin/admin-tabs", () => {
     expect(screen.getByRole("menuitem", { name: "Layout" })).toHaveAttribute("href", "/admin/layout");
     expect(screen.getByRole("menuitem", { name: "Theme" })).toHaveAttribute("href", "/admin/theme");
     expect(screen.getByRole("menuitem", { name: "Health" })).toHaveAttribute("href", "/admin/health");
+    expect(screen.getByRole("menuitem", { name: "History" })).toHaveAttribute("href", "/admin/history");
     expect(screen.getByRole("menuitem", { name: "Users" })).toHaveAttribute("href", "/admin/users");
   });
 
@@ -63,7 +65,7 @@ describe("components/admin/admin-tabs", () => {
     render(<AdminTabs tabs={tabs} activeHref="/admin/users" />);
 
     const desktop = screen.getByTestId("admin-tabs-desktop");
-    expect(within(desktop).getAllByRole("link")).toHaveLength(10);
+    expect(within(desktop).getAllByRole("link")).toHaveLength(11);
     expect(within(desktop).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
   });
 });

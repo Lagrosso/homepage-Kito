@@ -24,12 +24,17 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const { content } = req.body ?? {};
+    const { action, comment, content, sourceBackupId } = req.body ?? {};
     if (typeof content !== "string") {
       return res.status(400).json({ error: "Request body must include a string 'content' field" });
     }
     try {
-      const result = writeCustomCss(content);
+      const result = writeCustomCss(content, {
+        actor: session.user,
+        action: action === "restore" ? "restore" : "save",
+        comment,
+        sourceBackupId: typeof sourceBackupId === "string" ? sourceBackupId : null,
+      });
       return res.status(200).json({ written: true, backupPath: result.backupPath });
     } catch (e) {
       logger.error("Failed to write custom.css: %s", e.message);

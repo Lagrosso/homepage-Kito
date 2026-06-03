@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import { appendHistoryEntry } from "utils/config/backup-history";
 import { CONF_DIR } from "utils/config/config";
 import createLogger from "utils/logger";
 
@@ -18,7 +19,7 @@ export function readCustomCss() {
 
 // Back up and atomically write custom.css (no YAML validation — any text is valid).
 // Returns { written: true, backupPath } or throws on FS error.
-export function writeCustomCss(content) {
+export function writeCustomCss(content, historyContext = null) {
   const cssPath = join(CONF_DIR, CSS_FILENAME);
 
   let backupPath = null;
@@ -42,6 +43,15 @@ export function writeCustomCss(content) {
     statSync(cssPath).size,
     backupPath ? `, backup at ${backupPath}` : "",
   );
+
+  appendHistoryEntry({
+    file: CSS_FILENAME,
+    backupPath,
+    actor: historyContext?.actor ?? null,
+    action: historyContext?.action ?? "save",
+    comment: historyContext?.comment ?? "",
+    sourceBackupId: historyContext?.sourceBackupId ?? null,
+  });
 
   return { written: true, backupPath };
 }

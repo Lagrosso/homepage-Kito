@@ -15,7 +15,7 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
-  M19b-Stand: **556 Dateien / 1672 Tests** grün; spätere UI-Nachträge und M20 wurden gezielt getestet.
+  Stand nach M17: **561 Dateien / 1701 Tests** grün.
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -86,6 +86,13 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
     Preview gibt keine Rohimporte/Secrets zurück; ohne Secret-Übernahme werden Widget-Secrets zu
     `{{HOMEPAGE_VAR_*}}`-Platzhaltern. Weitere Quellen wie Homarr, Dashy, Browser-Bookmarks,
     Docker-Compose, Uptime-Kuma, Traefik und NPM sind bewusst auf später verschoben.
+17. **M17 History/Restore:** neue Admin-Seite `/admin/history` mit Admin-only APIs für Liste, Detail,
+    Diff, Download und Draft-first-Restore von `services.yaml`, `bookmarks.yaml`, `widgets.yaml`,
+    `settings.yaml`, `docker.yaml` und `custom.css`. Neue Utility
+    `src/utils/config/backup-history.js` führt ein append-only `CONF_DIR/.backups/history.jsonl`;
+    `writeRawConfig` und `writeCustomCss` loggen `actor`, `action`, `comment`, `backupPath` und optional
+    `sourceBackupId`. Restore lädt Versionen nur in Editor-/Theme-Drafts; erst der normale Save schreibt live.
+    `/admin/config` und `/admin/theme` haben dafür `Change comment` und Restore-Banner.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -125,7 +132,7 @@ denselben Projektstand wie diese Übergabe sehen.
 **Klein & naheliegend (vorgemerkt):**
 - **Admin-Sammeltab „Alle Services & Bookmarks"** (nur Admins; braucht Render-Pfad-Änderung → gehört zu M10).
 
-**Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst), M17 (Backup/Restore/Rollback),
+**Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst),
 M10 (Profile/Ansichts-Modi), M11 (Command Palette),
 M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15. M19/M19b
 (Service-/Info-Widgets), M20 (Import-Assistent: Homepage-YAML + Muximux) und M21
@@ -136,11 +143,19 @@ Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 
 ## Verifikation
 ```bash
-pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 556 Dateien / 1672 Tests
+pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 561 Dateien / 1701 Tests
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
 
-M20 wurde gezielt geprüft:
+M17 wurde vollständig geprüft:
+
+```bash
+pnpm test
+pnpm build
+git diff --check
+```
+
+M20 wurde zuvor gezielt geprüft:
 
 ```bash
 pnpm exec vitest run src/utils/config/import-assistant.test.js src/utils/config/config-writer.test.js src/components/admin/admin-tabs.test.jsx src/components/admin/config-editor.import-draft.test.jsx src/components/admin/config-editor.auth.test.jsx

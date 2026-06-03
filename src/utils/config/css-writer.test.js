@@ -37,6 +37,7 @@ describe("writeCustomCss", () => {
     const result = mod.writeCustomCss("body { font-size: 16px; }");
     expect(result.written).toBe(true);
     expect(readFileSync(join(confDir, "custom.css"), "utf8")).toBe("body { font-size: 16px; }");
+    expect(readFileSync(join(confDir, ".backups", "history.jsonl"), "utf8")).toContain('"file":"custom.css"');
   });
 
   it("creates a timestamped backup when custom.css already exists", () => {
@@ -58,5 +59,20 @@ describe("writeCustomCss", () => {
     const result = mod.writeCustomCss("");
     expect(result.written).toBe(true);
     expect(readFileSync(join(confDir, "custom.css"), "utf8")).toBe("");
+  });
+
+  it("stores restore metadata in the history log", () => {
+    writeFileSync(join(confDir, "custom.css"), "/* old */", "utf8");
+    mod.writeCustomCss("/* restored */", {
+      action: "restore",
+      actor: { role: "admin", username: "admin" },
+      comment: "restore css",
+      sourceBackupId: "hist-css",
+    });
+
+    const history = readFileSync(join(confDir, ".backups", "history.jsonl"), "utf8");
+    expect(history).toContain('"action":"restore"');
+    expect(history).toContain('"comment":"restore css"');
+    expect(history).toContain('"sourceBackupId":"hist-css"');
   });
 });

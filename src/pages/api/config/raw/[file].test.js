@@ -73,7 +73,12 @@ describe("/api/config/raw/[file]", () => {
 
     await handler(req("POST", { content: "x: true\n" }), res);
 
-    expect(mocks.writeRawConfig).toHaveBeenCalledWith("services.yaml", "x: true\n");
+    expect(mocks.writeRawConfig).toHaveBeenCalledWith("services.yaml", "x: true\n", {
+      action: "save",
+      actor: { role: "admin", username: "admin" },
+      comment: undefined,
+      sourceBackupId: null,
+    });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.body).toEqual({ backupPath: "/tmp/backup", written: true });
   });

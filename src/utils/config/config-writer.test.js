@@ -77,6 +77,7 @@ describe("writeRawConfig", () => {
     expect(result.written).toBe(true);
     expect(result.backupPath).toBeNull();
     expect(readFileSync(join(confDir, "services.yaml"), "utf8")).toContain("Svc");
+    expect(readFileSync(join(confDir, ".backups", "history.jsonl"), "utf8")).toContain('"file":"services.yaml"');
     // No leftover temp file.
     expect(existsSync(join(confDir, "services.yaml.tmp"))).toBe(false);
   });
@@ -88,7 +89,23 @@ describe("writeRawConfig", () => {
     expect(result.backupPath).toBeTruthy();
     expect(readFileSync(result.backupPath, "utf8")).toContain("http://old");
     expect(readFileSync(join(confDir, "services.yaml"), "utf8")).toContain("http://new");
-    // Backup lives in the .backups dir.
-    expect(readdirSync(join(confDir, ".backups")).length).toBe(1);
+    expect(readFileSync(join(confDir, ".backups", "history.jsonl"), "utf8")).toContain(result.backupPath);
+    // Backup plus history file live in the .backups dir.
+    expect(readdirSync(join(confDir, ".backups")).length).toBe(2);
+  });
+
+  it("stores restore metadata in the history log", () => {
+    writeFileSync(join(confDir, "services.yaml"), "- Old:\n    - Svc:\n        href: http://old\n");
+    mod.writeRawConfig("services.yaml", "- New:\n    - Svc:\n        href: http://new\n", {
+      action: "restore",
+      actor: { role: "admin", username: "admin" },
+      comment: "rollback",
+      sourceBackupId: "hist-1",
+    });
+
+    const history = readFileSync(join(confDir, ".backups", "history.jsonl"), "utf8");
+    expect(history).toContain('"action":"restore"');
+    expect(history).toContain('"comment":"rollback"');
+    expect(history).toContain('"sourceBackupId":"hist-1"');
   });
 });

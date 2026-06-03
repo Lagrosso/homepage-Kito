@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MdDelete, MdHome, MdUpload } from "react-icons/md";
+import { clearEditorDraft, getEditorDraft } from "utils/config/import-drafts";
 import { ALL_COLORS, THEME_PRESETS } from "utils/config/theme-presets";
 import { deleteSetting, removeBackground, setBackgroundField, updateSetting } from "utils/config/yaml-edit";
 
@@ -36,10 +37,13 @@ export default function AdminTheme() {
   const [settingsRaw, setSettingsRaw] = useState("");
   const [settingsStatus, setSettingsStatus] = useState(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsComment, setSettingsComment] = useState("");
 
   const [cssContent, setCssContent] = useState("");
   const [cssStatus, setCssStatus] = useState(null);
   const [cssSaving, setCssSaving] = useState(false);
+  const [cssComment, setCssComment] = useState("");
+  const [cssDraftInfo, setCssDraftInfo] = useState(null);
 
   const [bgPreview, setBgPreview] = useState(null); // { dataUrl, filename }
   const [bgUploading, setBgUploading] = useState(false);
@@ -92,7 +96,20 @@ export default function AdminTheme() {
       .then(([settings, css]) => {
         if (cancelled) return;
         setSettingsRaw(settings.content ?? "");
-        setCssContent(css.content ?? "");
+        const cssDraft = getEditorDraft("custom.css");
+        if (cssDraft?.content) {
+          setCssContent(cssDraft.content);
+          setCssDraftInfo(cssDraft);
+          setCssComment(cssDraft.comment ?? "");
+          setCssStatus({
+            type: "info",
+            message: "Restored custom.css loaded from history — review it and save when ready.",
+          });
+        } else {
+          setCssContent(css.content ?? "");
+          setCssDraftInfo(null);
+          setCssComment("");
+        }
         setLoadState("ready");
       })
       .catch((e) => {
@@ -227,7 +244,12 @@ export default function AdminTheme() {
       const r = await fetch("/api/config/raw/settings.yaml", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: settingsRaw }),
+        body: JSON.stringify({
+          action: "save",
+          comment: settingsComment,
+          content: settingsRaw,
+          sourceBackupId: null,
+        }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? `Fehler ${r.status}`);
@@ -235,6 +257,7 @@ export default function AdminTheme() {
         type: "success",
         message: `Gespeichert.${d.backupPath ? ` Backup: ${d.backupPath}` : ""}`,
       });
+      setSettingsComment("");
     } catch (e) {
       setSettingsStatus({ type: "error", message: e.message });
     } finally {
@@ -250,7 +273,12 @@ export default function AdminTheme() {
       const r = await fetch("/api/config/custom-css", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: cssContent }),
+        body: JSON.stringify({
+          action: cssDraftInfo?.kind === "restore" ? "restore" : "save",
+          comment: cssComment,
+          content: cssContent,
+          sourceBackupId: cssDraftInfo?.kind === "restore" ? cssDraftInfo.sourceBackupId : null,
+        }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? `Fehler ${r.status}`);
@@ -258,11 +286,29 @@ export default function AdminTheme() {
         type: "success",
         message: `CSS gespeichert.${d.backupPath ? ` Backup: ${d.backupPath}` : ""}`,
       });
+      clearEditorDraft("custom.css");
+      setCssDraftInfo(null);
+      setCssComment("");
     } catch (e) {
       setCssStatus({ type: "error", message: e.message });
     } finally {
       setCssSaving(false);
     }
+  };
+
+  const discardCssDraft = () => {
+    clearEditorDraft("custom.css");
+    setCssDraftInfo(null);
+    setCssComment("");
+    fetch("/api/config/custom-css")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`custom-css: ${r.status}`))))
+      .then((data) => {
+        setCssContent(data.content ?? "");
+        setCssStatus({ type: "info", message: "Restored custom.css draft discarded." });
+      })
+      .catch((error) => {
+        setCssStatus({ type: "error", message: error.message });
+      });
   };
 
   // --- Export ---
@@ -647,11 +693,23 @@ export default function AdminTheme() {
               </section>
 
               {/* ── Save settings ── */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <button type="button" onClick={saveSettings} disabled={settingsSaving} className={BTN_PRIMARY}>
-                  {settingsSaving ? "Speichert…" : "Einstellungen speichern"}
-                </button>
-                <StatusBanner status={settingsStatus} />
+              <div className="flex flex-col gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Change comment</span>
+                  <input
+                    type="text"
+                    value={settingsComment}
+                    onChange={(e) => setSettingsComment(e.target.value)}
+                    className={inputClass}
+                    placeholder="Optional note for settings.yaml"
+                  />
+                </label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button type="button" onClick={saveSettings} disabled={settingsSaving} className={BTN_PRIMARY}>
+                    {settingsSaving ? "Speichert…" : "Einstellungen speichern"}
+                  </button>
+                  <StatusBanner status={settingsStatus} />
+                </div>
               </div>
 
               {/* ── Custom CSS ── */}
@@ -660,6 +718,24 @@ export default function AdminTheme() {
                 <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">
                   ⚠ Custom CSS wird auf allen Seiten geladen. Fehlerhafte Regeln können das Dashboard beschädigen.
                 </p>
+                {cssDraftInfo && (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-400 bg-blue-50 p-3 text-xs dark:bg-blue-950">
+                    <div>Version aus History fuer custom.css geladen. Diese CSS ist noch nicht auf Disk gespeichert.</div>
+                    <button type="button" onClick={discardCssDraft} className={BTN_SECONDARY}>
+                      Draft verwerfen
+                    </button>
+                  </div>
+                )}
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-sm font-medium">Change comment</span>
+                  <input
+                    type="text"
+                    value={cssComment}
+                    onChange={(e) => setCssComment(e.target.value)}
+                    className={inputClass}
+                    placeholder="Optional note for custom.css"
+                  />
+                </label>
                 <textarea
                   value={cssContent}
                   onChange={(e) => setCssContent(e.target.value)}

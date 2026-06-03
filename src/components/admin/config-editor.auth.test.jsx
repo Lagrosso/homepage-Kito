@@ -57,7 +57,12 @@ describe("ConfigEditor auth behavior", () => {
     expect(global.fetch).toHaveBeenLastCalledWith("/api/config/raw/services.yaml", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "services: []\n" }),
+      body: JSON.stringify({
+        action: "save",
+        comment: "",
+        content: "services: []\n",
+        sourceBackupId: null,
+      }),
     });
     expect(JSON.stringify(global.fetch.mock.calls)).not.toContain("Authorization");
   });

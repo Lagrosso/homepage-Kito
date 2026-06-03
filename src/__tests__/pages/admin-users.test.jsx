@@ -63,7 +63,9 @@ describe("/admin/users", () => {
 
     render(<AdminUsers />);
 
-    expect(await screen.findByRole("heading", { name: "Add User" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 10000 });
+    expect(await screen.findByRole("heading", { name: "Add User" }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
     expect(screen.getAllByText("viewer").length).toBeGreaterThan(0);
   });

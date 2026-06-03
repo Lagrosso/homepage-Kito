@@ -3,16 +3,17 @@ import { join } from "path";
 
 import yaml from "js-yaml";
 
+import { appendHistoryEntry } from "utils/config/backup-history";
 import { CONF_DIR } from "utils/config/config";
+import { EDITABLE_CONFIGS } from "utils/config/editable-files";
 import createLogger from "utils/logger";
 
 const logger = createLogger("config-writer");
+export { EDITABLE_CONFIGS };
 
 // Only these files may be read/written through the admin config API.
 // Covers services.yaml, bookmarks.yaml, widgets.yaml and settings.yaml; all
 // share the same read/validate/backup/atomic-write path.
-export const EDITABLE_CONFIGS = ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml", "docker.yaml"];
-
 const BACKUP_DIR = ".backups";
 
 export function isEditableConfig(filename) {
@@ -68,7 +69,7 @@ function backupExistingConfig(configPath, filename) {
 
 // Validate, back up, then atomically write a config file.
 // Returns { written, backupPath } on success, or { written: false, error }.
-export function writeRawConfig(filename, content) {
+export function writeRawConfig(filename, content, historyContext = null) {
   const configPath = resolveConfigPath(filename);
 
   const validation = validateYaml(content);
@@ -89,6 +90,15 @@ export function writeRawConfig(filename, content) {
     statSync(configPath).size,
     backupPath ? `, backup at ${backupPath}` : "",
   );
+
+  appendHistoryEntry({
+    file: filename,
+    backupPath,
+    actor: historyContext?.actor ?? null,
+    action: historyContext?.action ?? "save",
+    comment: historyContext?.comment ?? "",
+    sourceBackupId: historyContext?.sourceBackupId ?? null,
+  });
 
   return { written: true, backupPath };
 }

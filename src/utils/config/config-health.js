@@ -1,6 +1,6 @@
 import yaml from "js-yaml";
 
-import { EDITABLE_CONFIGS } from "utils/config/config-writer";
+import { EDITABLE_CONFIGS } from "utils/config/editable-files";
 import { isPlaceholder, isSensitiveKey, SECRET_VALUE_CONTAINERS, tokenizePlaceholders } from "utils/config/secret-mask";
 import themes from "utils/styles/themes";
 

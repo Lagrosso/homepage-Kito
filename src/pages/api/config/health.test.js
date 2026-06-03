@@ -19,8 +19,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("utils/config/config-writer", () => ({
-  EDITABLE_CONFIGS: ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml"],
-  isEditableConfig: (file) => ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml"].includes(file),
+  EDITABLE_CONFIGS: ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml", "docker.yaml"],
+  isEditableConfig: (file) =>
+    ["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml", "docker.yaml"].includes(file),
   readRawConfig: mocks.readRawConfig,
 }));
 
@@ -74,7 +75,13 @@ describe("/api/config/health", () => {
     await handler(req(), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(Object.keys(res.body.files)).toEqual(["services.yaml", "bookmarks.yaml", "widgets.yaml", "settings.yaml"]);
+    expect(Object.keys(res.body.files)).toEqual([
+      "services.yaml",
+      "bookmarks.yaml",
+      "widgets.yaml",
+      "settings.yaml",
+      "docker.yaml",
+    ]);
     expect(mocks.readRawConfig).toHaveBeenCalledWith("services.yaml");
     expect(mocks.readRawConfig).toHaveBeenCalledWith("settings.yaml");
   });
