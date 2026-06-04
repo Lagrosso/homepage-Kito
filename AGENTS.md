@@ -44,7 +44,7 @@ Für Plan-Modi gilt: Architekturvorschläge, Vor- und Nachteile, Empfehlungen, A
 pnpm dev             # Dev-Server (Port 3000)
 pnpm build           # next build --webpack
 pnpm start           # Production-Server
-pnpm lint            # ESLint über das ganze Repo
+pnpm lint            # ESLint über src/ (Scope absichtlich auf src, damit stray Top-Level-Ordner Lint nicht brechen)
 pnpm test            # Vitest (einmalig)
 pnpm test:watch      # Vitest Watch-Mode
 pnpm test:coverage   # Vitest mit Coverage
@@ -180,7 +180,7 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 
 #### Phase 1/2 – read-only, mit den Leitplanken vereinbar
 
-9. **M9 – Status & Health pro Dienst über Dashboard + `/admin/health` (umgesetzt):** neue serverseitige Status-Aggregation `src/utils/config/service-status.js` vereinheitlicht bestehende Signale aus `ping`, `siteMonitor`, Docker, Kubernetes und Proxmox zu einem gemeinsamen Shape mit `signalType`, `state`, `severity`, `latencyMs`, `httpStatus` und `detailLabel`. Neue read-only API `/api/services/status` liefert rollenabhängig gefilterte/sortierte Statusdaten. Das Dashboard zeigt einen Problemfilter („All services“ / „Problematic only“), und `/admin/health` hat zusätzlich zur Config-Health einen zweiten Bereich „Service Status“ mit Filtern für `all`, `problematic`, `slow`, `no-check` und Signalquelle. `ping`- und `siteMonitor`-Badges markieren Antworten ab `1000 ms` konsistent als Warning/„slow“. Keine neuen aktiven Checks, kein Verlauf, keine Runtime-Aktionen. (F3; ersetzt Backlog „Service-Test")
+9. **M9 – Status & Health pro Dienst über Dashboard + `/admin/health` (umgesetzt):** neue serverseitige Status-Aggregation `src/utils/config/service-status.js` vereinheitlicht bestehende Signale aus `ping`, `siteMonitor`, Docker, Kubernetes und Proxmox zu einem gemeinsamen Shape mit `signalType`, `state`, `severity`, `latencyMs`, `httpStatus` und `detailLabel`. Neue read-only API `/api/services/status` liefert rollenabhängig gefilterte/sortierte Statusdaten. Das Dashboard zeigt einen Problemfilter („All services“ / „Problematic only“), und `/admin/health` hat zusätzlich zur Config-Health einen zweiten Bereich „Service Status“ mit Filtern für `all`, `problematic`, `slow`, `no-check` und Signalquelle. `ping`- und `siteMonitor`-Badges markieren Antworten ab `1000 ms` konsistent als Warning/„slow“. Keine neuen aktiven Checks, kein Verlauf, keine Runtime-Aktionen. (F3; ersetzt Backlog „Service-Test") **Härtung-Nachtrag (2026-06-04):** `slow` wird als stabiles Boolean-Feld am Signal/Status geführt (ping/siteMonitor → aggregierter Status → Summary/Filter) statt über `detailLabel.includes("slow")`-String-Matching; dadurch bleibt der „slow"-Filter auch bei geänderten/lokalisierten Labels korrekt. Dashboard-Filtertexte (`serviceStatus.allServices/problematicOnly/summary`) und die `slow`-Badges (`ping.slow`/`siteMonitor.slow`) laufen jetzt über next-i18next; `/admin/health` bleibt bewusst englisch (Admin-Konvention).
 10. **M10 – Profile & Ansichts-Modi (P2/P3, ★, 🔥🔥🔥):** Profile (Admin/Familie/Gast/Kinder/Mobil) + Modi (Normal/Admin/Wartung/Familie), Umschalter, Sichtbarkeit pro Profil, „unsichtbar statt gelöscht". Sichtbarkeit read-only; echte User-Bindung via M7. (F2+F8; verzahnt mit M6/M7)
 11. **M11 – Smart Search / Command Palette (P2, 🔥🔥):** `Strg+K`/`/`: Services/Bookmarks/Gruppen suchen, zuletzt geöffnet, Einstellungen/Logs öffnen; später Admin-Aktionen. (F4; erweitert QuickLaunch + Backlog „Such-/Filter")
 12. **M12 – Favoriten & „Zuletzt/Häufig verwendet" (P2):** anpinnen, lokale Historie, kontextabhängige Vorschläge; lokal + abschaltbar. (F11)
@@ -325,6 +325,18 @@ Gezielte Tests und Build grün; ein erneuter Volltest wurde nach M20 wegen Konti
 - **Muximux-Import v2:** aktive Apps, Gruppen/Reihenfolge, Collapse-Status, einfache Theme-/Spracheinstellungen, Icon-Mapping, `siteMonitor`, `target`, `access.groups` und Docker-Discovery werden übernommen; deaktivierte oder nicht abbildbare Einträge erzeugen Warnungen statt stiller Migration.
 - **Secret- und Save-Verhalten:** Preview liefert keine Rohimporte zurück; `includeSecrets=false` ersetzt Widget-Secrets durch `{{HOMEPAGE_VAR_*}}`; `[redacted]` wird nie geschrieben. Apply speichert nur Session-Drafts, kein direkter Disk-Write.
 - **Gezielte Checks:** Import-Assistent, `config-writer`, Admin-Tabs und Import-Draft-Flow per Vitest (M20-Grundschnitt: 5 Dateien / 20 Tests; Muximux-v2-Nachtest: 3 Dateien / 14 Tests), `pnpm build` und `git diff --check` grün.
+
+### Re-Verifikation & Härtung M9/M17/M20/M21 (2026-06-04)
+
+Vollständige Re-Verifikation von M9 (Service-Status), M17 (History/Restore), M20 (Import) und M21 (Icon-Helfer) plus die dabei gefundenen Verbesserungen. Commit `4b3e5923` auf `main` gepusht.
+
+- **Verifikation:** `pnpm test` grün (**564 Testdateien / 1721 Tests**), `pnpm build` grün, `pnpm lint` 0 Fehler, `git diff --check` sauber.
+- **Leitplanken-Review (statisch):** M17 Download/Restore admin-gated, `id` nur gegen bestehenden History-Index aufgelöst, Traversal-Guard `isPathInsideBackupDir` greift; M9 `/api/services/status` rollen-/sichtbarkeitsgefiltert; M20 `apply`/`preview` admin-gated, `apply` ohne direkten Disk-Write (Draft-first); M21 admin-gated, Input begrenzt, Fehler → leere Liste. **Bewusst keine SSRF-„Härtung"** beim Favicon-Fetch: ein Block privater/LAN-IPs würde den legitimen Homelab-Hauptfall brechen — Admin-only + Timeout ist hier die richtige Kontrolle.
+- **Fix M9 `slow`-Robustheit:** stabiles `slow`-Boolean ersetzt `detailLabel.includes("slow")` an drei Stellen (`service-status.js` ×2, `admin/health.jsx`); Regressionstest „Warning ≠ slow" ergänzt.
+- **Fix M9 i18n:** Dashboard-Filter + `slow`-Badges über next-i18next-Keys (`serviceStatus.*`, `ping.slow`, `siteMonitor.slow`); `/admin/health` bleibt englisch.
+- **Testlücke geschlossen:** neuer jsdom-Unit-Test `import-drafts.test.js` (11 Fälle) für den von M17-Restore + M20-Apply genutzten Draft-Store.
+- **Lint-Papercut:** `pnpm lint` von `eslint .` auf `eslint src` gescopt — der untracked Fremdordner `codex-desktop-linux` (gebündelte Third-Party-Assets) erzeugte zuvor ~550 Falsch-Fehler + Exit 1.
+- **Bekannte Schwachstellen (`pnpm audit`, nicht aus M9/M17–M21-Code):** kritisch `form-data` `<4.0.4` (via `@kubernetes/client-node`) und `fast-xml-parser` `<5.3.5` (via `gamedig`) — Runtime, tief transitiv, nur bei K8s- bzw. gamedig-Nutzung aktiv; dev-only `vitest` `<4.1.0` + `glob` `<10.5.0` (nicht im `standalone`-Docker-Image). Noch nicht gepatcht — separater Schritt. Dependabot-API im Repo deaktiviert, daher `pnpm audit` als Quelle.
 
 ## Vorgemerkte spätere Komfort-Features
 
