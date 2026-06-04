@@ -70,8 +70,11 @@ describe("components/services/ping", () => {
 
     render(<Ping groupName="g" serviceName="s" style="basic" />);
 
-    expect(screen.getByText("slow")).toBeInTheDocument();
-    expect(screen.getByText("slow").closest(".ping-status")).toHaveAttribute("title", expect.stringContaining("slow"));
+    expect(screen.getByText("ping.slow")).toBeInTheDocument();
+    expect(screen.getByText("ping.slow").closest(".ping-status")).toHaveAttribute(
+      "title",
+      expect.stringContaining("ping.slow"),
+    );
   });
 
   it("renders a dot when style is dot", () => {

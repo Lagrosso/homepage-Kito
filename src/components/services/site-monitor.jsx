@@ -38,11 +38,11 @@ export default function SiteMonitor({ groupName, serviceName, style }) {
       maximumFractionDigits: 0,
     });
     const isSlow = data.latency >= SLOW_THRESHOLD_MS;
-    statusTitle += isSlow ? ` ${data.status} (${responseTime}, slow)` : ` ${data.status} (${responseTime})`;
+    statusTitle += isSlow ? ` ${data.status} (${responseTime}, ${t("siteMonitor.slow")})` : ` ${data.status} (${responseTime})`;
     colorClass = isSlow ? "text-orange-400/80 dark:text-orange-300/80" : "text-emerald-500/80";
 
     if (style === "basic") {
-      statusText = isSlow ? "slow" : t("siteMonitor.up");
+      statusText = isSlow ? t("siteMonitor.slow") : t("siteMonitor.up");
     } else {
       statusText = responseTime;
       colorClass += " lowercase";

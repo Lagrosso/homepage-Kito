@@ -348,8 +348,8 @@ describe("pages/index Index routing + SWR branches", () => {
 
     await renderIndex({ initialSettings: { title: "Homepage", layout: {} }, settings: { layout: {} } });
 
-    expect(await screen.findByRole("button", { name: "Problematic only" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Problematic only" }));
+    expect(await screen.findByRole("button", { name: "serviceStatus.problematicOnly" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "serviceStatus.problematicOnly" }));
 
     expect(screen.getByText("Media")).toBeInTheDocument();
     expect(screen.queryByTestId("bookmarks-group")).not.toBeInTheDocument();

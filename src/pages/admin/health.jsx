@@ -145,7 +145,7 @@ export default function AdminHealth() {
         return serviceStatus.severity === "critical" || serviceStatus.severity === "warning";
       }
       if (serviceFilter === "slow") {
-        return serviceStatus.severity === "warning" && serviceStatus.detailLabel?.toLowerCase().includes("slow");
+        return serviceStatus.slow === true;
       }
       if (serviceFilter === "no-check") {
         return serviceStatus.state === "no-check";

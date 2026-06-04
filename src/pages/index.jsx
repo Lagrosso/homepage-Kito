@@ -243,7 +243,7 @@ function filterServiceGroupForProblematic(group, problematicServiceIds) {
 }
 
 function Home({ initialSettings }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme, setTheme } = useContext(ThemeContext);
   const { color, setColor } = useContext(ColorContext);
   const { settings, setSettings } = useContext(SettingsContext);
@@ -398,7 +398,7 @@ function Home({ initialSettings }) {
                   : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
               }`}
             >
-              All services
+              {t("serviceStatus.allServices")}
             </button>
             <button
               type="button"
@@ -409,10 +409,13 @@ function Home({ initialSettings }) {
                   : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
               }`}
             >
-              Problematic only
+              {t("serviceStatus.problematicOnly")}
             </button>
             <span className="text-xs text-theme-500 dark:text-theme-400">
-              {serviceStatusReport.summary.problematic} problematic, {serviceStatusReport.summary.noCheck} without checks
+              {t("serviceStatus.summary", {
+                problematic: serviceStatusReport.summary.problematic,
+                noCheck: serviceStatusReport.summary.noCheck,
+              })}
             </span>
           </div>
         )}

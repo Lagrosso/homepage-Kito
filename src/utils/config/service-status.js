@@ -96,6 +96,7 @@ function buildAggregatedStatus(group, name, service, signals) {
     signalType: primary.signalType,
     state: primary.state,
     severity: primary.severity,
+    slow: Boolean(primary.slow),
     latencyMs: primary.latencyMs,
     httpStatus: primary.httpStatus,
     detailLabel: primary.detailLabel,
@@ -114,7 +115,7 @@ function buildSummary(statuses) {
       else if (status.severity === "critical") summary.problematic += 1;
       else if (status.severity === "warning") {
         summary.problematic += 1;
-        if (status.detailLabel?.toLowerCase().includes("slow")) summary.slow += 1;
+        if (status.slow) summary.slow += 1;
       } else if (status.severity === "ok") summary.ok += 1;
       else summary.neutral += 1;
       return summary;
@@ -131,7 +132,7 @@ export function filterStatuses(statuses, filter = "all", source = "all") {
 
     if (filter === "all") return true;
     if (filter === "problematic") return status.severity === "critical" || status.severity === "warning";
-    if (filter === "slow") return status.severity === "warning" && status.detailLabel?.toLowerCase().includes("slow");
+    if (filter === "slow") return status.slow === true;
     if (filter === "no-check") return status.state === "no-check";
     return true;
   });
@@ -182,6 +183,7 @@ export async function fetchPingSignal(service) {
       signalType: "ping",
       state: "up",
       severity: slow ? "warning" : "ok",
+      slow,
       latencyMs: roundedLatency,
       detailLabel: slow ? `Slow ping (${roundedLatency} ms)` : `${roundedLatency} ms`,
     };
@@ -227,6 +229,7 @@ export async function fetchSiteMonitorSignal(service) {
       signalType: "siteMonitor",
       state: "up",
       severity: slow ? "warning" : "ok",
+      slow,
       httpStatus: status,
       latencyMs: latency,
       detailLabel: slow ? `Slow HTTP ${status} (${latency} ms)` : `HTTP ${status} (${latency} ms)`,

@@ -28,11 +28,11 @@ export default function Ping({ groupName, serviceName, style }) {
   } else if (data.alive) {
     const ping = t("common.ms", { value: data.time, style: "unit", unit: "millisecond", maximumFractionDigits: 0 });
     const isSlow = data.time >= SLOW_THRESHOLD_MS;
-    statusTitle += isSlow ? ` ${t("ping.up")} (${ping}, slow)` : ` ${t("ping.up")} (${ping})`;
+    statusTitle += isSlow ? ` ${t("ping.up")} (${ping}, ${t("ping.slow")})` : ` ${t("ping.up")} (${ping})`;
     colorClass = isSlow ? "text-orange-400/80 dark:text-orange-300/80" : "text-emerald-500/80";
 
     if (style === "basic") {
-      statusText = isSlow ? "slow" : t("ping.up");
+      statusText = isSlow ? t("ping.slow") : t("ping.up");
     } else {
       statusText = ping;
       colorClass += " lowercase";

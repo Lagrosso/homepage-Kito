@@ -92,6 +92,7 @@
         "ping": "Ping",
         "down": "Down",
         "up": "Up",
+        "slow": "Slow",
         "not_available": "Not Available"
     },
     "siteMonitor": {
@@ -100,7 +101,13 @@
         "response": "Response",
         "down": "Down",
         "up": "Up",
+        "slow": "Slow",
         "not_available": "Not Available"
+    },
+    "serviceStatus": {
+        "allServices": "All services",
+        "problematicOnly": "Problematic only",
+        "summary": "{{problematic}} problematic, {{noCheck}} without checks"
     },
     "emby": {
         "playing": "Playing",

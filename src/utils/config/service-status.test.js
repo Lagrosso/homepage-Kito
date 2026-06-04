@@ -111,6 +111,7 @@ describe("utils/config/service-status", () => {
       signalType: "ping",
       state: "up",
       severity: "warning",
+      slow: true,
       latencyMs: 1500,
     });
     expect(report.services[2]).toMatchObject({
@@ -162,12 +163,14 @@ describe("utils/config/service-status", () => {
   it("filters statuses by problematic, slow and no-check", async () => {
     const mod = await import("./service-status");
     const statuses = [
-      { id: "1", signalType: "ping", severity: "warning", state: "up", detailLabel: "Slow ping (1200 ms)" },
+      { id: "1", signalType: "ping", severity: "warning", state: "up", slow: true, detailLabel: "Slow ping (1200 ms)" },
       { id: "2", signalType: "siteMonitor", severity: "critical", state: "down", detailLabel: "HTTP 500" },
       { id: "3", signalType: "none", severity: "neutral", state: "no-check", detailLabel: "No check configured" },
+      // warning that is NOT slow (e.g. docker "starting") must not be counted as slow
+      { id: "4", signalType: "docker", severity: "warning", state: "unknown", detailLabel: "Docker starting" },
     ];
 
-    expect(mod.filterStatuses(statuses, "problematic", "all").map((status) => status.id)).toEqual(["1", "2"]);
+    expect(mod.filterStatuses(statuses, "problematic", "all").map((status) => status.id)).toEqual(["1", "2", "4"]);
     expect(mod.filterStatuses(statuses, "slow", "all").map((status) => status.id)).toEqual(["1"]);
     expect(mod.filterStatuses(statuses, "no-check", "all").map((status) => status.id)).toEqual(["3"]);
     expect(mod.filterStatuses(statuses, "all", "siteMonitor").map((status) => status.id)).toEqual(["2"]);

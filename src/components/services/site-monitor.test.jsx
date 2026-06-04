@@ -50,10 +50,10 @@ describe("components/services/site-monitor", () => {
 
     render(<SiteMonitor groupName="g" serviceName="s" style="basic" />);
 
-    expect(screen.getByText("slow")).toBeInTheDocument();
-    expect(screen.getByText("slow").closest(".site-monitor-status")).toHaveAttribute(
+    expect(screen.getByText("siteMonitor.slow")).toBeInTheDocument();
+    expect(screen.getByText("siteMonitor.slow").closest(".site-monitor-status")).toHaveAttribute(
       "title",
-      expect.stringContaining("slow"),
+      expect.stringContaining("siteMonitor.slow"),
     );
   });
 
