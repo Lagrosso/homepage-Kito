@@ -65,6 +65,15 @@ describe("components/services/ping", () => {
     expect(screen.getByText("ping.up")).toBeInTheDocument();
   });
 
+  it("renders a slow warning label for high latency in basic style", () => {
+    useSWR.mockReturnValue({ data: { alive: true, time: 1500 }, error: undefined });
+
+    render(<Ping groupName="g" serviceName="s" style="basic" />);
+
+    expect(screen.getByText("slow")).toBeInTheDocument();
+    expect(screen.getByText("slow").closest(".ping-status")).toHaveAttribute("title", expect.stringContaining("slow"));
+  });
+
   it("renders a dot when style is dot", () => {
     useSWR.mockReturnValue({ data: { alive: true, time: 5 }, error: undefined });
 

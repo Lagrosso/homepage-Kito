@@ -1,6 +1,7 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: HEAD `6f7a8958` auf `main` (== `origin/main`). Diese Datei ist die kompakte Übergabe für die
+Stand: Arbeitsstand auf `main`, lokaler HEAD aktuell `cdd07d0f` mit noch nicht committeten M9-Änderungen.
+Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
 **`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
 zwischen Doku und Code gilt der aktuelle Code-Stand.
@@ -15,7 +16,7 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
-  Stand nach M17: **561 Dateien / 1701 Tests** grün.
+  Stand nach M9: **563 Dateien / 1710 Tests** grün.
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -25,7 +26,16 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == `origin/main` (gepusht).
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, lokaler Arbeitsstand mit **noch uncommitteten M9-Dateien**.
+Geändert sind aktuell:
+
+- `src/utils/config/service-status.js` + Tests
+- `src/pages/api/services/status.js`
+- `src/pages/index.jsx`
+- `src/pages/admin/health.jsx`
+- `src/components/services/ping.jsx`
+- `src/components/services/site-monitor.jsx`
+- zugehörige Page-/Component-Tests
 
 ## Seit der letzten Übergabe umgesetzt
 1. **M8 Theming komplett** (`/admin/theme`): Presets, Hintergrund-Upload, visueller Editor,
@@ -93,6 +103,15 @@ Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`6f7a8958`**, lokal == 
     `writeRawConfig` und `writeCustomCss` loggen `actor`, `action`, `comment`, `backupPath` und optional
     `sourceBackupId`. Restore lädt Versionen nur in Editor-/Theme-Drafts; erst der normale Save schreibt live.
     `/admin/config` und `/admin/theme` haben dafür `Change comment` und Restore-Banner.
+18. **M9 Service-Status & Health v1:** neue serverseitige Status-Aggregation
+    `src/utils/config/service-status.js` vereinheitlicht bestehende Signale aus `ping`, `siteMonitor`,
+    Docker, Kubernetes und Proxmox zu einem gemeinsamen Shape mit `signalType`, `state`, `severity`,
+    `latencyMs`, `httpStatus` und `detailLabel`. Neue read-only API `/api/services/status` liefert
+    gefilterte/sortierte Statusdaten rollenabhängig. Das Dashboard zeigt damit einen Problemfilter
+    („All services“ / „Problematic only“), und `/admin/health` hat zusätzlich zur Config-Health einen
+    zweiten Bereich „Service Status“ mit Problem-/Slow-/No-Check-Filtern. `ping`- und `siteMonitor`-
+    Badges markieren Antworten ab `1000 ms` konsistent als Warning/„slow“. Keine neuen aktiven Checks,
+    kein Verlauf, keine Runtime-Aktionen.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -132,10 +151,9 @@ denselben Projektstand wie diese Übergabe sehen.
 **Klein & naheliegend (vorgemerkt):**
 - **Admin-Sammeltab „Alle Services & Bookmarks"** (nur Admins; braucht Render-Pfad-Änderung → gehört zu M10).
 
-**Phase 2 (read-only/config-only, Top ★🔥):** M9 (Status/Health pro Dienst),
-M10 (Profile/Ansichts-Modi), M11 (Command Palette),
+**Phase 2 (read-only/config-only, Top ★🔥):** M10 (Profile/Ansichts-Modi), M11 (Command Palette),
 M14 (Multi-URL/Safe-Links), M16 (Mobile/PWA). Ergänzend M12/M13/M15. M19/M19b
-(Service-/Info-Widgets), M20 (Import-Assistent: Homepage-YAML + Muximux) und M21
+(Service-/Info-Widgets), M20 (Import-Assistent: Homepage-YAML + Muximux), M21
 (Icon-/Favicon-Helfer) sind umgesetzt. Weitere Importquellen bleiben späterer Ausbau.
 
 **Phase 3 (Vision, erst nach Auth/Audit):** M22–M27 (Service-Aktionen, Autodiscovery, Setup-Assistent,
@@ -143,7 +161,7 @@ Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 
 ## Verifikation
 ```bash
-pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 561 Dateien / 1701 Tests
+pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 563 Dateien / 1710 Tests
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
 
@@ -166,3 +184,25 @@ git diff --check
 
 Dabei waren der M20-Grundschnitt (5 Dateien / 20 Tests), der Muximux-v2-Nachtest (3 Dateien / 14 Tests),
 Build und Whitespace-Check grün. Ein erneuter Volltest nach M20 wurde wegen Kontingent nicht ausgeführt.
+
+M9 wurde vollständig geprüft:
+
+```bash
+pnpm test
+pnpm build
+git diff --check
+```
+
+Stand dabei:
+
+- **Volltest:** 563 Testdateien / 1710 Tests grün
+- **Build:** grün
+- **Whitespace-Check:** grün
+
+## Offene Anschlussarbeit für Claude
+- M9 ist funktional fertig, aber **noch nicht committed**.
+- `codex-desktop-linux` liegt als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
+- Nächster sinnvoller Doku-/Produkt-Schritt wäre entweder:
+  - M9 in Browser manuell gegen reale Statusquellen durchklicken, oder
+  - M10 planen/umsetzen, oder
+  - M9 noch mit kleineren UX-Polishes versehen (z. B. Lokalisierung von `slow`, feinere Filtertexte).

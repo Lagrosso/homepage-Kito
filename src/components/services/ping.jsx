@@ -1,6 +1,8 @@
 import { useTranslation } from "next-i18next";
 import useSWR from "swr";
 
+const SLOW_THRESHOLD_MS = 1000;
+
 export default function Ping({ groupName, serviceName, style }) {
   const { t } = useTranslation();
   const { data, error } = useSWR(`/api/ping?${new URLSearchParams({ groupName, serviceName }).toString()}`, {
@@ -25,11 +27,12 @@ export default function Ping({ groupName, serviceName, style }) {
     statusText = t("ping.down");
   } else if (data.alive) {
     const ping = t("common.ms", { value: data.time, style: "unit", unit: "millisecond", maximumFractionDigits: 0 });
-    statusTitle += ` ${t("ping.up")} (${ping})`;
-    colorClass = "text-emerald-500/80";
+    const isSlow = data.time >= SLOW_THRESHOLD_MS;
+    statusTitle += isSlow ? ` ${t("ping.up")} (${ping}, slow)` : ` ${t("ping.up")} (${ping})`;
+    colorClass = isSlow ? "text-orange-400/80 dark:text-orange-300/80" : "text-emerald-500/80";
 
     if (style === "basic") {
-      statusText = t("ping.up");
+      statusText = isSlow ? "slow" : t("ping.up");
     } else {
       statusText = ping;
       colorClass += " lowercase";

@@ -221,6 +221,27 @@ function getAllServices(services) {
   return [...services.map(getServices).flat()];
 }
 
+function buildServiceStatusKey(group, name) {
+  return `${group}::${name}`;
+}
+
+function filterServiceGroupForProblematic(group, problematicServiceIds) {
+  const services = (group.services ?? []).filter((service) => problematicServiceIds.has(buildServiceStatusKey(group.name, service.name)));
+  const groups = (group.groups ?? [])
+    .map((subgroup) => filterServiceGroupForProblematic(subgroup, problematicServiceIds))
+    .filter(Boolean);
+
+  if (services.length === 0 && groups.length === 0) {
+    return null;
+  }
+
+  return {
+    ...group,
+    services,
+    groups,
+  };
+}
+
 function Home({ initialSettings }) {
   const { i18n } = useTranslation();
   const { theme, setTheme } = useContext(ThemeContext);
@@ -236,9 +257,21 @@ function Home({ initialSettings }) {
   const { data: services } = useSWR("/api/services");
   const { data: bookmarks } = useSWR("/api/bookmarks");
   const { data: widgets } = useSWR("/api/widgets");
+  const { data: serviceStatusReport } = useSWR("/api/services/status");
+  const [serviceFilter, setServiceFilter] = useState("all");
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
+  );
+
+  const problematicServiceIds = useMemo(
+    () =>
+      new Set(
+        (serviceStatusReport?.services ?? [])
+          .filter((serviceStatus) => serviceStatus.severity === "critical" || serviceStatus.severity === "warning")
+          .map((serviceStatus) => serviceStatus.id),
+      ),
+    [serviceStatusReport],
   );
 
   useEffect(() => {
@@ -317,8 +350,22 @@ function Home({ initialSettings }) {
       return <div />;
     }
 
-    const serviceGroups = services?.filter(tabGroupFilter).filter(undefinedGroupFilter);
-    const bookmarkGroups = bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
+    const serviceGroups = services
+      ?.filter(tabGroupFilter)
+      .filter(undefinedGroupFilter)
+      .map((group) =>
+        serviceFilter === "problematic" ? filterServiceGroupForProblematic(group, problematicServiceIds) : group,
+      )
+      .filter(Boolean);
+    const bookmarkGroups = serviceFilter === "problematic" ? [] : bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
+    const filteredLayoutGroups =
+      serviceFilter === "problematic"
+        ? layoutGroups
+            .map((group) =>
+              group?.services ? filterServiceGroupForProblematic(group, problematicServiceIds) : null,
+            )
+            .filter(Boolean)
+        : layoutGroups;
 
     return (
       <>
@@ -340,9 +387,38 @@ function Home({ initialSettings }) {
             </ul>
           </div>
         )}
-        {layoutGroups.length > 0 && (
+        {serviceStatusReport?.summary?.total > 0 && (
+          <div key="service-filter" className="mx-5 sm:mx-9 mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setServiceFilter("all")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                serviceFilter === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
+              }`}
+            >
+              All services
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceFilter("problematic")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                serviceFilter === "problematic"
+                  ? "bg-blue-600 text-white"
+                  : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
+              }`}
+            >
+              Problematic only
+            </button>
+            <span className="text-xs text-theme-500 dark:text-theme-400">
+              {serviceStatusReport.summary.problematic} problematic, {serviceStatusReport.summary.noCheck} without checks
+            </span>
+          </div>
+        )}
+        {filteredLayoutGroups.length > 0 && (
           <div key="layoutGroups" id="layout-groups" className="flex flex-wrap m-4 sm:m-8 sm:mt-4 items-start mb-2">
-            {layoutGroups.map((group) =>
+            {filteredLayoutGroups.map((group) =>
               group.services ? (
                 <ServicesGroup
                   key={group.name}
@@ -402,6 +478,9 @@ function Home({ initialSettings }) {
     activeTab,
     services,
     bookmarks,
+    serviceStatusReport,
+    serviceFilter,
+    problematicServiceIds,
     settings.layout,
     settings.fiveColumns,
     settings.maxGroupColumns,

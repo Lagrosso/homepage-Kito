@@ -45,6 +45,18 @@ describe("components/services/site-monitor", () => {
     expect(screen.getByText("siteMonitor.up")).toBeInTheDocument();
   });
 
+  it("renders a slow warning label for high latency in basic style", () => {
+    useSWR.mockReturnValue({ data: { status: 200, latency: 1500 }, error: undefined });
+
+    render(<SiteMonitor groupName="g" serviceName="s" style="basic" />);
+
+    expect(screen.getByText("slow")).toBeInTheDocument();
+    expect(screen.getByText("slow").closest(".site-monitor-status")).toHaveAttribute(
+      "title",
+      expect.stringContaining("slow"),
+    );
+  });
+
   it("renders down label for failing status in basic style", () => {
     useSWR.mockReturnValue({ data: { status: 500, latency: 0 }, error: undefined });
 

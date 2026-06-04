@@ -1,6 +1,8 @@
 import { useTranslation } from "next-i18next";
 import useSWR from "swr";
 
+const SLOW_THRESHOLD_MS = 1000;
+
 export default function SiteMonitor({ groupName, serviceName, style }) {
   const { t } = useTranslation();
   const { data, error } = useSWR(`/api/siteMonitor?${new URLSearchParams({ groupName, serviceName }).toString()}`, {
@@ -35,11 +37,12 @@ export default function SiteMonitor({ groupName, serviceName, style }) {
       unit: "millisecond",
       maximumFractionDigits: 0,
     });
-    statusTitle += ` ${data.status} (${responseTime})`;
-    colorClass = "text-emerald-500/80";
+    const isSlow = data.latency >= SLOW_THRESHOLD_MS;
+    statusTitle += isSlow ? ` ${data.status} (${responseTime}, slow)` : ` ${data.status} (${responseTime})`;
+    colorClass = isSlow ? "text-orange-400/80 dark:text-orange-300/80" : "text-emerald-500/80";
 
     if (style === "basic") {
-      statusText = t("siteMonitor.up");
+      statusText = isSlow ? "slow" : t("siteMonitor.up");
     } else {
       statusText = responseTime;
       colorClass += " lowercase";

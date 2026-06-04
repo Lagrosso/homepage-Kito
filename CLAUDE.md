@@ -172,7 +172,7 @@ Der Code basiert ursprünglich auf [gethomepage/homepage](https://github.com/get
 
 #### Phase 1/2 – read-only, mit den Leitplanken vereinbar
 
-9. **M9 – Status & Health pro Dienst (P2, ★, 🔥🔥🔥):** online/offline, Antwortzeit, HTTP-Code, letzter Check, Warnsymbol, Mini-Verlauf; sortier-/filterbar („nur kaputte/langsame Dienste"), optional Benachrichtigung. Nutzt Homepage `siteMonitor`/ping; read-only. (F3; ersetzt Backlog „Service-Test")
+9. **M9 – Status & Health pro Dienst über Dashboard + `/admin/health` (umgesetzt):** neue serverseitige Status-Aggregation `src/utils/config/service-status.js` vereinheitlicht bestehende Signale aus `ping`, `siteMonitor`, Docker, Kubernetes und Proxmox zu einem gemeinsamen Shape mit `signalType`, `state`, `severity`, `latencyMs`, `httpStatus` und `detailLabel`. Neue read-only API `/api/services/status` liefert rollenabhängig gefilterte/sortierte Statusdaten. Das Dashboard zeigt einen Problemfilter („All services“ / „Problematic only“), und `/admin/health` hat zusätzlich zur Config-Health einen zweiten Bereich „Service Status“ mit Filtern für `all`, `problematic`, `slow`, `no-check` und Signalquelle. `ping`- und `siteMonitor`-Badges markieren Antworten ab `1000 ms` konsistent als Warning/„slow“. Keine neuen aktiven Checks, kein Verlauf, keine Runtime-Aktionen. (F3; ersetzt Backlog „Service-Test")
 10. **M10 – Profile & Ansichts-Modi (P2/P3, ★, 🔥🔥🔥):** Profile (Admin/Familie/Gast/Kinder/Mobil) + Modi (Normal/Admin/Wartung/Familie), Umschalter, Sichtbarkeit pro Profil, „unsichtbar statt gelöscht". Sichtbarkeit read-only; echte User-Bindung via M7. (F2+F8; verzahnt mit M6/M7)
 11. **M11 – Smart Search / Command Palette (P2, 🔥🔥):** `Strg+K`/`/`: Services/Bookmarks/Gruppen suchen, zuletzt geöffnet, Einstellungen/Logs öffnen; später Admin-Aktionen. (F4; erweitert QuickLaunch + Backlog „Such-/Filter")
 12. **M12 – Favoriten & „Zuletzt/Häufig verwendet" (P2):** anpinnen, lokale Historie, kontextabhängige Vorschläge; lokal + abschaltbar. (F11)
@@ -297,6 +297,16 @@ Volltest nach M19b: `pnpm test -- --runInBand` grün (556 Testdateien / 1672 Tes
 - **Admin-UI:** neue Seite `/admin/history` mit Filterung nach Datei/Aktion, Detailansicht, Rohinhalt, Patch-Diff, Download und „Restore to editor“. `CONFIG_TABS` enthält jetzt auch `History`.
 - **Draft-first Restore:** Restore-API legt nur einen Editor-Draft an; `/admin/config` und `/admin/theme` laden diesen Draft, zeigen einen Banner „noch nicht gespeichert“ und senden beim anschließenden Save `action: "restore"` plus `sourceBackupId`.
 - **Suite-Stabilität:** der bestehende `/admin/users`-Seitentest wurde unter Vollsuite-Last robuster gemacht, damit der neue `History`-Tab die Suite nicht wegen Timing-Flakes kippt.
+
+### Verifikationsstatus (M9 Service-Status & Health, 2026-06-04)
+
+`pnpm test` grün (563 Testdateien / 1710 Tests), `pnpm build` grün, `git diff --check` grün.
+
+- **Status-Aggregation:** `src/utils/config/service-status.js` normiert `ping`, `siteMonitor`, Docker-, Kubernetes- und Proxmox-Signale; Dienste ohne Prüfsignal werden neutral als `no-check` geführt; Probleme werden vor neutralen/ok Einträgen sortiert.
+- **API:** `/api/services/status` ist read-only und session-gebunden; Dashboard-User sehen nur ihre sichtbaren Dienste, `/admin/health` nutzt dieselbe Quelle für die Gesamtübersicht.
+- **Dashboard:** `src/pages/index.jsx` kann zwischen allen Diensten und nur problematischen Diensten filtern; Bookmark-Gruppen werden im Problemfilter ausgeblendet, Service-Gruppen rekursiv auf problematische Einträge reduziert.
+- **Admin-Health:** `/admin/health` zeigt jetzt getrennt Config-Health und Runtime-Service-Status inklusive Filtern für Problemfälle, langsame Checks, `no-check` und Signalquelle.
+- **Badges:** `ping` und `siteMonitor` behandeln Antworten ab `1000 ms` als Warning/„slow“ statt nur als „alive/up“.
 
 ### Verifikationsstatus (M20 Import-Assistent, 2026-06-02)
 

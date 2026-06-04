@@ -32,6 +32,7 @@ const {
     quickLaunchProps: null,
     widgetCalls: [],
     windowFocused: false,
+    serviceStatusData: null,
   };
 
   const router = { asPath: "/" };
@@ -65,6 +66,7 @@ const {
     if (key === "/api/services") return { data: state.servicesData };
     if (key === "/api/bookmarks") return { data: state.bookmarksData };
     if (key === "/api/widgets") return { data: state.widgetsData };
+    if (key === "/api/services/status") return { data: state.serviceStatusData };
     return { data: undefined };
   });
 
@@ -178,6 +180,7 @@ describe("pages/index getStaticProps", () => {
     state.quickLaunchProps = null;
     state.widgetCalls = [];
     state.windowFocused = false;
+    state.serviceStatusData = null;
     router.asPath = "/";
     i18n.changeLanguage.mockClear();
   });
@@ -259,6 +262,7 @@ describe("pages/index Wrapper", () => {
     state.servicesData = [];
     state.bookmarksData = [];
     state.widgetsData = [];
+    state.serviceStatusData = null;
     state.widgetCalls = [];
     document.documentElement.className = "dark theme-slate";
   });
@@ -312,6 +316,7 @@ describe("pages/index Index routing + SWR branches", () => {
     state.servicesData = [];
     state.bookmarksData = [];
     state.widgetsData = [];
+    state.serviceStatusData = null;
   });
 
   it("renders the validation error screen when /api/validate returns an error", async () => {
@@ -321,6 +326,33 @@ describe("pages/index Index routing + SWR branches", () => {
 
     expect(screen.getByText("Error")).toBeInTheDocument();
     expect(screen.getByText("bad config")).toBeInTheDocument();
+  });
+
+  it("filters dashboard services down to problematic entries", async () => {
+    state.validateData = [];
+    state.servicesData = [
+      {
+        name: "Media",
+        services: [{ name: "Jellyfin", href: "http://jellyfin.local" }, { name: "Grafana", href: "http://grafana.local" }],
+        groups: [],
+      },
+    ];
+    state.bookmarksData = [{ name: "Links", bookmarks: [{ name: "Docs", href: "http://docs.local" }] }];
+    state.serviceStatusData = {
+      summary: { total: 2, problematic: 1, slow: 0, noCheck: 0, ok: 1, neutral: 0 },
+      services: [
+        { id: "Media::Grafana", group: "Media", name: "Grafana", severity: "critical", state: "down" },
+        { id: "Media::Jellyfin", group: "Media", name: "Jellyfin", severity: "ok", state: "up" },
+      ],
+    };
+
+    await renderIndex({ initialSettings: { title: "Homepage", layout: {} }, settings: { layout: {} } });
+
+    expect(await screen.findByRole("button", { name: "Problematic only" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Problematic only" }));
+
+    expect(screen.getByText("Media")).toBeInTheDocument();
+    expect(screen.queryByTestId("bookmarks-group")).not.toBeInTheDocument();
   });
 
   it("renders config errors when /api/validate returns a list of errors", async () => {
