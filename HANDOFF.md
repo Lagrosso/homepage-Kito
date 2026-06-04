@@ -1,6 +1,6 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: HEAD `db272095` auf `main`; M9 ist committed und laut Nutzer bereits gepusht.
+Stand: HEAD `4b3e5923` auf `main` (gepusht); M9 ist committed, zusätzlich Re-Verifikation + Härtung M9/M17/M20/M21.
 Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
 **`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
@@ -16,7 +16,7 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
-  Stand nach M9: **563 Dateien / 1710 Tests** grün.
+  Stand: **564 Dateien / 1721 Tests** grün. `pnpm lint` ist auf `eslint src` gescopt (nicht `eslint .`).
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -26,7 +26,7 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`db272095`**.
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`4b3e5923`**.
 
 Aktuell sichtbar im Worktree:
 
@@ -197,6 +197,24 @@ Aktuell sichtbar im Worktree:
 - **Verifikation:** `pnpm test`, `pnpm build`, `git diff --check` grün; Stand
   **563 Dateien / 1710 Tests**.
 
+### Re-Verifikation & Härtung M9/M17/M20/M21 (2026-06-04, Commit `4b3e5923`)
+- **Verifikation:** `pnpm test` **564 / 1721** grün, `pnpm build` grün, `pnpm lint` 0 Fehler, `git diff --check` sauber.
+- **Statisches Leitplanken-Review:** M17 Download/Restore admin-gated + Traversal-Guard (`id` nur gegen
+  bestehenden History-Index aufgelöst); M9 `/api/services/status` rollen-/sichtbarkeitsgefiltert; M20
+  `apply`/`preview` admin-gated und Draft-first (kein direkter Disk-Write); M21 admin-gated, Input begrenzt,
+  Fehler → leere Liste. **Bewusst keine SSRF-„Härtung"** beim Favicon-Fetch (würde legitime LAN-IP-Ziele brechen).
+- **Fix (M9 slow-Robustheit):** stabiles `slow`-Boolean ersetzt `detailLabel.includes("slow")`
+  (`service-status.js` ×2, `admin/health.jsx`) → Filter bricht nicht mehr bei geänderten/lokalisierten Labels.
+- **Fix (M9 i18n):** Dashboard-Filter + `slow`-Badges über next-i18next (`serviceStatus.*`, `ping.slow`,
+  `siteMonitor.slow`); `/admin/health` bleibt englisch (Admin-Konvention).
+- **Testlücke geschlossen:** neuer `src/utils/config/import-drafts.test.js` (11 Fälle) für den Draft-Store
+  (M17-Restore + M20-Apply).
+- **Lint-Papercut:** `pnpm lint` → `eslint src` (der untracked Fremdordner `codex-desktop-linux` erzeugte
+  zuvor ~550 Falsch-Fehler + Exit 1).
+- **Offene Sicherheitslage (`pnpm audit`, nicht aus M9/M17–M21-Code):** kritisch `form-data` `<4.0.4` (via
+  `@kubernetes/client-node`) und `fast-xml-parser` `<5.3.5` (via `gamedig`); dev-only `vitest` `<4.1.0` +
+  `glob` `<10.5.0` (nicht im Docker-Image). Noch **nicht gepatcht** — separater Schritt. Dependabot-API im Repo deaktiviert.
+
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
 
@@ -245,7 +263,7 @@ Wartungszentrale, Notfall-Ansicht, Netzwerk-Überblick).
 
 ## Verifikation
 ```bash
-pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 563 Dateien / 1710 Tests
+pnpm lint && pnpm test          # muss grün sein; letzter Vollstand: 564 Dateien / 1721 Tests
 docker build -t homepage-kito:test .   # fängt next-build-Fehler ab
 ```
 
@@ -284,9 +302,11 @@ Stand dabei:
 - **Whitespace-Check:** grün
 
 ## Offene Anschlussarbeit für Claude
-- M9 ist bereits im Repo-Stand enthalten; Doku dazu ist jetzt ebenfalls nachgezogen.
-- `codex-desktop-linux` liegt als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
-- Nächster sinnvoller Doku-/Produkt-Schritt wäre entweder:
-  - M9 in Browser manuell gegen reale Statusquellen durchklicken, oder
-  - M10 planen/umsetzen, oder
-  - M9 noch mit kleineren UX-Polishes versehen (z. B. Lokalisierung von `slow`, feinere Filtertexte).
+- M9 ist im Repo-Stand enthalten und re-verifiziert; der M9-UX-Polish (Lokalisierung von `slow`/Filtertexte,
+  robuster `slow`-Filter) ist mit Commit `4b3e5923` **erledigt**.
+- `codex-desktop-linux` liegt weiter als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
+- **Sicherheits-Backlog (priorisiert):** kritische transitive Deps patchen — `form-data` (`@kubernetes/client-node`)
+  und `fast-xml-parser` (`gamedig`); dev-only `vitest`/`glob` mitziehen. Per `pnpm audit` / `pnpm.overrides`
+  oder Dep-Bumps; danach `pnpm test` + `pnpm build`. Dependabot im Repo ist deaktiviert.
+- Nächster sinnvoller Produkt-Schritt: M10 planen/umsetzen, oder M9 in Browser manuell gegen reale
+  Statusquellen durchklicken.
