@@ -1,6 +1,6 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: Arbeitsstand auf `main`, lokaler HEAD aktuell `cdd07d0f` mit noch nicht committeten M9-Änderungen.
+Stand: HEAD `db272095` auf `main`; M9 ist committed und laut Nutzer bereits gepusht.
 Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
 **`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
@@ -26,92 +26,176 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, lokaler Arbeitsstand mit **noch uncommitteten M9-Dateien**.
-Geändert sind aktuell:
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`db272095`**.
 
-- `src/utils/config/service-status.js` + Tests
-- `src/pages/api/services/status.js`
-- `src/pages/index.jsx`
-- `src/pages/admin/health.jsx`
-- `src/components/services/ping.jsx`
-- `src/components/services/site-monitor.jsx`
-- zugehörige Page-/Component-Tests
+Aktuell sichtbar im Worktree:
+
+- untracked Fremdeintrag `codex-desktop-linux` — **nicht Teil der Arbeit**, nicht anfassen ohne Anlass
+- diese Doku-Datei plus `CLAUDE.md`/`AGENTS.md` können lokal von der letzten Übergabe-Aktualisierung abweichen
 
 ## Seit der letzten Übergabe umgesetzt
-1. **M8 Theming komplett** (`/admin/theme`): Presets, Hintergrund-Upload, visueller Editor,
-   Custom-CSS-Editor, Import/Export.
-2. **Ruhige Farbpalette:** Farbpicker kuratiert auf gedämpfte/pastellige Töne
-   (`ALL_COLORS` in `utils/config/theme-presets.js`); 10 neue entsättigte Paletten in
-   `src/styles/theme.css` **und** `src/utils/styles/themes.js`. Schrille Farben bleiben definiert.
-3. **Ecken-Rundung** global (`settings.cardRadius`): CSS-Var `--card-radius` via
-   `/api/config/theme-vars` + `_app.jsx`; CSS in `globals.css` (Karten, Such-Box, Admin-Buttons, Tabs,
-   Service-Widget-Blöcke). Shared Map: `utils/styles/card-radius.js`.
-4. **Font** JetBrains Mono (self-hosted `@fontsource-variable/jetbrains-mono`); Manrope entfernt.
-5. **Admin-Nav vereinheitlicht** (flache Unterstrich-Tabs, `config-editor.jsx`).
-6. **DnD-Fix + Gruppen-Reihenfolge:** pointer-basierte Kollisionserkennung (`dndCollisionDetection`);
-   Gruppen-Reihenfolge wird über `settings.yaml` `layout:` gesteuert → neue Helfer
-   `moveLayoutGroup`/`moveLayoutGroupToIndex` (`yaml-edit.js`) + ▲/▼ in `/admin/layout`.
-   Service-/Bookmark-Vorschau blendet Gruppen-Reorder aus, wenn ein Layout governt
-   (`components/admin/use-layout-governs.js`) und zeigt einen Hinweis-Link.
-7. **Add-Service-Dialog:** Beschreibungsfeld auch im Add-Modus (`config.jsx`, `yaml-insert.js`).
-8. **Docker-Deployment** (siehe unten).
-9. **M7b User-Management-UI:** `/admin/users` + Admin-only `/api/users` zum Anlegen, Bearbeiten,
-   Löschen und Passwort-Zurücksetzen von Nutzern; `users.yaml` bleibt außerhalb des Raw-Editors,
-   Passwort-Hashes werden nie zurückgegeben, letzter Admin ist geschützt.
-10. **8g Presets entschärft:** `THEME_PRESETS` nutzt gedämpfte/pastellige Farben aus der kuratierten
-    Palette; Test deckt Preset-Farben gegen `ALL_COLORS` und gültige Paletten ab.
-11. **M18 Config-Health v1:** statische read-only Health-Checks für `services.yaml`, `bookmarks.yaml`,
-    `widgets.yaml`, `settings.yaml`; Admin-only `/api/config/health`, neue Seite `/admin/health` mit
-    Severity-Filtern und `Health check`-Button in den bestehenden Config-Editoren. Keine Netzwerkchecks,
-    keine Auto-Fixes, Save bleibt nur durch YAML-Syntax blockiert. `pnpm test` grün: 551 Dateien / 1640 Tests.
-12. **M19 Service-Widgets per UI:** `/admin/config` erweitert den Service-Edit-Dialog um „Enable service widget"
-    für 40 kuratierte Homepage-Service-Widgets. Neue Registry `src/utils/config/service-widget-templates.js`;
-    neue YAML-Helfer `updateServiceWidget`/`deleteServiceWidget`; secret-aware (leer = bestehende Secrets
-    behalten, `[redacted]` nie schreiben, Platzhalter sichtbar). Unbekannte Widget-Optionen bleiben erhalten;
-    Dashboard-Render-Pfad bleibt unverändert. `pnpm test` grün: 552 Dateien / 1651 Tests; `pnpm build` grün.
-13. **M21 Icon-/Favicon-Helfer:** `/admin/config` erweitert das Service-Icon-Feld um „Find icon".
-    Admin-only `/api/config/icon-suggestions` nutzt `src/utils/config/icon-suggestions.js` für kuratierte
-    Vorschläge aus `homarr-labs/dashboard-icons`, `sh-*`/`si-*`-Syntax und Favicons aus Service-URLs.
-    Auswahl schreibt nur ins Formular, Save bleibt manuell; keine freie Websuche, keine lokalen Bilddownloads,
-    keine Credential-Tests. `pnpm test` grün: 555 Dateien / 1662 Tests; `pnpm build` grün.
-14. **M19b Widget-Schema & Info-Widget-UI:** `service-widget-templates.js` ist eine Schema-Registry mit
-    `allowedFields`/`defaultFields`/`maxFields`, `optionFields`, Typ- und Secret-Metadaten. `/admin/config`
-    zeigt Service-Widget-`fields` als Checkboxen mit Max-Validierung. Neue Registry
-    `src/utils/config/info-widget-templates.js` für `datetime`, `greeting`, `logo`, `openmeteo`,
-    `resources`, `search`; `/admin/widgets` kann bekannte Info-Widgets hinzufügen/bearbeiten/löschen/
-    umsortieren. `addInfoWidget` + typisierte `updateWidgetOptions` schreiben Booleans/Numbers als echte
-    YAML-Typen; unbekannte Widgets/Optionen bleiben Raw-YAML. Volltest nach M19b: 556 Dateien / 1672 Tests;
-    `pnpm build` grün.
-15. **UI-Nachbesserungen nach Browser-Feedback:** Service-Widget-Anzeigen in Kacheln übernehmen
-    `--card-radius`; Service-Edit-Dialog ist breiter (`max-w-3xl`) und Icon-Vorschläge passen besser hinein;
-    `/admin/layout` bietet ▲/▼ für selbst sortierbare Tabs (`moveLayoutTab`); Dashboard-Tabs sind mobil
-    kompakter und klemmen Rundungen sauber. Gezielt getestet: Widget-/Layout-/Tab-Unit-Tests, Prettier,
-    `pnpm build` und Browser-Smokes.
-16. **M20 Import-Assistent:** `/admin/import` mit Admin-only Preview-/Apply-APIs
-    (`/api/config/import/preview`, `/api/config/import/apply`). V1 importiert Homepage-YAML aus
-    `services.yaml`, `bookmarks.yaml`, `widgets.yaml`, kuratierten `settings.yaml`-Keys und `docker.yaml`.
-    V2 importiert Muximux: aktive Apps als Services, Gruppen/Reihenfolge/Collapse nach `settings.layout`,
-    Icon-Mapping, `siteMonitor`, `target`, `access.groups` und Docker-Discovery nach `docker.yaml`.
-    Apply schreibt nur Import-Drafts für die bestehenden Editor-Seiten; Save/Validate/Backup bleiben manuell.
-    Preview gibt keine Rohimporte/Secrets zurück; ohne Secret-Übernahme werden Widget-Secrets zu
-    `{{HOMEPAGE_VAR_*}}`-Platzhaltern. Weitere Quellen wie Homarr, Dashy, Browser-Bookmarks,
-    Docker-Compose, Uptime-Kuma, Traefik und NPM sind bewusst auf später verschoben.
-17. **M17 History/Restore:** neue Admin-Seite `/admin/history` mit Admin-only APIs für Liste, Detail,
-    Diff, Download und Draft-first-Restore von `services.yaml`, `bookmarks.yaml`, `widgets.yaml`,
-    `settings.yaml`, `docker.yaml` und `custom.css`. Neue Utility
-    `src/utils/config/backup-history.js` führt ein append-only `CONF_DIR/.backups/history.jsonl`;
-    `writeRawConfig` und `writeCustomCss` loggen `actor`, `action`, `comment`, `backupPath` und optional
-    `sourceBackupId`. Restore lädt Versionen nur in Editor-/Theme-Drafts; erst der normale Save schreibt live.
-    `/admin/config` und `/admin/theme` haben dafür `Change comment` und Restore-Banner.
-18. **M9 Service-Status & Health v1:** neue serverseitige Status-Aggregation
-    `src/utils/config/service-status.js` vereinheitlicht bestehende Signale aus `ping`, `siteMonitor`,
-    Docker, Kubernetes und Proxmox zu einem gemeinsamen Shape mit `signalType`, `state`, `severity`,
-    `latencyMs`, `httpStatus` und `detailLabel`. Neue read-only API `/api/services/status` liefert
-    gefilterte/sortierte Statusdaten rollenabhängig. Das Dashboard zeigt damit einen Problemfilter
-    („All services“ / „Problematic only“), und `/admin/health` hat zusätzlich zur Config-Health einen
-    zweiten Bereich „Service Status“ mit Problem-/Slow-/No-Check-Filtern. `ping`- und `siteMonitor`-
-    Badges markieren Antworten ab `1000 ms` konsistent als Warning/„slow“. Keine neuen aktiven Checks,
-    kein Verlauf, keine Runtime-Aktionen.
+
+### M17 – History / Restore / Änderungsverlauf
+- **Ziel:** Backups nicht nur schreiben, sondern sichtbar, diffbar und restorebar machen, ohne das
+  bestehende Draft-/Save-Sicherheitsmodell aufzugeben.
+- **Funktional umgesetzt:**
+  - neue Admin-Seite `/admin/history`
+  - Liste, Detail, Diff, Download und Draft-first-Restore für `services.yaml`, `bookmarks.yaml`,
+    `widgets.yaml`, `settings.yaml`, `docker.yaml` und `custom.css`
+  - JSONL-History zusätzlich zu bestehenden `.bak`-Dateien
+  - Restore lädt nur einen Draft; Live-Write passiert weiterhin erst beim normalen Save
+  - `Change comment` in `/admin/config` und `/admin/theme`
+- **Wichtige Dateien:**
+  - `src/utils/config/backup-history.js`
+  - `src/utils/config/config-writer.js`
+  - `src/utils/config/css-writer.js`
+  - `src/utils/config/import-drafts.js`
+  - `src/pages/api/config/history/index.js`
+  - `src/pages/api/config/history/[id].js`
+  - `src/pages/api/config/history/[id]/diff.js`
+  - `src/pages/api/config/history/[id]/download.js`
+  - `src/pages/api/config/history/[id]/restore.js`
+  - `src/pages/admin/history.jsx`
+  - `src/components/admin/config-editor.jsx`
+  - `src/pages/admin/theme.jsx`
+- **Verifikation:** `pnpm test`, `pnpm build`, `git diff --check` grün; Stand damals
+  **561 Dateien / 1701 Tests**.
+
+### M18 – Config-Health v1
+- **Ziel:** statische Qualitäts- und Sicherheitschecks für die editierbaren YAML-Dateien direkt in der Admin-UI.
+- **Funktional umgesetzt:**
+  - neue Admin-Seite `/admin/health`
+  - Admin-only API `/api/config/health`
+  - `Health check`-Button in den Config-Editoren
+  - Prüfungen u. a. auf YAML-Shape, duplizierte/fehlende URLs, ungültige `access.groups`,
+    Klartext-Secrets, Layout-/Theme-Auffälligkeiten
+  - keine Netzwerkchecks, keine Auto-Fixes, Save nur durch YAML-Syntax blockiert
+- **Wichtige Dateien:**
+  - `src/utils/config/config-health.js`
+  - `src/pages/api/config/health.js`
+  - `src/pages/admin/health.jsx`
+  - `src/components/admin/config-editor.jsx`
+  - zugehörige Tests in `src/utils/config/config-health.test.js` und Page-Tests
+- **Verifikation:** `pnpm test` grün; Stand damals **551 Dateien / 1640 Tests**.
+
+### M19 – Service-Widgets per UI
+- **Ziel:** kuratierte Homepage-Service-Widgets direkt im Service-Dialog anlegen/bearbeiten/löschen.
+- **Funktional umgesetzt:**
+  - Widget-Bereich im Service-Edit-Dialog unter `/admin/config`
+  - Aktivieren/Deaktivieren von `widget:`
+  - Auswahl aus 40 kuratierten Service-Widget-Typen
+  - Secret-aware Verhalten: echte Secrets nie vorbefüllt, leer = behalten, `[redacted]` nie schreiben
+  - unbekannte Widget-Optionen bleiben erhalten, Raw-YAML bleibt für Sonderfälle möglich
+- **Wichtige Dateien:**
+  - `src/utils/config/service-widget-templates.js`
+  - `src/utils/config/yaml-edit.js`
+  - `src/pages/admin/config.jsx`
+  - `src/components/admin/service-form-dialog.jsx`
+  - `src/components/admin/config-editor.jsx`
+  - zugehörige Registry-/YAML-/UI-Tests
+- **Verifikation:** `pnpm test` und `pnpm build` grün; Stand damals
+  **552 Dateien / 1651 Tests**.
+
+### M19b – Widget-Schema & Info-Widget-UI
+- **Ziel:** M19 von groben Feldern auf echtes Schema heben und `/admin/widgets` für Info-Widgets strukturiert machen.
+- **Funktional umgesetzt:**
+  - `fields` für Service-Widgets als Checkboxen mit `allowedFields`/`defaultFields`/`maxFields`
+  - Max-Validierung im UI
+  - neue Info-Widget-Registry für `datetime`, `greeting`, `logo`, `openmeteo`, `resources`, `search`
+  - `/admin/widgets` kann bekannte Info-Widgets hinzufügen, bearbeiten, löschen und umsortieren
+  - Boolean-/Number-Werte werden typisiert in YAML geschrieben
+- **Wichtige Dateien:**
+  - `src/utils/config/service-widget-templates.js`
+  - `src/utils/config/info-widget-templates.js`
+  - `src/utils/config/yaml-edit.js`
+  - `src/pages/admin/widgets.jsx`
+  - `src/components/admin/config-editor.jsx`
+  - `src/components/admin/widget-form-dialog.jsx`
+  - zugehörige Schema-/YAML-/Page-Tests
+- **Verifikation:** Volltest nach M19b grün; Stand damals **556 Dateien / 1672 Tests**.
+
+### M20 – Import-Assistent
+- **Ziel:** bestehende Konfigurationen übernehmen, aber weiterhin nur als Draft in die Editor-Shell schreiben.
+- **Funktional umgesetzt:**
+  - neue Admin-Seite `/admin/import`
+  - Preview-/Apply-APIs
+  - Import v1 für Homepage-YAML (`services.yaml`, `bookmarks.yaml`, `widgets.yaml`, kuratierte
+    `settings.yaml`-Keys, `docker.yaml`)
+  - Import v2 für Muximux
+  - Apply schreibt nur Drafts; Save/Validate/Backup bleiben manuell
+  - Secret-Verhalten: Vorschau ohne Rohimporte; ohne Secret-Übernahme werden Widget-Secrets als
+    `{{HOMEPAGE_VAR_*}}` geschrieben
+  - weitere Quellen wie Homarr, Dashy, Browser-Bookmarks, Docker-Compose, Uptime-Kuma, Traefik und NPM
+    bewusst verschoben
+- **Wichtige Dateien:**
+  - `src/pages/admin/import.jsx`
+  - `src/pages/api/config/import/preview.js`
+  - `src/pages/api/config/import/apply.js`
+  - `src/utils/config/import-assistant.js`
+  - `src/utils/config/import-drafts.js`
+  - `src/utils/config/config-writer.js`
+  - `src/components/admin/config-editor.jsx`
+  - zugehörige Import-/Draft-/Auth-Tests
+- **Verifikation:** gezielte Tests + `pnpm build` + `git diff --check` grün; zusätzlich
+  Muximux-v2-Nachtest separat grün.
+
+### M21 – Icon- und Favicon-Helfer
+- **Ziel:** Service-Icons im Config-Dialog kuratiert vorschlagen statt nur manuell eintippen.
+- **Funktional umgesetzt:**
+  - „Find icon“-Button im Service-Dialog
+  - Admin-only API `/api/config/icon-suggestions`
+  - Vorschläge aus `homarr-labs/dashboard-icons`, `sh-*`, `si-*` und Favicons der Ziel-URL
+  - Auswahl schreibt nur ins Formular; Save bleibt manuell
+  - keine freie Websuche, keine lokalen Bilddownloads, keine Credential-Tests
+- **Wichtige Dateien:**
+  - `src/utils/config/icon-suggestions.js`
+  - `src/pages/api/config/icon-suggestions.js`
+  - `src/components/admin/service-form-dialog.jsx`
+  - `src/components/resolvedicon.jsx` bzw. bestehender Render-Pfad für Vorschau
+  - zugehörige API-/Utility-/UI-Tests
+- **Verifikation:** `pnpm test` und `pnpm build` grün; Stand damals
+  **555 Dateien / 1662 Tests**.
+
+### UI-/Layout-/Theme-Nachträge rund um M19–M21
+- **Zusätzlich gemeinsam umgesetzt:**
+  - Service-Widget-Blöcke übernehmen `--card-radius`
+  - Service-Dialog breiter (`max-w-3xl`) für Icon-Vorschläge
+  - `/admin/layout` kann Tabs per ▲/▼ selbst sortieren (`moveLayoutTab`)
+  - Dashboard-Tabs mobil kompakter und sauber gerundet
+  - globale Gruppen-Reihenfolge läuft über `settings.yaml` `layout:`
+  - irreführendes Gruppen-Reorder wird bei layout-gesteuerter Reihenfolge ausgeblendet
+- **Wichtige Dateien:**
+  - `src/pages/admin/layout.jsx`
+  - `src/utils/config/yaml-edit.js`
+  - `src/components/admin/use-layout-governs.js`
+  - `src/styles/globals.css`
+  - `src/pages/_app.jsx`
+  - `src/utils/styles/card-radius.js`
+
+### M9 – Service-Status & Health v1
+- **Ziel:** bestehende Statussignale operativ nutzbar machen, ohne neue aktive Checks einzuführen.
+- **Funktional umgesetzt:**
+  - neue serverseitige Status-Aggregation
+  - read-only API `/api/services/status`
+  - Dashboard-Filter „All services“ / „Problematic only“
+  - `/admin/health` um zweiten Bereich „Service Status“ ergänzt
+  - `ping` und `siteMonitor` markieren Antworten ab `1000 ms` als Warning/`slow`
+  - keine Runtime-Aktionen, kein Verlauf, keine Zusatzprobes
+- **Wichtige Dateien:**
+  - `src/utils/config/service-status.js`
+  - `src/pages/api/services/status.js`
+  - `src/pages/index.jsx`
+  - `src/pages/admin/health.jsx`
+  - `src/components/services/ping.jsx`
+  - `src/components/services/site-monitor.jsx`
+  - `src/utils/config/service-status.test.js`
+  - `src/__tests__/pages/api/services/status.test.js`
+  - `src/__tests__/pages/admin-health.test.jsx`
+  - `src/__tests__/pages/index.test.jsx`
+  - `src/components/services/ping.test.jsx`
+  - `src/components/services/site-monitor.test.jsx`
+- **Verifikation:** `pnpm test`, `pnpm build`, `git diff --check` grün; Stand
+  **563 Dateien / 1710 Tests**.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -200,7 +284,7 @@ Stand dabei:
 - **Whitespace-Check:** grün
 
 ## Offene Anschlussarbeit für Claude
-- M9 ist funktional fertig, aber **noch nicht committed**.
+- M9 ist bereits im Repo-Stand enthalten; Doku dazu ist jetzt ebenfalls nachgezogen.
 - `codex-desktop-linux` liegt als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
 - Nächster sinnvoller Doku-/Produkt-Schritt wäre entweder:
   - M9 in Browser manuell gegen reale Statusquellen durchklicken, oder
