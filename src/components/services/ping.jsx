@@ -46,7 +46,7 @@ export default function Ping({ groupName, serviceName, style }) {
 
   return (
     <div
-      className={`w-auto text-center rounded-b-[3px] overflow-hidden ping-status ${backgroundClass}`}
+      className={`w-auto text-center rounded-[4px] overflow-hidden ping-status ${backgroundClass}`}
       title={statusTitle}
     >
       {style !== "dot" && <div className={`font-bold uppercase text-[8px] ${colorClass}`}>{statusText}</div>}

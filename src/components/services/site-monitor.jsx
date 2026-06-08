@@ -38,7 +38,9 @@ export default function SiteMonitor({ groupName, serviceName, style }) {
       maximumFractionDigits: 0,
     });
     const isSlow = data.latency >= SLOW_THRESHOLD_MS;
-    statusTitle += isSlow ? ` ${data.status} (${responseTime}, ${t("siteMonitor.slow")})` : ` ${data.status} (${responseTime})`;
+    statusTitle += isSlow
+      ? ` ${data.status} (${responseTime}, ${t("siteMonitor.slow")})`
+      : ` ${data.status} (${responseTime})`;
     colorClass = isSlow ? "text-orange-400/80 dark:text-orange-300/80" : "text-emerald-500/80";
 
     if (style === "basic") {
@@ -56,7 +58,7 @@ export default function SiteMonitor({ groupName, serviceName, style }) {
 
   return (
     <div
-      className={`w-auto text-center rounded-b-[3px] overflow-hidden site-monitor-status ${backgroundClass}`}
+      className={`w-auto text-center rounded-[4px] overflow-hidden site-monitor-status ${backgroundClass}`}
       title={statusTitle}
     >
       {style !== "dot" && <div className={`font-bold uppercase text-[8px] ${colorClass}`}>{statusText}</div>}

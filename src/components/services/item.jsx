@@ -86,7 +86,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
 
           <div
             className={`absolute top-0 right-0 flex flex-row justify-end ${
-              statusStyle === "dot" ? "gap-0" : "gap-2 mr-2"
+              statusStyle === "dot" ? "gap-0" : "gap-2 mt-2 mr-3"
             } z-10 service-tags`}
           >
             {service.ping && (
