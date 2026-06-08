@@ -1,6 +1,6 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: HEAD `ccd6eda4` auf `main` (gepusht); zuletzt Sicherheits-Patch (kritische Deps + vitest 3→4), davor Re-Verifikation + Härtung M9/M17/M20/M21.
+Stand: HEAD `464fa4b1` auf `main` (gepusht); zuletzt UI-Fixes (cardRadius/Dropdown) + `tmp`-Override, davor Sicherheits-Patch (kritische Deps + vitest 3→4).
 Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
 **`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
@@ -28,7 +28,7 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`ccd6eda4`**.
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`464fa4b1`**.
 
 Aktuell sichtbar im Worktree:
 
@@ -229,13 +229,28 @@ Aktuell sichtbar im Worktree:
     `config-editor.auth`-Save/Health-Test mit `waitFor`-Timeout gegen Vollsuite-Last-Flake gehärtet.
 - **Verifikation:** `pnpm test` **564 / 1721** grün, `pnpm build` grün, `pnpm lint` 0 Fehler,
   `git diff --check` sauber. **`pnpm audit`: 0 kritische** (vorher 1 critical vitest + 2 critical Runtime).
-- **Noch offen (nicht kritisch, separat zu bewerten):** 11 Funde (2 low / 2 moderate / **7 high**) —
-  `minimatch`-ReDoS (6× high, **eslint/typescript-eslint-intern**, dev-only; Fix wäre `minimatch@10` =
-  Major-API-Sprung, würde eslint brechen → nicht forciert); `tmp` Path-Traversal (high, Runtime via
-  `@kubernetes/client-node>tmp-promise`; Fix `0.2.4+` = **sicherer Patch-Override**, lohnt als nächstes);
-  `postcss` XSS (moderate, via `next`) und `uuid` (moderate, via `dockerode`) = bundle-/Major-intern, riskant.
+- **`tmp`-Override nachgezogen (Commit `464fa4b1`):** `tmp@<0.2.4 → ^0.2.4` (jetzt 0.2.7) in
+  `pnpm-workspace.yaml`; der k8s-Pfad ist gepatcht. `pnpm audit` jetzt **9 Funde (1 low / 2 moderate / 6 high)**.
+- **Noch offen (nicht kritisch):** 6× `minimatch`-ReDoS (high, **eslint/typescript-eslint-intern**, dev-only;
+  Fix wäre `minimatch@10` = Major-API-Sprung, würde eslint brechen → nicht forciert); `postcss` XSS
+  (moderate, via `next`) und `uuid` (moderate, via `dockerode`) = bundle-/Major-intern, riskant.
 - **Minor (vitest-4-Warnung, kein Fehler):** `vi.unmock(...)` nicht auf Top-Level in `favicon.test.jsx` +
   `proxy/http.test.js` → „will become an error in a future version"; bei Gelegenheit nach oben ziehen.
+
+### UI-Fixes bei `cardRadius: full` + Search-Dropdown (2026-06-08, Commit `f6937a6e`)
+- **Problem:** Bei `cardRadius: full` (`--card-radius: 9999px`) runden die nur ~36–60px hohen Service-Cards
+  so stark, dass ihr `overflow: clip` die Ecken-Badges (`ping`/`siteMonitor`-Latenz, z. B. „421 MS" → „421 .")
+  und die innere Widget-API-Error-Bar **anschneidet**. Zusätzlich war der Provider-Dropdown des Search-Widgets
+  (`dark:bg-theme-600`, solides Grau) nicht theme-konform.
+- **Fix (`src/styles/globals.css` + `src/components/widgets/search/search.jsx`):**
+  - `.service-card` Radius auf `min(var(--card-radius), 1.5rem)` geklemmt (+ Error-`<summary>` auf `0.75rem`) —
+    selbe Logik wie der bestehende `#myTab`-Clamp; Cards bleiben gerundet, Badges/Error-Bar werden nicht mehr
+    beschnitten.
+  - Search-Provider-Dropdown auf glasiges `bg-theme-50/95 dark:bg-theme-800/95 backdrop-blur-md` + Border
+    (konsistent mit dem Suggestions-Dropdown).
+- **Verifikation:** live per CSS-Injection (Badge-Clipping behoben) + `pnpm build` grün, `search.test.jsx` grün,
+  Prettier sauber. **Hinweis:** der Dev-Server hat die CSS-Änderung per HMR **nicht** übernommen
+  (File-Watch/`.next`-Thema) — für die Live-Vorschau Dev-Server stoppen, `rm -rf .next`, neu starten.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -327,9 +342,8 @@ Stand dabei:
 - M9 ist im Repo-Stand enthalten und re-verifiziert; der M9-UX-Polish (Lokalisierung von `slow`/Filtertexte,
   robuster `slow`-Filter) ist mit Commit `4b3e5923` **erledigt**.
 - `codex-desktop-linux` liegt weiter als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
-- **Sicherheits-Backlog:** kritische Deps + `glob` + vitest sind mit `ccd6eda4` **erledigt** (0 critical).
-  **Rest (nicht kritisch):** `tmp` (high, Runtime via k8s) ist der nächste sinnvolle, risikoarme
-  Override (`0.2.4+`); `minimatch`/`postcss`/`uuid` sind dev-/bundle-intern bzw. moderate und riskanter
-  (Details im Abschnitt „Sicherheits-Patch"). Vorher abwägen, nicht blind forcieren.
+- **Sicherheits-Backlog:** kritische Deps + `glob` + vitest (`ccd6eda4`) und `tmp` (`464fa4b1`) sind
+  **erledigt** (0 critical, 9 Funde Rest). **Rest (nicht kritisch, riskant zu forcieren):** `minimatch`
+  (high, dev-only eslint-intern), `postcss`/`uuid` (moderate, bundle-/Major-intern). Vorher abwägen.
 - Nächster sinnvoller Produkt-Schritt: M10 planen/umsetzen, oder M9 in Browser manuell gegen reale
   Statusquellen durchklicken.
