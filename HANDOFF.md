@@ -1,6 +1,6 @@
 # Übergabe / Handoff — homepage-Kito
 
-Stand: HEAD `4b3e5923` auf `main` (gepusht); M9 ist committed, zusätzlich Re-Verifikation + Härtung M9/M17/M20/M21.
+Stand: HEAD `ccd6eda4` auf `main` (gepusht); zuletzt Sicherheits-Patch (kritische Deps + vitest 3→4), davor Re-Verifikation + Härtung M9/M17/M20/M21.
 Diese Datei ist die kompakte Übergabe für die
 Fortsetzung der Arbeit (z. B. durch Codex). Die ausführliche Roadmap + Verifikationsstatus stehen in
 **`CLAUDE.md`**; **`AGENTS.md`** ist die für Codex synchronisierte Arbeitsanweisung. Bei Widerspruch
@@ -16,7 +16,9 @@ unangetastet; neue Features sind additiv und standardmäßig deaktiviert.
 - **Kommunikation auf Deutsch**, Code/Identifier/Commit-Messages Englisch.
   Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **pnpm only.** Vor jedem Commit: `pnpm lint` (0 Fehler) **und** `pnpm test`. Letzter vollständiger
-  Stand: **564 Dateien / 1721 Tests** grün. `pnpm lint` ist auf `eslint src` gescopt (nicht `eslint .`).
+  Stand: **564 Dateien / 1721 Tests** grün (unter **vitest 4**). `pnpm lint` ist auf `eslint src`
+  gescopt (nicht `eslint .`). Dependency-**Overrides** liegen in `pnpm-workspace.yaml` (pnpm v11 liest
+  `package.json` `pnpm.overrides` **nicht** mehr).
 - Tests neben dem Code als `*.test.{js,jsx}` (Vitest, `vi.mock`/`vi.hoisted`).
   FS/YAML nur serverseitig in `src/utils/config/`. Secrets nie in Preview/Logs/Export.
 - Import-Aliase: `components`, `pages`, `styles`, `utils`, `widgets`, `test-utils` (`baseUrl: ./src/`).
@@ -26,7 +28,7 @@ Next.js 16 (Pages Router, `output: "standalone"`, SSG via `getStaticProps`), Rea
 next-i18next, eemeli `yaml` (kommentarerhaltend, Document-API), iron-session, js-yaml, winston, Vitest.
 
 ## Repo-Stand
-Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`4b3e5923`**.
+Repo `Lagrosso/homepage-Kito`, Branch **`main`**, HEAD **`ccd6eda4`**.
 
 Aktuell sichtbar im Worktree:
 
@@ -211,9 +213,29 @@ Aktuell sichtbar im Worktree:
   (M17-Restore + M20-Apply).
 - **Lint-Papercut:** `pnpm lint` → `eslint src` (der untracked Fremdordner `codex-desktop-linux` erzeugte
   zuvor ~550 Falsch-Fehler + Exit 1).
-- **Offene Sicherheitslage (`pnpm audit`, nicht aus M9/M17–M21-Code):** kritisch `form-data` `<4.0.4` (via
-  `@kubernetes/client-node`) und `fast-xml-parser` `<5.3.5` (via `gamedig`); dev-only `vitest` `<4.1.0` +
-  `glob` `<10.5.0` (nicht im Docker-Image). Noch **nicht gepatcht** — separater Schritt. Dependabot-API im Repo deaktiviert.
+- **Sicherheitslage (`pnpm audit`):** die hier gelisteten kritischen Funde (`form-data`, `fast-xml-parser`,
+  `vitest`) sowie `glob` sind mit Commit `ccd6eda4` **gepatcht** (siehe Abschnitt „Sicherheits-Patch" oben).
+  Dependabot-API im Repo deaktiviert, daher `pnpm audit` als Quelle.
+
+### Sicherheits-Patch: kritische Deps + vitest 3→4 (2026-06-08, Commit `ccd6eda4`)
+- **Ziel:** alle **kritischen** `pnpm audit`-Funde beseitigen (priorisierter Backlog-Punkt).
+- **Umgesetzt:**
+  - Overrides in `pnpm-workspace.yaml` (pnpm v11): `form-data <4.0.4 → ^4.0.4` (via `@kubernetes/client-node`),
+    `fast-xml-parser <5.3.5 → ^5.3.5` (via `gamedig`), `glob >=10.2.0 <10.5.0 → ^10.5.0`.
+  - `vitest` + `@vitest/coverage-v8` → `^4.1.8` (Major; coverage-v8 peer-pinnt vitest exakt).
+  - **vitest-4-Test-Fixes (nur Test-Mocks, Produktionscode unverändert):** Arrow-`vi.fn()`-Mocks sind in
+    vitest 4 **nicht konstruierbar**. Resources-Widget-Tests: `Error`-Mock → `ErrorWidget` umbenannt
+    (überschattete global `Error` bei `new Error()`); `Docker`/`UrbackupServer`-Mocks auf `function`-Form;
+    `config-editor.auth`-Save/Health-Test mit `waitFor`-Timeout gegen Vollsuite-Last-Flake gehärtet.
+- **Verifikation:** `pnpm test` **564 / 1721** grün, `pnpm build` grün, `pnpm lint` 0 Fehler,
+  `git diff --check` sauber. **`pnpm audit`: 0 kritische** (vorher 1 critical vitest + 2 critical Runtime).
+- **Noch offen (nicht kritisch, separat zu bewerten):** 11 Funde (2 low / 2 moderate / **7 high**) —
+  `minimatch`-ReDoS (6× high, **eslint/typescript-eslint-intern**, dev-only; Fix wäre `minimatch@10` =
+  Major-API-Sprung, würde eslint brechen → nicht forciert); `tmp` Path-Traversal (high, Runtime via
+  `@kubernetes/client-node>tmp-promise`; Fix `0.2.4+` = **sicherer Patch-Override**, lohnt als nächstes);
+  `postcss` XSS (moderate, via `next`) und `uuid` (moderate, via `dockerode`) = bundle-/Major-intern, riskant.
+- **Minor (vitest-4-Warnung, kein Fehler):** `vi.unmock(...)` nicht auf Top-Level in `favicon.test.jsx` +
+  `proxy/http.test.js` → „will become an error in a future version"; bei Gelegenheit nach oben ziehen.
 
 Hinweis zur Doku: `CLAUDE.md` und `AGENTS.md` wurden mit diesen Nachträgen ergänzt, damit Claude/Codex
 denselben Projektstand wie diese Übergabe sehen.
@@ -305,8 +327,9 @@ Stand dabei:
 - M9 ist im Repo-Stand enthalten und re-verifiziert; der M9-UX-Polish (Lokalisierung von `slow`/Filtertexte,
   robuster `slow`-Filter) ist mit Commit `4b3e5923` **erledigt**.
 - `codex-desktop-linux` liegt weiter als untracked Fremdeintrag im Worktree und wurde nicht angefasst.
-- **Sicherheits-Backlog (priorisiert):** kritische transitive Deps patchen — `form-data` (`@kubernetes/client-node`)
-  und `fast-xml-parser` (`gamedig`); dev-only `vitest`/`glob` mitziehen. Per `pnpm audit` / `pnpm.overrides`
-  oder Dep-Bumps; danach `pnpm test` + `pnpm build`. Dependabot im Repo ist deaktiviert.
+- **Sicherheits-Backlog:** kritische Deps + `glob` + vitest sind mit `ccd6eda4` **erledigt** (0 critical).
+  **Rest (nicht kritisch):** `tmp` (high, Runtime via k8s) ist der nächste sinnvolle, risikoarme
+  Override (`0.2.4+`); `minimatch`/`postcss`/`uuid` sind dev-/bundle-intern bzw. moderate und riskanter
+  (Details im Abschnitt „Sicherheits-Patch"). Vorher abwägen, nicht blind forcieren.
 - Nächster sinnvoller Produkt-Schritt: M10 planen/umsetzen, oder M9 in Browser manuell gegen reale
   Statusquellen durchklicken.

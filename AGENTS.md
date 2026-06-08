@@ -336,7 +336,12 @@ Vollständige Re-Verifikation von M9 (Service-Status), M17 (History/Restore), M2
 - **Fix M9 i18n:** Dashboard-Filter + `slow`-Badges über next-i18next-Keys (`serviceStatus.*`, `ping.slow`, `siteMonitor.slow`); `/admin/health` bleibt englisch.
 - **Testlücke geschlossen:** neuer jsdom-Unit-Test `import-drafts.test.js` (11 Fälle) für den von M17-Restore + M20-Apply genutzten Draft-Store.
 - **Lint-Papercut:** `pnpm lint` von `eslint .` auf `eslint src` gescopt — der untracked Fremdordner `codex-desktop-linux` (gebündelte Third-Party-Assets) erzeugte zuvor ~550 Falsch-Fehler + Exit 1.
-- **Bekannte Schwachstellen (`pnpm audit`, nicht aus M9/M17–M21-Code):** kritisch `form-data` `<4.0.4` (via `@kubernetes/client-node`) und `fast-xml-parser` `<5.3.5` (via `gamedig`) — Runtime, tief transitiv, nur bei K8s- bzw. gamedig-Nutzung aktiv; dev-only `vitest` `<4.1.0` + `glob` `<10.5.0` (nicht im `standalone`-Docker-Image). Noch nicht gepatcht — separater Schritt. Dependabot-API im Repo deaktiviert, daher `pnpm audit` als Quelle.
+- **Bekannte Schwachstellen (`pnpm audit`):** die kritischen Funde sind mit Commit `ccd6eda4` **gepatcht** (`form-data → ^4.0.4`, `fast-xml-parser → ^5.3.5`, `glob → ^10.5.0` via Overrides in `pnpm-workspace.yaml`; `vitest`/`@vitest/coverage-v8` → `^4.1.8`). `pnpm audit` zeigt jetzt **0 critical**. Verbleibend (nicht kritisch): `minimatch`-ReDoS (high, eslint/typescript-eslint-intern, dev-only — Fix `minimatch@10` wäre Major-Bruch), `tmp` (high, Runtime via `@kubernetes/client-node` — sicherer `0.2.4+`-Override als nächster Schritt), `postcss`/`uuid` (moderate, via `next`/`dockerode`). Dependabot-API im Repo deaktiviert, daher `pnpm audit` als Quelle.
+
+#### Sicherheits-Patch & vitest 4 (2026-06-08, Commit `ccd6eda4`)
+- **Dependency-Overrides** liegen jetzt in `pnpm-workspace.yaml` (pnpm v11 liest `package.json` `pnpm.overrides` **nicht** mehr): `form-data@<4.0.4 → ^4.0.4`, `fast-xml-parser@<5.3.5 → ^5.3.5`, `glob@>=10.2.0 <10.5.0 → ^10.5.0`.
+- **vitest 3→4** (`^4.1.8`, gekoppelt mit `@vitest/coverage-v8`). **Breaking für Test-Mocks (Produktionscode unverändert):** Arrow-`vi.fn()`-Mocks sind in vitest 4 **nicht konstruierbar** — Mocks, die per `new` oder als Komponente genutzt werden, müssen `function`/`class` sein. Konkret gefixt: Resources-Widget-Tests (`Error`-Mock → `ErrorWidget`, sonst überschattet er global `Error` bei `new Error()`), `Docker`/`UrbackupServer`-Konstruktor-Mocks → `function`-Form, `config-editor.auth`-Test mit `waitFor`-Timeout gegen Vollsuite-Flake gehärtet.
+- **Verifikation:** `pnpm test` 564/1721 grün, `pnpm build` grün, `pnpm lint` 0 Fehler, `pnpm audit` 0 critical.
 
 ## Vorgemerkte spätere Komfort-Features
 
