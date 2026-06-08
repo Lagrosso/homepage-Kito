@@ -219,8 +219,9 @@ export default function Search({ options }) {
               >
                 <ListboxOptions
                   className="absolute right-0 z-10 mt-1 origin-top-right rounded-md
-                  bg-theme-100 dark:bg-theme-600 shadow-lg
-                  ring-1 ring-black ring-opacity-5 focus:outline-hidden"
+                  bg-theme-50/95 dark:bg-theme-800/95 backdrop-blur-md
+                  border border-theme-300 dark:border-theme-200/30 shadow-lg
+                  ring-1 ring-black/5 focus:outline-hidden"
                 >
                   <div className="flex flex-col">
                     {availableProviderIds.map((providerId) => {

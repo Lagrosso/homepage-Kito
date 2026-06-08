@@ -112,6 +112,19 @@ dialog ::-webkit-scrollbar {
   border-radius: var(--card-radius, 0.375rem);
 }
 
+/* Service cards are short (~one row high), so `cardRadius: full` rounds the
+   corners hard enough that the card's `overflow: clip` cuts into the corner
+   status badges (ping/siteMonitor) and the inner widget error bar. Clamp the
+   service-card radius (same rationale as the #myTab clamp below) so the
+   rounding stays generous without clipping content. */
+.service-card {
+  border-radius: min(var(--card-radius, 0.375rem), 1.5rem);
+}
+
+.service-card details > summary {
+  border-radius: min(var(--card-radius, 0.375rem), 0.75rem);
+}
+
 /* Preset preview cards keep their own fixed rounding regardless of the
    configured --card-radius (otherwise the color bar gets clipped oddly). */
 .admin-shell .theme-preset-card {
