@@ -5,6 +5,7 @@ overrides:
   'form-data@<4.0.4': '^4.0.4'
   'fast-xml-parser@<5.3.5': '^5.3.5'
   'glob@>=10.2.0 <10.5.0': '^10.5.0'
+  'tmp@<0.2.4': '^0.2.4'
 
 allowBuilds:
   '@tailwindcss/oxide': true
