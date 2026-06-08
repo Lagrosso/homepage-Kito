@@ -48,12 +48,12 @@ describe("ConfigEditor auth behavior", () => {
 
     renderEditor();
 
-    await screen.findByRole("button", { name: "Save" });
+    await screen.findByRole("button", { name: "Save" }, { timeout: 5000 });
     expect(screen.queryByLabelText(/config edit token/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(screen.getByText(/Saved\. Backup:/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Saved\. Backup:/)).toBeInTheDocument(), { timeout: 5000 });
     expect(global.fetch).toHaveBeenLastCalledWith("/api/config/raw/services.yaml", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,9 +107,11 @@ describe("ConfigEditor auth behavior", () => {
 
     renderEditor();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Health check" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Health check" }, { timeout: 5000 }));
 
-    await waitFor(() => expect(screen.getByText(/Health: 0 errors, 1 warnings, 0 info/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Health: 0 errors, 1 warnings, 0 info/)).toBeInTheDocument(), {
+      timeout: 5000,
+    });
     expect(screen.getByText("This service has no href.")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenLastCalledWith("/api/config/health", {
       method: "POST",

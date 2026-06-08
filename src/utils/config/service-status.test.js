@@ -25,16 +25,18 @@ const { state, servicesResponse, pingLib, httpProxy, Docker, dockerCfg, kubeCfg,
       if (state.httpError) throw state.httpError;
       return state.httpResponses.shift();
     });
-    const Docker = vi.fn(() => ({
-      listContainers: vi.fn(async () => state.dockerContainers),
-      getContainer: vi.fn(() => ({
-        inspect: vi.fn(async () => state.dockerInspect),
-      })),
-      getService: vi.fn(() => ({
-        inspect: vi.fn(async () => ({ Spec: { Mode: { Replicated: { Replicas: 2 } } } })),
-      })),
-      listTasks: vi.fn(async () => []),
-    }));
+    const Docker = vi.fn(function () {
+      return {
+        listContainers: vi.fn(async () => state.dockerContainers),
+        getContainer: vi.fn(() => ({
+          inspect: vi.fn(async () => state.dockerInspect),
+        })),
+        getService: vi.fn(() => ({
+          inspect: vi.fn(async () => ({ Spec: { Mode: { Replicated: { Replicas: 2 } } } })),
+        })),
+        listTasks: vi.fn(async () => []),
+      };
+    });
     const dockerCfg = { default: vi.fn(() => ({ conn: {} })) };
     const kubeCfg = {
       getKubeConfig: vi.fn(() => ({

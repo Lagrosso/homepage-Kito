@@ -3,15 +3,15 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { useSWR, Resource, Error } = vi.hoisted(() => ({
+const { useSWR, Resource, ErrorWidget } = vi.hoisted(() => ({
   useSWR: vi.fn(),
   Resource: vi.fn(() => <div data-testid="resource" />),
-  Error: vi.fn(() => <div data-testid="error" />),
+  ErrorWidget: vi.fn(() => <div data-testid="error" />),
 }));
 
 vi.mock("swr", () => ({ default: useSWR }));
 vi.mock("../widget/resource", () => ({ default: Resource }));
-vi.mock("../widget/error", () => ({ default: Error }));
+vi.mock("../widget/error", () => ({ default: ErrorWidget }));
 
 import Cpu from "./cpu";
 
@@ -50,6 +50,6 @@ describe("components/widgets/resources/cpu", () => {
 
     render(<Cpu expanded />);
 
-    expect(Error).toHaveBeenCalled();
+    expect(ErrorWidget).toHaveBeenCalled();
   });
 });
