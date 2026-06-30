@@ -25,26 +25,16 @@ import { MdDragIndicator, MdHome, MdKeyboardArrowDown, MdKeyboardArrowUp } from 
 import AdminTabs from "components/admin/admin-tabs";
 import LogoutButton from "components/admin/logout-button";
 
+import { CONFIG_TABS } from "utils/admin/config-tabs";
 import { clearEditorDraft, getEditorDraft } from "utils/config/import-drafts";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
 // Tabs shown in the editor header so the config pages cross-link. The active tab
 // is matched by route (href), so /admin/layout and /admin/settings stay distinct
-// even though both edit settings.yaml. Exported so standalone pages (e.g. /admin/theme)
-// can render the same nav without duplicating the list.
-export const CONFIG_TABS = [
-  { label: "Services", href: "/admin/config" },
-  { label: "Bookmarks", href: "/admin/bookmarks" },
-  { label: "Widgets", href: "/admin/widgets" },
-  { label: "Settings", href: "/admin/settings" },
-  { label: "Docker", href: "/admin/docker" },
-  { label: "Import", href: "/admin/import" },
-  { label: "Layout", href: "/admin/layout" },
-  { label: "Theme", href: "/admin/theme" },
-  { label: "Health", href: "/admin/health" },
-  { label: "History", href: "/admin/history" },
-  { label: "Users", href: "/admin/users" },
-];
+// even though both edit settings.yaml. Re-exported so the existing imports
+// (`components/admin/config-editor`) keep working while the source of truth lives
+// in the lightweight utils/admin/config-tabs module.
+export { CONFIG_TABS };
 
 // Parse a YAML error into a readable line/column message. Shared by every
 // config editor (services, bookmarks, …).

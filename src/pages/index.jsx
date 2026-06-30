@@ -27,6 +27,7 @@ import { widgetsResponse } from "utils/config/api-response";
 import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
+import { buildGroupTargets } from "utils/quicklaunch/commands";
 import themes from "utils/styles/themes";
 
 const ThemeToggle = dynamic(() => import("components/toggles/theme"), {
@@ -264,6 +265,11 @@ function Home({ initialSettings }) {
     (i) => i?.href,
   );
 
+  const groupTargets = useMemo(
+    () => buildGroupTargets({ services, bookmarks, layout: settings.layout }),
+    [services, bookmarks, settings.layout],
+  );
+
   const problematicServiceIds = useMemo(
     () =>
       new Set(
@@ -295,6 +301,24 @@ function Home({ initialSettings }) {
 
   useEffect(() => {
     function handleKeyDown(e) {
+      // Ctrl/Cmd+K opens the command palette regardless of focus.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setSearching(true);
+        return;
+      }
+
+      const inEditable =
+        e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
+
+      // "/" opens the palette in command mode when not typing in a field.
+      if (e.key === "/" && !inEditable && !(e.altKey || e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setSearchString("/");
+        setSearching(true);
+        return;
+      }
+
       if (e.target.tagName === "BODY" || e.target.id === "inner_wrapper") {
         if (
           (e.key.length === 1 &&
@@ -542,6 +566,8 @@ function Home({ initialSettings }) {
           setSearchString={setSearchString}
           isOpen={searching}
           setSearching={setSearching}
+          groupTargets={groupTargets}
+          setActiveTab={setActiveTab}
         />
         <div id="header-nav" className="flex flex-row justify-between items-center w-full mb-2 z-20">
           <Link

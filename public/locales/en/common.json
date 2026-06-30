@@ -500,7 +500,13 @@
         "custom": "Custom",
         "visit": "Visit",
         "url": "URL",
-        "searchsuggestion": "Suggestion"
+        "searchsuggestion": "Suggestion",
+        "command": "Command",
+        "group": "Group",
+        "commands": {
+            "home": "Go to Dashboard",
+            "admin": "Open {{page}}"
+        }
     },
     "wmo": {
         "0-day": "Sunny",

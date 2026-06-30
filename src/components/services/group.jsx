@@ -2,6 +2,7 @@ import { Disclosure, Transition } from "@headlessui/react";
 import classNames from "classnames";
 import ResolvedIcon from "components/resolvedicon";
 import List from "components/services/list";
+import { slugifyAndEncode } from "components/tab";
 import { useEffect, useRef } from "react";
 import { MdKeyboardArrowDown } from "react-icons/md";
 
@@ -28,6 +29,7 @@ export default function ServicesGroup({
   return (
     <div
       key={group.name}
+      id={isSubgroup ? undefined : `group-${slugifyAndEncode(group.name)}`}
       className={classNames(
         "services-group flex-1",
         layout?.style === "row" ? "basis-full" : "basis-full md:basis-1/2 lg:basis-1/3 xl:basis-1/4",

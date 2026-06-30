@@ -6,19 +6,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
 
-const { state, useSWR, getStoredProvider } = vi.hoisted(() => ({
+const { state, useSWR, getStoredProvider, routerPush } = vi.hoisted(() => ({
   state: {
     widgets: {},
+    me: undefined,
   },
   useSWR: vi.fn((key) => {
     if (key === "/api/widgets") return { data: state.widgets, error: undefined };
+    if (key === "/api/auth/me") return { data: state.me, error: undefined };
     return { data: undefined, error: undefined };
   }),
   getStoredProvider: vi.fn(() => null),
+  routerPush: vi.fn(),
 }));
 
 vi.mock("swr", () => ({
   default: useSWR,
+}));
+
+vi.mock("next/router", () => ({
+  useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock("./resolvedicon", () => ({
@@ -41,7 +48,7 @@ vi.mock("./widgets/search/search", () => ({
 
 import QuickLaunch from "./quicklaunch";
 
-function Wrapper({ servicesAndBookmarks = [], initialOpen = true } = {}) {
+function Wrapper({ servicesAndBookmarks = [], initialOpen = true, groupTargets = [], setActiveTab } = {}) {
   const [searchString, setSearchString] = useState("");
   const [isOpen, setSearching] = useState(initialOpen);
 
@@ -52,6 +59,8 @@ function Wrapper({ servicesAndBookmarks = [], initialOpen = true } = {}) {
       setSearchString={setSearchString}
       isOpen={isOpen}
       setSearching={setSearching}
+      groupTargets={groupTargets}
+      setActiveTab={setActiveTab}
     />
   );
 }
@@ -60,6 +69,7 @@ describe("components/quicklaunch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.widgets = {};
+    state.me = undefined;
   });
 
   it("uses a custom provider from quicklaunch settings when configured", async () => {
@@ -385,5 +395,95 @@ describe("components/quicklaunch", () => {
     });
 
     expect(input).toHaveValue("");
+  });
+
+  it("matches with a non-contiguous fuzzy subsequence (beyond plain substring)", async () => {
+    renderWithProviders(
+      <Wrapper
+        servicesAndBookmarks={[
+          { name: "Portainer", href: "https://portainer.example" },
+          { name: "Plex", href: "https://plex.example" },
+        ]}
+      />,
+      { settings: { quicklaunch: { showSearchSuggestions: false } } },
+    );
+
+    const input = screen.getByPlaceholderText("Search");
+    await waitFor(() => expect(input).toHaveFocus());
+
+    // "ptr" is not a substring of either name, but is a subsequence of Portainer only.
+    fireEvent.change(input, { target: { value: "ptr" } });
+
+    expect(await screen.findByText("Portainer")).toBeInTheDocument();
+    expect(screen.queryByText("Plex")).not.toBeInTheDocument();
+  });
+
+  it("shows only the Home command for non-admins in '/' command mode", async () => {
+    renderWithProviders(<Wrapper />, { settings: { quicklaunch: { showSearchSuggestions: false } } });
+
+    const input = screen.getByPlaceholderText("Search");
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: "/" } });
+
+    await waitFor(() => {
+      expect(document.querySelector('button[data-index="0"]')).toBeTruthy();
+    });
+    // Viewer sees exactly one command (Home) and no admin pages.
+    expect(document.querySelectorAll("button[data-index]")).toHaveLength(1);
+    expect(screen.getAllByText("quicklaunch.command").length).toBe(1);
+  });
+
+  it("exposes admin pages in '/' command mode and navigates via router.push", async () => {
+    state.me = { user: { role: "admin" } };
+
+    renderWithProviders(<Wrapper />, { settings: { quicklaunch: { showSearchSuggestions: false } } });
+
+    const input = screen.getByPlaceholderText("Search");
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: "/" } });
+
+    await waitFor(() => {
+      expect(document.querySelectorAll("button[data-index]").length).toBeGreaterThan(1);
+    });
+
+    // First command is Home; selecting it navigates client-side instead of window.open.
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    fireEvent.click(document.querySelector('button[data-index="0"]'));
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 350));
+    });
+
+    expect(routerPush).toHaveBeenCalledWith("/");
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it("jumps to a group target by switching the active tab", async () => {
+    const setActiveTab = vi.fn();
+
+    renderWithProviders(
+      <Wrapper
+        groupTargets={[{ id: "g1", name: "My Group", type: "group", slug: "my-group", tab: "home" }]}
+        setActiveTab={setActiveTab}
+      />,
+      { settings: { quicklaunch: { showSearchSuggestions: false } } },
+    );
+
+    const input = screen.getByPlaceholderText("Search");
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: "my gr" } });
+
+    const groupButton = await screen.findByText("My Group");
+    fireEvent.click(groupButton.closest("button"));
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    expect(setActiveTab).toHaveBeenCalledWith("home");
   });
 });

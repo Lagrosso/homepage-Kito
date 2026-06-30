@@ -1,8 +1,11 @@
 import classNames from "classnames";
 import { useTranslation } from "next-i18next";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import useSWR from "swr";
+import { buildCommands } from "utils/quicklaunch/commands";
+import { fuzzyFilter, fuzzyScore } from "utils/quicklaunch/fuzzy";
 import { SettingsContext } from "utils/contexts/settings";
 
 import ResolvedIcon from "./resolvedicon";
@@ -15,8 +18,17 @@ const MOBILE_BUTTON_POSITIONS = {
   "bottom-right": "bottom-4 right-4",
 };
 
-export default function QuickLaunch({ servicesAndBookmarks, searchString, setSearchString, isOpen, setSearching }) {
+export default function QuickLaunch({
+  servicesAndBookmarks,
+  searchString,
+  setSearchString,
+  isOpen,
+  setSearching,
+  groupTargets = [],
+  setActiveTab,
+}) {
   const { t } = useTranslation();
+  const router = useRouter();
 
   const { settings } = useContext(SettingsContext);
   const { searchDescriptions = false, hideVisitURL = false } = settings?.quicklaunch ?? {};
@@ -30,6 +42,10 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
 
   const { data: widgets } = useSWR("/api/widgets");
   const searchWidget = Object.values(widgets).find((w) => w.type === "search");
+
+  const { data: me } = useSWR("/api/auth/me");
+  const isAdmin = me?.user?.role === "admin";
+  const commands = useMemo(() => buildCommands({ isAdmin, t }), [isAdmin, t]);
 
   let searchProvider;
 
@@ -61,13 +77,34 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
     ? MOBILE_BUTTON_POSITIONS[settings.quicklaunch.mobileButtonPosition]
     : null;
 
-  function openCurrentItem(newWindow) {
-    const result = results[currentItemIndex];
+  function activateResult(result, newWindow) {
+    if (!result) return;
+
+    if (result.type === "command") {
+      router.push(result.href);
+      return;
+    }
+
+    if (result.type === "group") {
+      if (result.tab && setActiveTab) {
+        setActiveTab(result.tab);
+        window.location.hash = `#${result.tab}`;
+      }
+      setTimeout(() => {
+        document.getElementById(`group-${result.slug}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+      return;
+    }
+
     window.open(
       result.href,
       newWindow ? "_blank" : (result.target ?? searchProvider?.target ?? settings.target ?? "_blank"),
       "noreferrer",
     );
+  }
+
+  function openCurrentItem(newWindow) {
+    activateResult(results[currentItemIndex], newWindow);
   }
 
   const closeAndReset = useCallback(() => {
@@ -139,22 +176,30 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
 
   useEffect(() => {
     const abortController = new AbortController();
+    const trimmed = searchString.trim();
 
-    if (searchString.trim().length === 0) setResults([]);
-    else {
-      let newResults = servicesAndBookmarks.filter((r) => {
-        const nameMatch = r.name.toLowerCase().includes(searchString);
-        let descriptionMatch;
-        if (searchDescriptions) {
-          descriptionMatch = r.description?.toLowerCase().includes(searchString);
-          r.priority = nameMatch ? 2 * +nameMatch : +descriptionMatch; // eslint-disable-line no-param-reassign
-        }
-        return nameMatch || descriptionMatch;
-      });
+    if (trimmed.length === 0) setResults([]);
+    else if (trimmed.startsWith("/")) {
+      // Command mode: navigate to the dashboard home or admin pages.
+      const commandQuery = trimmed.slice(1);
+      const matched = commandQuery.length === 0 ? commands : fuzzyFilter(commandQuery, commands, (c) => c.name);
+      setResults(matched);
+      setCurrentItemIndex(matched.length ? 0 : null);
+    } else {
+      const getText = (r) => (searchDescriptions ? `${r.name}\n${r.description ?? ""}` : r.name);
+      let newResults = fuzzyFilter(searchString, servicesAndBookmarks, getText);
 
       if (searchDescriptions) {
-        newResults = newResults.sort((a, b) => b.priority - a.priority);
+        newResults.forEach((r) => {
+          // Name hits rank above description-only hits; drives highlightText below.
+          r.priority = fuzzyScore(searchString, r.name) > 0 ? 2 : 1; // eslint-disable-line no-param-reassign
+        });
+        // Stable sort keeps fuzzy order within each priority bucket.
+        newResults.sort((a, b) => b.priority - a.priority);
       }
+
+      // Group/tab jump targets are appended below the direct service/bookmark hits.
+      newResults = newResults.concat(fuzzyFilter(searchString, groupTargets, (g) => g.name));
 
       if (searchProvider) {
         newResults.push({
@@ -216,8 +261,20 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
     return () => {
       abortController.abort();
     };
+    // commands/groupTargets are intentionally excluded: their identities are not
+    // stable across renders (commands derives from the i18n `t`), which would loop
+    // the effect. isAdmin is the stable trigger that matters once /api/auth/me loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchString, servicesAndBookmarks, searchDescriptions, hideVisitURL, searchSuggestions, searchProvider, url]);
+  }, [
+    searchString,
+    servicesAndBookmarks,
+    searchDescriptions,
+    hideVisitURL,
+    searchSuggestions,
+    searchProvider,
+    url,
+    isAdmin,
+  ]);
 
   const [hidden, setHidden] = useState(true);
   useEffect(() => {

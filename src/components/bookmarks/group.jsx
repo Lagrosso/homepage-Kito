@@ -3,6 +3,7 @@ import classNames from "classnames";
 import List from "components/bookmarks/list";
 import ErrorBoundary from "components/errorboundry";
 import ResolvedIcon from "components/resolvedicon";
+import { slugifyAndEncode } from "components/tab";
 import { useEffect, useRef } from "react";
 import { MdKeyboardArrowDown } from "react-icons/md";
 
@@ -23,6 +24,7 @@ export default function BookmarksGroup({
   return (
     <div
       key={bookmarks.name}
+      id={`group-${slugifyAndEncode(bookmarks.name)}`}
       className={classNames(
         "bookmark-group flex-1 overflow-hidden",
         layout?.style === "row" ? "basis-full" : "basis-full md:basis-1/4 lg:basis-1/5 xl:basis-1/6",
