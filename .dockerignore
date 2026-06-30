@@ -25,6 +25,9 @@ README.md
 config/
 k3d/
 coverage/
+# graphify generated knowledge-graph output (derived data, not part of the app).
+graphify-out/
+src/graphify-out/
 # Stray local third-party folder (~2.4 GB, not part of the app); keep it out of
 # the build context so `COPY . .` doesn't pull it into the builder image.
 codex-desktop-linux/

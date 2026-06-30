@@ -57,3 +57,7 @@ site*/
 # local Claude Code preview launch config (may contain a session secret)
 .claude/launch.json
 codex-desktop-linux
+
+# graphify generated knowledge-graph output (derived data, not source)
+graphify-out/
+src/graphify-out/
