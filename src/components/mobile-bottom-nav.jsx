@@ -1,16 +1,36 @@
 import classNames from "classnames";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { MdArrowUpward, MdSearch } from "react-icons/md";
 import { TabContext } from "utils/contexts/tab";
 
 import { slugifyAndEncode } from "./tab";
 
+// Scroll the page to the top. The dashboard scrolls inside #inner_wrapper
+// (overflow-auto), not the window, so target that container first.
+function scrollToTop() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const scroller = document.getElementById("inner_wrapper");
+  (scroller ?? window).scrollTo({ top: 0, behavior: "smooth" });
+}
+
 // Fixed bottom navigation for phones (M16). Hidden on >= sm. Gives quick access to
 // search (opens QuickLaunch), horizontal tab switching, and scroll-to-top without
 // reaching for the top of the page. Additive — desktop layout is unchanged.
 // (Admin/Home stay reachable from the always-visible top header.)
+//
+// Rendered through a portal into <body>: the dashboard's #inner_wrapper uses
+// backdrop-filter, which would otherwise make `position: fixed` resolve against
+// that container instead of the viewport (the bar would scroll with the page).
 export default function MobileBottomNav({ tabs = [], onSearch }) {
   const { activeTab, setActiveTab } = useContext(TabContext);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const selectTab = (tab) => {
     const slug = slugifyAndEncode(tab);
@@ -20,7 +40,7 @@ export default function MobileBottomNav({ tabs = [], onSearch }) {
     }
   };
 
-  return (
+  const nav = (
     <nav
       className="sm:hidden fixed bottom-0 inset-x-0 z-40 border-t border-theme-300/30 dark:border-white/10 bg-theme-50/95 dark:bg-theme-900/95 backdrop-blur-md"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -64,11 +84,7 @@ export default function MobileBottomNav({ tabs = [], onSearch }) {
 
         <button
           type="button"
-          onClick={() => {
-            if (typeof window !== "undefined") {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
-          }}
+          onClick={scrollToTop}
           aria-label="Scroll to top"
           className="shrink-0 flex flex-col items-center justify-center rounded-md px-3 py-1.5 text-theme-700 dark:text-theme-200 hover:bg-theme-200/60 dark:hover:bg-white/10"
         >
@@ -77,4 +93,10 @@ export default function MobileBottomNav({ tabs = [], onSearch }) {
       </div>
     </nav>
   );
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(nav, document.body);
 }
