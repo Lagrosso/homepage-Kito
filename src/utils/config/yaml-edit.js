@@ -163,6 +163,50 @@ function applyAccessGroups(doc, map, rawGroups) {
   }
 }
 
+// Multi-URL context keys (M14): per-service reachable URLs by network.
+export const SERVICE_URL_KEYS = ["lan", "tailscale", "public"];
+
+// Set/clear the nested `urls` map on a service. Only the keys present in
+// `rawUrls` are touched; an empty string removes that key; when `urls` ends up
+// empty it is removed entirely. `undefined` leaves `urls` untouched.
+function applyUrls(doc, map, rawUrls) {
+  if (rawUrls === undefined) {
+    return;
+  }
+  const urls = rawUrls && typeof rawUrls === "object" ? rawUrls : {};
+  let urlsMap = map.get("urls", true);
+
+  SERVICE_URL_KEYS.forEach((key) => {
+    const raw = urls[key];
+    if (raw === undefined) {
+      return;
+    }
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (value === "" || value === null) {
+      if (isMap(urlsMap)) {
+        urlsMap.delete(key);
+      }
+      return;
+    }
+    if (!isMap(urlsMap)) {
+      urlsMap = doc.createNode({});
+      urlsMap.flow = false;
+      map.set("urls", urlsMap);
+      urlsMap = map.get("urls", true);
+    }
+    const existing = urlsMap.get(key, true);
+    if (isScalar(existing)) {
+      existing.value = value;
+    } else {
+      urlsMap.set(key, value);
+    }
+  });
+
+  if (isMap(urlsMap) && urlsMap.items.length === 0) {
+    map.delete("urls");
+  }
+}
+
 // Edit an existing service's fields and/or rename it. Only the keys present in
 // `values` are touched; an empty string removes that field; unknown/nested
 // fields (widget:, ping:, …) on the entry are left untouched. Returns new raw text.
@@ -179,6 +223,7 @@ export function updateServiceEntry(rawText, { group, name }, values) {
   applyRename(pair, name, values.name);
   EDITABLE_SERVICE_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
   applyAccessGroups(doc, propsMap, values.accessGroups);
+  applyUrls(doc, propsMap, values.urls);
 
   return doc.toString();
 }

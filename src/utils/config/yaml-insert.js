@@ -50,13 +50,29 @@ function appendAccessGroups(lines, groups, indent = "        ") {
   lines.push(`${indent}  groups: [${normalizedGroups.map(quoteScalar).join(", ")}]`);
 }
 
+// Multi-URL context keys (M14): per-service reachable URLs by network.
+const URL_CONTEXT_KEYS = ["lan", "tailscale", "public"];
+
+function appendUrls(lines, urls, indent = "        ") {
+  if (!urls || typeof urls !== "object") {
+    return;
+  }
+  const present = URL_CONTEXT_KEYS.filter((key) => typeof urls[key] === "string" && urls[key].trim());
+  if (present.length === 0) {
+    return;
+  }
+  lines.push(`${indent}urls:`);
+  present.forEach((key) => lines.push(`${indent}  ${key}: ${quoteScalar(urls[key].trim())}`));
+}
+
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups }) {
+export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
   }
+  appendUrls(lines, urls);
   if (description) {
     lines.push(`        description: ${quoteScalar(description)}`);
   }
@@ -150,11 +166,14 @@ export function insertEntry(rawText, group, entry) {
 }
 
 // Insert a service into a raw services.yaml string.
-export function insertService(rawText, { group, name, href, description, icon, server, container, accessGroups }) {
+export function insertService(
+  rawText,
+  { group, name, href, description, icon, server, container, accessGroups, urls },
+) {
   return insertEntry(
     rawText,
     group,
-    buildServiceEntry({ name, href, description, icon, server, container, accessGroups }),
+    buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls }),
   );
 }
 

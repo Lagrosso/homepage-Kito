@@ -246,4 +246,65 @@ describe("components/services/item", () => {
 
     expect(screen.queryByTestId("kubernetes-status")).not.toBeInTheDocument();
   });
+
+  it("resolves the LAN url when accessed from a private network (jsdom localhost)", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{
+          id: "svc1",
+          name: "My Service",
+          href: "https://public.example.com",
+          urls: { lan: "http://192.168.14.2:8080", public: "https://public.example.com" },
+          icon: "mdi:test",
+          widgets: [],
+        }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    const links = screen.getAllByRole("link");
+    expect(links.some((l) => l.getAttribute("href") === "http://192.168.14.2:8080")).toBe(true);
+    // LAN url is private → no public-link warning.
+    expect(screen.queryByText("Public link (goes over the internet)")).not.toBeInTheDocument();
+  });
+
+  it("shows a public-link warning when the resolved url is public", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{
+          id: "svc1",
+          name: "My Service",
+          href: "https://public.example.com",
+          icon: "mdi:test",
+          widgets: [],
+        }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.getByText("Public link (goes over the internet)")).toBeInTheDocument();
+  });
+
+  it("does not warn for a private-only service", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{
+          id: "svc1",
+          name: "My Service",
+          href: "http://192.168.14.2:8080",
+          icon: "mdi:test",
+          widgets: [],
+        }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.queryByText("Public link (goes over the internet)")).not.toBeInTheDocument();
+  });
 });

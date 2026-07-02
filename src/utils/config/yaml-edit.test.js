@@ -160,6 +160,63 @@ describe("updateServiceEntry", () => {
     );
     expect(yaml.load(withoutGroups)[0]["My First Group"][0]["My First Service"].access).toBeUndefined();
   });
+
+  it("adds nested network urls and keeps other fields + comments", () => {
+    const out = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "http://192.168.1.2:8080", public: "https://svc.example.com" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.urls).toEqual({ lan: "http://192.168.1.2:8080", public: "https://svc.example.com" });
+    // Untouched fields + inline comment preserved.
+    expect(out).toContain("href: http://localhost/ # inline note");
+    expect(out).toContain("ping: 8.8.8.8");
+  });
+
+  it("updates one url key without touching the others", () => {
+    const withUrls = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "http://old:1", tailscale: "http://ts:1" } },
+    );
+    const out = updateServiceEntry(
+      withUrls,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "http://new:2" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.urls).toEqual({ lan: "http://new:2", tailscale: "http://ts:1" });
+  });
+
+  it("removes a single url key with an empty string", () => {
+    const withUrls = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "http://a", public: "https://b" } },
+    );
+    const out = updateServiceEntry(
+      withUrls,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { public: "" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.urls).toEqual({ lan: "http://a" });
+  });
+
+  it("removes the whole urls map when the last key is cleared", () => {
+    const withUrls = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "http://a" } },
+    );
+    const out = updateServiceEntry(
+      withUrls,
+      { group: "My First Group", name: "My First Service" },
+      { urls: { lan: "" } },
+    );
+    expect(yaml.load(out)[0]["My First Group"][0]["My First Service"].urls).toBeUndefined();
+  });
 });
 
 describe("hasBarePlaceholder", () => {

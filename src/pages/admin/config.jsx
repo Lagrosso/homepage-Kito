@@ -81,6 +81,7 @@ function parseServices(content) {
             container: value?.container ?? value?.widget?.container,
             widget: maskWidget(value?.widget),
             accessGroups: Array.isArray(value?.access?.groups) ? value.access.groups : [],
+            urls: value?.urls && typeof value.urls === "object" ? value.urls : undefined,
           };
         });
       return { name, entries };
@@ -153,6 +154,19 @@ function ServiceCard({ entry, onEdit, onDelete }) {
             </span>
           </div>
         )}
+        {entry.urls && (
+          <div className="shrink-0 self-start m-1">
+            <span
+              className="inline-block rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:text-purple-300"
+              title={`Network URLs: ${Object.keys(entry.urls).join(", ")}`}
+            >
+              {["lan", "tailscale", "public"]
+                .filter((key) => entry.urls[key])
+                .map((key) => ({ lan: "LAN", tailscale: "TS", public: "WWW" })[key])
+                .join(" · ")}
+            </span>
+          </div>
+        )}
         {(onEdit || onDelete) && (
           <div className="shrink-0 self-start flex gap-1 m-1">
             {onEdit && (
@@ -193,10 +207,20 @@ const EMPTY_FORM = {
   server: "",
   container: "",
   accessGroups: "",
+  urlLan: "",
+  urlTailscale: "",
+  urlPublic: "",
   widgetEnabled: false,
   widgetType: SERVICE_WIDGET_TEMPLATES[0].type,
   widgetOptions: {},
 };
+
+// Maps form field keys (urlLan/…) to the YAML urls.* keys and back.
+const URL_FORM_FIELDS = [
+  ["urlLan", "lan", "LAN URL"],
+  ["urlTailscale", "tailscale", "Tailscale URL"],
+  ["urlPublic", "public", "Public URL"],
+];
 
 function uniqueFields(fields) {
   return [...new Set(fields.filter(Boolean))];
@@ -476,6 +500,9 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             server: initial?.server ?? "",
             container: initial?.container ?? "",
             accessGroups: Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "",
+            urlLan: initial?.urls?.lan ?? "",
+            urlTailscale: initial?.urls?.tailscale ?? "",
+            urlPublic: initial?.urls?.public ?? "",
             widgetEnabled: Boolean(initial?.widget?.type && initial?.widget?.supported),
             widgetType:
               initial?.widget?.type && initial?.widget?.supported
@@ -535,7 +562,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
       return;
     }
     if (!isEdit) {
-      onSubmit({
+      const addValues = {
         group: form.group.trim(),
         name: form.name.trim(),
         href: form.href.trim(),
@@ -544,7 +571,17 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         server: form.server.trim(),
         container: form.container.trim(),
         accessGroups: form.accessGroups.trim(),
+      };
+      const urls = {};
+      URL_FORM_FIELDS.forEach(([formKey, urlKey]) => {
+        if (form[formKey].trim()) {
+          urls[urlKey] = form[formKey].trim();
+        }
       });
+      if (Object.keys(urls).length > 0) {
+        addValues.urls = urls;
+      }
+      onSubmit(addValues);
       return;
     }
     // Edit mode: send the name plus only fields that actually changed, so
@@ -558,6 +595,18 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     });
     if (form.accessGroups.trim() !== (Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "")) {
       values.accessGroups = form.accessGroups.trim();
+    }
+    // Only send the url keys that actually changed (empty = remove that variant).
+    const urlChanges = {};
+    URL_FORM_FIELDS.forEach(([formKey, urlKey]) => {
+      const current = form[formKey].trim();
+      const original = String(initial?.urls?.[urlKey] ?? "");
+      if (current !== original) {
+        urlChanges[urlKey] = current;
+      }
+    });
+    if (Object.keys(urlChanges).length > 0) {
+      values.urls = urlChanges;
     }
     if (!form.widgetEnabled && initial?.widget?.type && initial?.widget?.supported) {
       values.__widget = { delete: true };
@@ -634,6 +683,25 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   className={inputClass}
                 />
               </Field>
+              <details className="block text-sm rounded-md border border-theme-200 dark:border-theme-700 px-3 py-2">
+                <summary className="cursor-pointer font-medium">Network URLs (optional)</summary>
+                <p className="mt-1 mb-2 text-xs text-theme-400">
+                  Per-network URLs. The dashboard auto-picks the one matching how it is accessed (LAN / Tailscale /
+                  public); the URL above is the fallback.
+                </p>
+                <div className="space-y-2">
+                  {URL_FORM_FIELDS.map(([formKey, , label]) => (
+                    <Field key={formKey} label={label}>
+                      <input
+                        value={form[formKey]}
+                        onChange={setField(formKey)}
+                        placeholder={formKey === "urlPublic" ? "https://service.example.com" : "http://192.168.1.2:8080"}
+                        className={inputClass}
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </details>
               <div className="block text-sm">
                 <label htmlFor={iconInputId} className="block font-medium mb-1">
                   Icon

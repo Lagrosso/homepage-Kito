@@ -1,7 +1,9 @@
 import classNames from "classnames";
 import ResolvedIcon from "components/resolvedicon";
 import { useContext, useState } from "react";
+import { MdPublic } from "react-icons/md";
 import { SettingsContext } from "utils/contexts/settings";
+import { isPublicUrl, resolveServiceUrl, useNetworkContext } from "utils/services/resolve-url";
 import Docker from "widgets/docker/component";
 import Kubernetes from "widgets/kubernetes/component";
 import ProxmoxVM from "widgets/proxmoxvm/component";
@@ -14,8 +16,11 @@ import Status from "./status";
 import Widget from "./widget";
 
 export default function Item({ service, groupName, useEqualHeights }) {
-  const hasLink = service.href && service.href !== "#";
   const { settings } = useContext(SettingsContext);
+  const networkContext = useNetworkContext();
+  const { url: resolvedHref } = resolveServiceUrl(service, networkContext);
+  const hasLink = resolvedHref && resolvedHref !== "#";
+  const showPublicWarning = hasLink && isPublicUrl(resolvedHref);
   const showStats = service.showStats === false ? false : settings.showStats;
   const statusStyle = service.statusStyle !== undefined ? service.statusStyle : settings.statusStyle;
   const [statsOpen, setStatsOpen] = useState(service.showStats);
@@ -45,7 +50,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
           {service.icon &&
             (hasLink ? (
               <a
-                href={service.href}
+                href={resolvedHref}
                 target={service.target ?? settings.target ?? "_blank"}
                 rel="noreferrer"
                 className="shrink-0 flex items-center justify-center w-12 service-icon z-10"
@@ -61,7 +66,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
 
           {hasLink ? (
             <a
-              href={service.href}
+              href={resolvedHref}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
               className="flex-1 flex items-center justify-between rounded-r-md service-title-text"
@@ -89,6 +94,16 @@ export default function Item({ service, groupName, useEqualHeights }) {
               statusStyle === "dot" ? "gap-0" : "gap-2 mt-2 mr-3"
             } z-10 service-tags`}
           >
+            {showPublicWarning && (
+              <div
+                className="shrink-0 flex items-center justify-center service-tag service-public-link"
+                title="Öffentlicher Link – geht über das Internet"
+              >
+                <MdPublic className="w-3.5 h-3.5 text-amber-500/80" />
+                <span className="sr-only">Public link (goes over the internet)</span>
+              </div>
+            )}
+
             {service.ping && (
               <div className="shrink-0 flex items-center justify-center service-tag service-ping">
                 <Ping groupName={groupName} serviceName={service.name} style={statusStyle} />
