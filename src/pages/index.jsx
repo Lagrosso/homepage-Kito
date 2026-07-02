@@ -2,6 +2,8 @@
 import classNames from "classnames";
 import BookmarksGroup from "components/bookmarks/group";
 import ErrorBoundary from "components/errorboundry";
+import MobileBottomNav from "components/mobile-bottom-nav";
+import QrButton from "components/qr-button";
 import QuickLaunch from "components/quicklaunch";
 import ServicesGroup from "components/services/group";
 import Tab, { slugifyAndEncode } from "components/tab";
@@ -581,6 +583,7 @@ function Home({ initialSettings }) {
             <span className="hidden sm:inline">Home</span>
           </Link>
           <div className="flex items-center gap-1">
+            <QrButton />
             <AdminNavLink />
             <LogoutButton />
           </div>
@@ -644,7 +647,10 @@ function Home({ initialSettings }) {
             {!settings.hideVersion && <Version disableUpdateCheck={settings.disableUpdateCheck} />}
           </div>
         </div>
+        {/* Spacer so the fixed mobile bottom nav doesn't cover the last content. */}
+        <div className="sm:hidden h-16" aria-hidden="true" />
       </div>
+      <MobileBottomNav tabs={tabs} onSearch={() => setSearching(true)} />
     </>
   );
 }

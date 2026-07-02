@@ -40,6 +40,7 @@
     "next-i18next": "^15.4.3",
     "ping": "^0.4.4",
     "pretty-bytes": "^7.1.0",
+    "qrcode.react": "^4.2.0",
     "raw-body": "^3.0.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

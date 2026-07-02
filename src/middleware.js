@@ -5,6 +5,8 @@ import { getSessionFromRequest, isAuthenticatedSession } from "utils/config/sess
 const PUBLIC_PATHS = new Set([
   "/login",
   "/setup",
+  "/offline",
+  "/sw.js",
   "/favicon.ico",
   "/homepage.ico",
   "/apple-touch-icon.png",

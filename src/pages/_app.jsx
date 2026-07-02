@@ -1,5 +1,6 @@
 /* eslint-disable react/jsx-props-no-spreading */
 import "@fontsource-variable/jetbrains-mono";
+import ServiceWorkerRegister from "components/service-worker-register";
 import { appWithTranslation } from "next-i18next";
 import Head from "next/head";
 import "styles/globals.css";
@@ -99,7 +100,7 @@ function MyApp({ Component, pageProps }) {
         {/* https://nextjs.org/docs/messages/no-document-viewport-meta */}
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+          content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
         />
       </Head>
       <ColorProvider>
@@ -107,6 +108,7 @@ function MyApp({ Component, pageProps }) {
           <SettingsProvider>
             <TabProvider>
               <CardRadiusVar />
+              <ServiceWorkerRegister />
               <Component {...pageProps} />
             </TabProvider>
           </SettingsProvider>
