@@ -69,7 +69,7 @@ describe("pages/api/ping", () => {
     expect(ping.probe).not.toHaveBeenCalled();
   });
 
-  it("pings the hostname extracted from a URL", async () => {
+  it("pings the hostname extracted from a URL with the ping library default (no explicit timeout)", async () => {
     getServiceItem.mockResolvedValueOnce({ ping: "http://example.com:1234/path" });
     ping.probe.mockResolvedValueOnce({ alive: true });
 
@@ -78,9 +78,29 @@ describe("pages/api/ping", () => {
 
     await handler(req, res);
 
-    expect(ping.probe).toHaveBeenCalledWith("example.com");
+    // No env override → no config passed, so the ping library keeps its fast ~2s default.
+    expect(ping.probe).toHaveBeenCalledWith("example.com", undefined);
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ alive: true });
+  });
+
+  it("passes the configured timeout (in seconds) to ping when HOMEPAGE_MONITOR_TIMEOUT is set", async () => {
+    const prev = process.env.HOMEPAGE_MONITOR_TIMEOUT;
+    process.env.HOMEPAGE_MONITOR_TIMEOUT = "3000";
+    try {
+      getServiceItem.mockResolvedValueOnce({ ping: "example.com" });
+      ping.probe.mockResolvedValueOnce({ alive: true });
+
+      const req = { query: { groupName: "g", serviceName: "s" } };
+      const res = createMockRes();
+
+      await handler(req, res);
+
+      expect(ping.probe).toHaveBeenCalledWith("example.com", { timeout: 3 });
+    } finally {
+      if (prev === undefined) delete process.env.HOMEPAGE_MONITOR_TIMEOUT;
+      else process.env.HOMEPAGE_MONITOR_TIMEOUT = prev;
+    }
   });
 
   it("returns 400 when ping throws", async () => {

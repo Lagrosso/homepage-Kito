@@ -74,7 +74,7 @@ describe("pages/api/siteMonitor", () => {
     expect(httpProxy).not.toHaveBeenCalled();
   });
 
-  it("uses HEAD and returns status + latency when the response is OK", async () => {
+  it("uses HEAD with a bounded timeout and returns status + latency when the response is OK", async () => {
     getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://example.com" });
     perf.now.mockReturnValueOnce(1).mockReturnValueOnce(11);
     httpProxy.mockResolvedValueOnce([200]);
@@ -84,13 +84,13 @@ describe("pages/api/siteMonitor", () => {
 
     await handler(req, res);
 
-    expect(httpProxy).toHaveBeenCalledWith("http://example.com", { method: "HEAD" });
+    expect(httpProxy).toHaveBeenCalledWith("http://example.com", { method: "HEAD", timeout: 5000 });
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe(200);
     expect(res.body.latency).toBe(10);
   });
 
-  it("falls back to GET when HEAD is rejected", async () => {
+  it("falls back to GET (also bounded) when HEAD is rejected", async () => {
     getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://example.com" });
     perf.now.mockReturnValueOnce(1).mockReturnValueOnce(2).mockReturnValueOnce(5).mockReturnValueOnce(15);
     httpProxy.mockResolvedValueOnce([500]).mockResolvedValueOnce([200]);
@@ -100,10 +100,30 @@ describe("pages/api/siteMonitor", () => {
 
     await handler(req, res);
 
-    expect(httpProxy).toHaveBeenNthCalledWith(1, "http://example.com", { method: "HEAD" });
-    expect(httpProxy).toHaveBeenNthCalledWith(2, "http://example.com");
+    expect(httpProxy).toHaveBeenNthCalledWith(1, "http://example.com", { method: "HEAD", timeout: 5000 });
+    expect(httpProxy).toHaveBeenNthCalledWith(2, "http://example.com", { timeout: 5000 });
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ status: 200, latency: 10 });
+  });
+
+  it("honours HOMEPAGE_MONITOR_TIMEOUT for the probe timeout", async () => {
+    const prev = process.env.HOMEPAGE_MONITOR_TIMEOUT;
+    process.env.HOMEPAGE_MONITOR_TIMEOUT = "3000";
+    try {
+      getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://example.com" });
+      perf.now.mockReturnValueOnce(1).mockReturnValueOnce(11);
+      httpProxy.mockResolvedValueOnce([200]);
+
+      const req = { query: { groupName: "g", serviceName: "s" } };
+      const res = createMockRes();
+
+      await handler(req, res);
+
+      expect(httpProxy).toHaveBeenCalledWith("http://example.com", { method: "HEAD", timeout: 3000 });
+    } finally {
+      if (prev === undefined) delete process.env.HOMEPAGE_MONITOR_TIMEOUT;
+      else process.env.HOMEPAGE_MONITOR_TIMEOUT = prev;
+    }
   });
 
   it("returns 400 when httpProxy throws", async () => {

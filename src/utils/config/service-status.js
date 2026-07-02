@@ -7,6 +7,7 @@ import { promise as ping } from "ping";
 import { servicesResponse } from "utils/config/api-response";
 import getDockerArguments from "utils/config/docker";
 import { getKubeConfig } from "utils/config/kubernetes";
+import { getMonitorTimeoutMs } from "utils/config/monitor-timeout";
 import { getProxmoxConfig } from "utils/config/proxmox";
 import createLogger from "utils/logger";
 import { httpProxy } from "utils/proxy/http";
@@ -14,13 +15,6 @@ import { httpProxy } from "utils/proxy/http";
 const logger = createLogger("service-status");
 
 export const SLOW_THRESHOLD_MS = 1000;
-
-// httpProxy has no default socket timeout, so an unreachable/silently-dropping host would
-// otherwise hang this check for the OS-level TCP connect timeout (often 30-130+ seconds),
-// blocking /api/services/status (and, transitively, the browser's per-origin connection
-// pool for other in-flight requests) for that long. Bound it so one unreachable service
-// can't stall the whole status check.
-const SITE_MONITOR_TIMEOUT_MS = 5000;
 
 const PRIORITY_BY_SIGNAL = {
   siteMonitor: 0,
@@ -208,14 +202,19 @@ export async function fetchPingSignal(service) {
 export async function fetchSiteMonitorSignal(service) {
   if (!service?.siteMonitor) return null;
 
+  // Bound each probe so one unreachable service can't stall the whole status
+  // report (and saturate the browser connection pool). Shared, env-configurable
+  // timeout via HOMEPAGE_MONITOR_TIMEOUT.
+  const timeout = getMonitorTimeoutMs();
+
   try {
     let startTime = performance.now();
-    let [status] = await httpProxy(service.siteMonitor, { method: "HEAD", timeout: SITE_MONITOR_TIMEOUT_MS });
+    let [status] = await httpProxy(service.siteMonitor, { method: "HEAD", timeout });
     let endTime = performance.now();
 
     if (status > 403) {
       startTime = performance.now();
-      [status] = await httpProxy(service.siteMonitor, { timeout: SITE_MONITOR_TIMEOUT_MS });
+      [status] = await httpProxy(service.siteMonitor, { timeout });
       endTime = performance.now();
     }
 

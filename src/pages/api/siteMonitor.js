@@ -1,6 +1,7 @@
 import { performance } from "perf_hooks";
 
 import { isVisibleForUser } from "utils/config/access";
+import { getMonitorTimeoutMs } from "utils/config/monitor-timeout";
 import { getServiceItem } from "utils/config/service-helpers";
 import { getSession } from "utils/config/session";
 import { findUser } from "utils/config/users";
@@ -33,17 +34,23 @@ export default async function handler(req, res) {
     });
   }
 
+  // A reachability probe only needs a fast up/down answer; bound it so an
+  // unreachable host can't hang the request (and saturate the browser's
+  // per-origin connection pool). Configurable via HOMEPAGE_MONITOR_TIMEOUT.
+  const timeout = getMonitorTimeoutMs();
+
   try {
     let startTime = performance.now();
     let [status] = await httpProxy(monitorURL, {
       method: "HEAD",
+      timeout,
     });
     let endTime = performance.now();
 
     if (status > 403) {
       // try one more time as a GET in case HEAD is rejected for whatever reason
       startTime = performance.now();
-      [status] = await httpProxy(monitorURL);
+      [status] = await httpProxy(monitorURL, { timeout });
       endTime = performance.now();
     }
 
