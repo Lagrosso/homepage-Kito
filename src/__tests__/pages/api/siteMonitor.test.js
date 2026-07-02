@@ -126,6 +126,23 @@ describe("pages/api/siteMonitor", () => {
     }
   });
 
+  it("does NOT retry with GET when HEAD fails with a network error/timeout (synthetic 500)", async () => {
+    getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://unreachable.local" });
+    perf.now.mockReturnValueOnce(0).mockReturnValueOnce(5000);
+    // httpProxy's shape for a network error/timeout: [500, "application/json", { error }]
+    httpProxy.mockResolvedValueOnce([500, "application/json", { error: { message: "timed out" } }]);
+
+    const req = { query: { groupName: "g", serviceName: "s" } };
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    // Only ONE call — no doubling of the timeout on an unreachable host.
+    expect(httpProxy).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe(500);
+  });
+
   it("returns 400 when httpProxy throws", async () => {
     getServiceItem.mockResolvedValueOnce({ siteMonitor: "http://example.com" });
     httpProxy.mockRejectedValueOnce(new Error("nope"));

@@ -137,6 +137,17 @@ describe("utils/config/service-status", () => {
     expect(httpProxy.mock.calls[0][1].timeout).toBeGreaterThan(0);
   });
 
+  it("does not double the timeout: an unreachable siteMonitor makes a single httpProxy call", async () => {
+    // httpProxy's network-error/timeout shape: [500, "application/json", { error }]
+    state.httpResponses = [[500, "application/json", { error: { message: "timed out" } }]];
+
+    const mod = await import("./service-status");
+    const signal = await mod.fetchSiteMonitorSignal({ name: "ZimaFiles", siteMonitor: "http://192.168.1.2/" });
+
+    expect(httpProxy).toHaveBeenCalledTimes(1);
+    expect(signal).toMatchObject({ signalType: "siteMonitor", state: "down", httpStatus: 500 });
+  });
+
   it("maps docker, kubernetes and proxmox states into unified severities", async () => {
     state.services = [
       {

@@ -209,10 +209,14 @@ export async function fetchSiteMonitorSignal(service) {
 
   try {
     let startTime = performance.now();
-    let [status] = await httpProxy(service.siteMonitor, { method: "HEAD", timeout });
+    let [status, , data] = await httpProxy(service.siteMonitor, { method: "HEAD", timeout });
     let endTime = performance.now();
 
-    if (status > 403) {
+    // A synthetic 500 with an { error } body means a network error/timeout, i.e. the
+    // host is unreachable — skip the GET retry so an unreachable service costs one
+    // timeout, not two (which would double the wait and pool-hold time).
+    const headNetworkError = status === 500 && data?.error;
+    if (status > 403 && !headNetworkError) {
       startTime = performance.now();
       [status] = await httpProxy(service.siteMonitor, { timeout });
       endTime = performance.now();

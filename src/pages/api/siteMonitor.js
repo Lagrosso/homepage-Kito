@@ -41,13 +41,18 @@ export default async function handler(req, res) {
 
   try {
     let startTime = performance.now();
-    let [status] = await httpProxy(monitorURL, {
+    let [status, , data] = await httpProxy(monitorURL, {
       method: "HEAD",
       timeout,
     });
     let endTime = performance.now();
 
-    if (status > 403) {
+    // httpProxy returns a synthetic 500 with an { error } body on a network
+    // error/timeout. In that case the host is unreachable, so a GET retry would
+    // just double the wait — only retry when HEAD got a real response that
+    // rejected the method (e.g. 405).
+    const headNetworkError = status === 500 && data?.error;
+    if (status > 403 && !headNetworkError) {
       // try one more time as a GET in case HEAD is rejected for whatever reason
       startTime = performance.now();
       [status] = await httpProxy(monitorURL, { timeout });
