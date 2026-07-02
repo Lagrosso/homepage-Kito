@@ -28,6 +28,7 @@ import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
 import { buildGroupTargets } from "utils/quicklaunch/commands";
+import { useServiceStatusReport } from "utils/services/use-service-status";
 import themes from "utils/styles/themes";
 
 const ThemeToggle = dynamic(() => import("components/toggles/theme"), {
@@ -258,7 +259,7 @@ function Home({ initialSettings }) {
   const { data: services } = useSWR("/api/services");
   const { data: bookmarks } = useSWR("/api/bookmarks");
   const { data: widgets } = useSWR("/api/widgets");
-  const { data: serviceStatusReport } = useSWR("/api/services/status");
+  const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(

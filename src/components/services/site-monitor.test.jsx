@@ -3,21 +3,33 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { useSWR } = vi.hoisted(() => ({ useSWR: vi.fn() }));
+const { useServiceStatusReport } = vi.hoisted(() => ({ useServiceStatusReport: vi.fn() }));
 
-vi.mock("swr", () => ({
-  default: useSWR,
+// Mock only the shared SWR hook; keep the real (pure) lookup helpers.
+vi.mock("utils/services/use-service-status", async (importActual) => ({
+  ...(await importActual()),
+  useServiceStatusReport,
 }));
 
 import SiteMonitor from "./site-monitor";
 
+// Build an aggregated report shaped like /api/services/status for one service.
+function reportWith(signal) {
+  return { services: [{ group: "g", name: "s", signals: signal ? [signal] : [] }] };
+}
+
+function siteMonitorSignal({ state = "up", httpStatus, latencyMs } = {}) {
+  return { signalType: "siteMonitor", state, httpStatus, latencyMs };
+}
+
 describe("components/services/site-monitor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useServiceStatusReport.mockReturnValue({ data: undefined, error: undefined });
   });
 
-  it("renders a loading state when data is not available yet", () => {
-    useSWR.mockReturnValue({ data: undefined, error: undefined });
+  it("renders a loading state when the report is not available yet", () => {
+    useServiceStatusReport.mockReturnValue({ data: undefined, error: undefined });
 
     render(<SiteMonitor groupName="g" serviceName="s" />);
 
@@ -29,16 +41,21 @@ describe("components/services/site-monitor", () => {
   });
 
   it("renders response time when status is up", () => {
-    useSWR.mockReturnValue({ data: { status: 200, latency: 10 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "up", httpStatus: 200, latencyMs: 10 })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" />);
 
-    expect(useSWR).toHaveBeenCalledWith("/api/siteMonitor?groupName=g&serviceName=s", { refreshInterval: 30000 });
     expect(screen.getByText("10")).toBeInTheDocument();
   });
 
   it("renders up label for basic style when status is ok", () => {
-    useSWR.mockReturnValue({ data: { status: 200, latency: 1 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "up", httpStatus: 200, latencyMs: 1 })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" style="basic" />);
 
@@ -46,7 +63,10 @@ describe("components/services/site-monitor", () => {
   });
 
   it("renders a slow warning label for high latency in basic style", () => {
-    useSWR.mockReturnValue({ data: { status: 200, latency: 1500 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "up", httpStatus: 200, latencyMs: 1500 })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" style="basic" />);
 
@@ -58,7 +78,10 @@ describe("components/services/site-monitor", () => {
   });
 
   it("renders down label for failing status in basic style", () => {
-    useSWR.mockReturnValue({ data: { status: 500, latency: 0 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "down", httpStatus: 500, latencyMs: 0 })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" style="basic" />);
 
@@ -66,31 +89,51 @@ describe("components/services/site-monitor", () => {
   });
 
   it("renders the http status code for failing status in non-basic style", () => {
-    useSWR.mockReturnValue({ data: { status: 500, latency: 0 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "down", httpStatus: 500, latencyMs: 0 })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" />);
 
     expect(screen.getByText("500")).toBeInTheDocument();
   });
 
-  it("renders an error label when SWR returns error", () => {
-    useSWR.mockReturnValue({ data: undefined, error: new Error("boom") });
+  it("renders an error label when the report request errors", () => {
+    useServiceStatusReport.mockReturnValue({ data: undefined, error: new Error("boom") });
 
     render(<SiteMonitor groupName="g" serviceName="s" />);
 
     expect(screen.getByText("siteMonitor.error")).toBeInTheDocument();
   });
 
-  it("treats an embedded data.error as an error state", () => {
-    useSWR.mockReturnValue({ data: { error: "bad" }, error: undefined });
+  it("treats an error-state signal as an error", () => {
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "error" })),
+      error: undefined,
+    });
 
     render(<SiteMonitor groupName="g" serviceName="s" />);
 
     expect(screen.getByText("siteMonitor.error")).toBeInTheDocument();
+  });
+
+  it("shows not-available when the report has no matching siteMonitor signal", () => {
+    useServiceStatusReport.mockReturnValue({
+      data: { services: [{ group: "other", name: "x", signals: [] }] },
+      error: undefined,
+    });
+
+    render(<SiteMonitor groupName="g" serviceName="s" />);
+
+    expect(screen.getByText("siteMonitor.response")).toBeInTheDocument();
   });
 
   it("renders a dot when style is dot", () => {
-    useSWR.mockReturnValue({ data: { status: 500, latency: 0 }, error: undefined });
+    useServiceStatusReport.mockReturnValue({
+      data: reportWith(siteMonitorSignal({ state: "down", httpStatus: 500, latencyMs: 0 })),
+      error: undefined,
+    });
 
     const { container } = render(<SiteMonitor groupName="g" serviceName="s" style="dot" />);
 

@@ -1,20 +1,33 @@
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+
+import { findServiceStatus, findSignal, useServiceStatusReport } from "utils/services/use-service-status";
 
 const SLOW_THRESHOLD_MS = 1000;
 
+// Map an aggregated ping signal back to the shape this component's render logic
+// already expects ({ alive, time } or { error }), so only the data source
+// changes — the display branches below stay identical.
+function signalToData(signal) {
+  if (!signal) {
+    return undefined;
+  }
+  if (signal.state === "error") {
+    return { error: "error" };
+  }
+  return { alive: signal.state === "up", time: signal.latencyMs };
+}
+
 export default function Ping({ groupName, serviceName, style }) {
   const { t } = useTranslation();
-  const { data, error } = useSWR(`/api/ping?${new URLSearchParams({ groupName, serviceName }).toString()}`, {
-    refreshInterval: 30000,
-  });
+  const { data: report, error } = useServiceStatusReport();
+  const data = signalToData(findSignal(findServiceStatus(report, groupName, serviceName), "ping"));
 
   let colorClass = "text-black/20 dark:text-white/40 opacity-20";
   let backgroundClass = "bg-theme-500/10 dark:bg-theme-900/50 px-1.5 py-0.5";
   let statusTitle = t("ping.ping");
   let statusText = "";
 
-  if (error) {
+  if (error || data?.error) {
     colorClass = "text-rose-500";
     statusText = t("ping.error");
     statusTitle += ` ${t("ping.error")}`;

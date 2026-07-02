@@ -1,13 +1,26 @@
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+
+import { findServiceStatus, findSignal, useServiceStatusReport } from "utils/services/use-service-status";
 
 const SLOW_THRESHOLD_MS = 1000;
 
+// Map an aggregated siteMonitor signal back to the shape this component's render
+// logic already expects ({ status, latency } or { error }), so only the data
+// source changes — the display branches below stay identical.
+function signalToData(signal) {
+  if (!signal) {
+    return undefined;
+  }
+  if (signal.state === "error") {
+    return { error: "error" };
+  }
+  return { status: signal.httpStatus, latency: signal.latencyMs };
+}
+
 export default function SiteMonitor({ groupName, serviceName, style }) {
   const { t } = useTranslation();
-  const { data, error } = useSWR(`/api/siteMonitor?${new URLSearchParams({ groupName, serviceName }).toString()}`, {
-    refreshInterval: 30000,
-  });
+  const { data: report, error } = useServiceStatusReport();
+  const data = signalToData(findSignal(findServiceStatus(report, groupName, serviceName), "siteMonitor"));
 
   let colorClass = "text-black/20 dark:text-white/40 opacity-20";
   let backgroundClass = "bg-theme-500/10 dark:bg-theme-900/50 px-1.5 py-0.5";
