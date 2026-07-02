@@ -66,6 +66,16 @@ function handleRequest(requestor, url, params) {
       reject([500, error]);
     });
 
+    // Node/follow-redirects only *arm* a socket timeout from `params.timeout`; it does not
+    // abort the request itself. Callers that need a bounded request (e.g. status/health
+    // checks against hosts that may silently drop packets) opt in via `params.timeout` and
+    // we destroy the request on expiry, which routes into the `error` handler above.
+    if (params?.timeout) {
+      request.on("timeout", () => {
+        request.destroy(new Error(`Request to ${url} timed out after ${params.timeout}ms`));
+      });
+    }
+
     if (params?.body) {
       request.write(params.body);
     }
@@ -249,19 +259,30 @@ function getAgent(protocol, disableIpv6) {
   return agent;
 }
 
+// Widgets/checks can opt into a shorter timeout (e.g. status checks) or opt out
+// entirely with `timeout: 0`; everything else gets this safety net so one
+// unreachable/silently-dropping host can't hang a request (and, transitively,
+// the browser's per-origin connection pool) for the OS-level TCP timeout,
+// which is often 30-130+ seconds.
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
 export async function httpProxy(url, params = {}) {
   const constructedUrl = new URL(url);
   const disableIpv6 = process.env.HOMEPAGE_PROXY_DISABLE_IPV6 === "true";
+  const requestParams = {
+    ...params,
+    timeout: params.timeout === undefined ? DEFAULT_REQUEST_TIMEOUT_MS : params.timeout,
+  };
   let request = null;
   if (constructedUrl.protocol === "https:") {
     request = httpsRequest(constructedUrl, {
       agent: getAgent(constructedUrl.protocol, disableIpv6),
-      ...params,
+      ...requestParams,
     });
   } else {
     request = httpRequest(constructedUrl, {
       agent: getAgent(constructedUrl.protocol, disableIpv6),
-      ...params,
+      ...requestParams,
     });
   }
 

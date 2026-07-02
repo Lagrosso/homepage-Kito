@@ -124,6 +124,19 @@ describe("utils/config/service-status", () => {
     });
   });
 
+  it("bounds siteMonitor checks with a timeout so an unreachable host can't hang the status report", async () => {
+    state.httpResponses = [[200]];
+
+    const mod = await import("./service-status");
+    await mod.fetchSiteMonitorSignal({ name: "Grafana", siteMonitor: "http://grafana.local" });
+
+    expect(httpProxy).toHaveBeenCalledWith("http://grafana.local", {
+      method: "HEAD",
+      timeout: expect.any(Number),
+    });
+    expect(httpProxy.mock.calls[0][1].timeout).toBeGreaterThan(0);
+  });
+
   it("maps docker, kubernetes and proxmox states into unified severities", async () => {
     state.services = [
       {

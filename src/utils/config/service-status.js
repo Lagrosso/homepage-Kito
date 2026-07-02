@@ -15,6 +15,13 @@ const logger = createLogger("service-status");
 
 export const SLOW_THRESHOLD_MS = 1000;
 
+// httpProxy has no default socket timeout, so an unreachable/silently-dropping host would
+// otherwise hang this check for the OS-level TCP connect timeout (often 30-130+ seconds),
+// blocking /api/services/status (and, transitively, the browser's per-origin connection
+// pool for other in-flight requests) for that long. Bound it so one unreachable service
+// can't stall the whole status check.
+const SITE_MONITOR_TIMEOUT_MS = 5000;
+
 const PRIORITY_BY_SIGNAL = {
   siteMonitor: 0,
   ping: 1,
@@ -203,12 +210,12 @@ export async function fetchSiteMonitorSignal(service) {
 
   try {
     let startTime = performance.now();
-    let [status] = await httpProxy(service.siteMonitor, { method: "HEAD" });
+    let [status] = await httpProxy(service.siteMonitor, { method: "HEAD", timeout: SITE_MONITOR_TIMEOUT_MS });
     let endTime = performance.now();
 
     if (status > 403) {
       startTime = performance.now();
-      [status] = await httpProxy(service.siteMonitor);
+      [status] = await httpProxy(service.siteMonitor, { timeout: SITE_MONITOR_TIMEOUT_MS });
       endTime = performance.now();
     }
 

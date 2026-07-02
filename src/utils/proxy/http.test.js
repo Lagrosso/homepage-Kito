@@ -12,6 +12,7 @@ const { state, cache, logger, dns, net, cookieJar } = vi.hoisted(() => ({
     lastAgentOptions: null,
     lastRequestParams: null,
     lastWrittenBody: null,
+    simulateTimeout: false,
   },
   cache: {
     get: vi.fn(),
@@ -59,9 +60,19 @@ vi.mock("follow-redirects", async () => {
       req.write = vi.fn((chunk) => {
         state.lastWrittenBody = chunk;
       });
+      // Mirrors real Node request.destroy([error]): emits "error" when given one.
+      req.destroy = vi.fn((err) => {
+        if (err) {
+          req.emit("error", err);
+        }
+      });
       req.end = vi.fn(() => {
         state.lastAgent = params?.agent ?? null;
         state.lastAgentOptions = params?.agent?.opts ?? null;
+        if (state.simulateTimeout) {
+          req.emit("timeout");
+          return;
+        }
         if (state.error) {
           req.emit("error", state.error);
           return;
@@ -314,6 +325,7 @@ describe("utils/proxy/http httpProxy", () => {
     state.lastAgentOptions = null;
     state.lastRequestParams = null;
     state.lastWrittenBody = null;
+    state.simulateTimeout = false;
     process.env.HOMEPAGE_PROXY_DISABLE_IPV6 = "";
     vi.resetModules();
   });
@@ -437,5 +449,39 @@ describe("utils/proxy/http httpProxy", () => {
     expect(contentType).toBe("application/json");
     expect(data.error.message).toBe("boom");
     expect(data.error.url).toContain("apikey=***");
+  });
+
+  it("applies a default request timeout when the caller does not specify one", async () => {
+    const httpMod = await import("./http");
+
+    await httpMod.httpProxy("http://example.com");
+
+    expect(state.lastRequestParams.timeout).toBe(15000);
+  });
+
+  it("lets the caller override the default timeout", async () => {
+    const httpMod = await import("./http");
+
+    await httpMod.httpProxy("http://example.com", { timeout: 5000 });
+
+    expect(state.lastRequestParams.timeout).toBe(5000);
+  });
+
+  it("lets the caller opt out of the request timeout with timeout: 0", async () => {
+    const httpMod = await import("./http");
+
+    await httpMod.httpProxy("http://example.com", { timeout: 0 });
+
+    expect(state.lastRequestParams.timeout).toBe(0);
+  });
+
+  it("destroys the request and returns a 500 when the request timeout expires", async () => {
+    state.simulateTimeout = true;
+    const httpMod = await import("./http");
+
+    const [status, , data] = await httpMod.httpProxy("http://example.com", { timeout: 5000 });
+
+    expect(status).toBe(500);
+    expect(data.error.message).toContain("timed out after 5000ms");
   });
 });
