@@ -63,6 +63,28 @@ export function parseGlobalLayout(content) {
   return { maxGroupColumns: data.maxGroupColumns, fiveColumns: data.fiveColumns };
 }
 
+// Read the top-level `tabs:` block (per-tab access.groups, independent of
+// `layout[group].tab`). Returns { [tabName]: string[] }; a tab with no entry or
+// an empty/malformed access.groups maps to []. [] / {} / parse errors are safe.
+export function parseTabAccess(content) {
+  let data;
+  try {
+    data = yaml.load(content);
+  } catch {
+    return {};
+  }
+  const tabs = data?.tabs;
+  if (!tabs || typeof tabs !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(tabs).map(([tab, opts]) => [
+      tab,
+      Array.isArray(opts?.access?.groups) ? opts.access.groups.map(String) : [],
+    ]),
+  );
+}
+
 // Extract the top-level group names from a raw services.yaml / bookmarks.yaml
 // string (list of single-key maps). Returns [] on parse errors.
 export function groupNamesFromRaw(content) {

@@ -345,6 +345,12 @@ function checkSettings(data, map, file, checks, context) {
     }
   });
 
+  if (isObject(data.tabs)) {
+    Object.entries(data.tabs).forEach(([tabName, options]) => {
+      warnUnknownGroups(file, checks, `tabs.${tabName}`, collectAccessGroups(options), context.knownUserGroups);
+    });
+  }
+
   if (data.maxGroupColumns !== undefined && (!Number.isInteger(data.maxGroupColumns) || data.maxGroupColumns < 4 || data.maxGroupColumns > 8)) {
     addCheck(checks, file, "warning", "invalid-max-group-columns", "maxGroupColumns", "maxGroupColumns should be an integer from 4 to 8.", "Choose a value between 4 and 8 in /admin/layout.");
   }

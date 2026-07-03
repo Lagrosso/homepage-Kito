@@ -1,7 +1,7 @@
 import ConfigEditor, { inputClass } from "components/admin/config-editor";
 import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdClose, MdDelete, MdEdit, MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
-import { groupNamesFromRaw, parseGlobalLayout, parseLayout } from "utils/config/layout-preview";
+import { groupNamesFromRaw, parseGlobalLayout, parseLayout, parseTabAccess } from "utils/config/layout-preview";
 import {
   assignGroupToTab,
   deleteSetting,
@@ -10,6 +10,7 @@ import {
   moveLayoutTab,
   renameTab,
   setGroupLayoutField,
+  setTabAccessGroups,
   updateSetting,
 } from "utils/config/yaml-edit";
 
@@ -47,6 +48,8 @@ function LayoutManager({ content, setContent, setStatus }) {
   const tabByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e.tab])), [layout]);
   const optsByGroup = useMemo(() => new Map(layout.map((e) => [e.group, e])), [layout]);
   const tabs = useMemo(() => [...new Set(layout.map((e) => e.tab).filter(Boolean))], [layout]);
+  const tabAccess = useMemo(() => parseTabAccess(content), [content]);
+  const [accessDrafts, setAccessDrafts] = useState({}); // { [tab]: string } — only for tabs mid-edit
   // The dashboard renders groups in `layout:` order, so list layout groups first
   // (in that order), followed by any remaining groups not yet in the layout.
   const layoutOrder = useMemo(() => layout.map((e) => e.group), [layout]);
@@ -118,6 +121,34 @@ function LayoutManager({ content, setContent, setStatus }) {
     } catch (e) {
       fail(e);
     }
+  };
+
+  // Access-groups draft for a tab: uncommitted typing, or the parsed value.
+  const accessGroupsValue = (tab) =>
+    accessDrafts[tab] !== undefined ? accessDrafts[tab] : (tabAccess[tab] ?? []).join(", ");
+
+  const onAccessGroupsChange = (tab, value) => {
+    setAccessDrafts((prev) => ({ ...prev, [tab]: value }));
+  };
+
+  // Commit on blur (not on every keystroke) so typing doesn't rewrite the YAML
+  // document on every character. No-op if nothing was actually edited.
+  const commitAccessGroups = (tab) => {
+    const value = accessDrafts[tab];
+    if (value === undefined) return;
+    try {
+      apply(
+        setTabAccessGroups(content, { tab }, value),
+        `Access groups für Tab "${tab}" aktualisiert (im Editor) — review and Save.`,
+      );
+    } catch (e) {
+      fail(e);
+    }
+    setAccessDrafts((prev) => {
+      const next = { ...prev };
+      delete next[tab];
+      return next;
+    });
   };
 
   // Per-group layout option (style/columns/header/…). "" clears the field.
@@ -220,86 +251,104 @@ function LayoutManager({ content, setContent, setStatus }) {
         ) : (
           <ul className="flex flex-col gap-1">
             {tabs.map((tab, index) => (
-              <li
-                key={tab}
-                className="flex items-center justify-between gap-2 rounded-md bg-theme-100/40 dark:bg-white/5 px-2 py-1"
-              >
-                {renaming === tab ? (
-                  <form onSubmit={submitRename} className="flex items-center gap-1 w-full">
-                    <input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      // eslint-disable-next-line jsx-a11y/no-autofocus
-                      autoFocus
-                      className={`${inputClass} flex-1`}
-                    />
-                    <button type="submit" title="Speichern" aria-label="Save rename" className={iconBtn}>
-                      <MdCheck className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRenaming(null)}
-                      title="Abbrechen"
-                      aria-label="Cancel rename"
-                      className={iconBtn}
-                    >
-                      <MdClose className="w-4 h-4" />
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    <span className="shrink-0 flex flex-col -my-1">
-                      <button
-                        type="button"
-                        onClick={() => onMoveTab(tab, "up")}
-                        disabled={index <= 0}
-                        title="Tab nach oben"
-                        aria-label={`Move tab ${tab} up`}
-                        className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
-                      >
-                        <MdKeyboardArrowUp className="w-4 h-4" />
+              <li key={tab} className="flex flex-col gap-1 rounded-md bg-theme-100/40 dark:bg-white/5 px-2 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  {renaming === tab ? (
+                    <form onSubmit={submitRename} className="flex items-center gap-1 w-full">
+                      <input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        autoFocus
+                        className={`${inputClass} flex-1`}
+                      />
+                      <button type="submit" title="Speichern" aria-label="Save rename" className={iconBtn}>
+                        <MdCheck className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => onMoveTab(tab, "down")}
-                        disabled={index >= tabs.length - 1}
-                        title="Tab nach unten"
-                        aria-label={`Move tab ${tab} down`}
-                        className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        onClick={() => setRenaming(null)}
+                        title="Abbrechen"
+                        aria-label="Cancel rename"
+                        className={iconBtn}
                       >
-                        <MdKeyboardArrowDown className="w-4 h-4" />
+                        <MdClose className="w-4 h-4" />
                       </button>
-                    </span>
-                    <span className="min-w-0 truncate">
-                      <span className="font-medium">{tab}</span>
-                      <span className="ml-2 text-theme-500 text-xs">
-                        {layout
-                          .filter((e) => e.tab === tab)
-                          .map((e) => e.group)
-                          .join(", ") || "—"}
+                    </form>
+                  ) : (
+                    <>
+                      <span className="shrink-0 flex flex-col -my-1">
+                        <button
+                          type="button"
+                          onClick={() => onMoveTab(tab, "up")}
+                          disabled={index <= 0}
+                          title="Tab nach oben"
+                          aria-label={`Move tab ${tab} up`}
+                          className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <MdKeyboardArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMoveTab(tab, "down")}
+                          disabled={index >= tabs.length - 1}
+                          title="Tab nach unten"
+                          aria-label={`Move tab ${tab} down`}
+                          className={`${iconBtn} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <MdKeyboardArrowDown className="w-4 h-4" />
+                        </button>
                       </span>
-                    </span>
-                    <span className="shrink-0 flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => startRename(tab)}
-                        title="Umbenennen"
-                        aria-label={`Rename tab ${tab}`}
-                        className={`${iconBtn} hover:text-theme-700 dark:hover:text-theme-200`}
-                      >
-                        <MdEdit className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(tab)}
-                        title="Löschen"
-                        aria-label={`Delete tab ${tab}`}
-                        className={`${iconBtn} hover:text-red-600`}
-                      >
-                        <MdDelete className="w-4 h-4" />
-                      </button>
-                    </span>
-                  </>
+                      <span className="min-w-0 truncate">
+                        <span className="font-medium">{tab}</span>
+                        <span className="ml-2 text-theme-500 text-xs">
+                          {layout
+                            .filter((e) => e.tab === tab)
+                            .map((e) => e.group)
+                            .join(", ") || "—"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startRename(tab)}
+                          title="Umbenennen"
+                          aria-label={`Rename tab ${tab}`}
+                          className={`${iconBtn} hover:text-theme-700 dark:hover:text-theme-200`}
+                        >
+                          <MdEdit className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(tab)}
+                          title="Löschen"
+                          aria-label={`Delete tab ${tab}`}
+                          className={`${iconBtn} hover:text-red-600`}
+                        >
+                          <MdDelete className="w-4 h-4" />
+                        </button>
+                      </span>
+                    </>
+                  )}
+                </div>
+                {renaming !== tab && (
+                  <div className="flex items-center gap-2 pl-1">
+                    <span className="shrink-0 text-theme-500 text-xs">Access groups</span>
+                    <input
+                      value={accessGroupsValue(tab)}
+                      onChange={(e) => onAccessGroupsChange(tab, e.target.value)}
+                      onBlur={() => commitAccessGroups(tab)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      placeholder="family, kids (leer = für alle sichtbar)"
+                      aria-label={`Access groups for tab ${tab}`}
+                      className={`${inputClass} flex-1 text-xs py-1`}
+                    />
+                  </div>
                 )}
               </li>
             ))}
@@ -307,7 +356,8 @@ function LayoutManager({ content, setContent, setStatus }) {
         )}
         <p className="mt-1 text-xs text-theme-400">
           ▲/▼ verschiebt den ganzen Tab-Block in der <code>layout:</code>-Reihenfolge. Das bestimmt die sichtbare
-          Tab-Reihenfolge auf dem Dashboard.
+          Tab-Reihenfolge auf dem Dashboard. „Access groups" schränkt ein, wer den Tab-Button überhaupt sieht (leer =
+          für alle sichtbar, unabhängig von den Zugriffsgruppen der einzelnen Dienste/Bookmarks darin).
         </p>
       </section>
 

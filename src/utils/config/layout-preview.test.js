@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupNamesFromRaw, parseGlobalLayout, parseLayout } from "./layout-preview";
+import { groupNamesFromRaw, parseGlobalLayout, parseLayout, parseTabAccess } from "./layout-preview";
 
 describe("parseLayout", () => {
   it("parses list-form layout in order", () => {
@@ -94,5 +94,34 @@ describe("groupNamesFromRaw", () => {
   it("returns [] for empty or non-list input", () => {
     expect(groupNamesFromRaw("")).toEqual([]);
     expect(groupNamesFromRaw("foo: bar")).toEqual([]);
+  });
+});
+
+describe("parseTabAccess", () => {
+  it("reads per-tab access.groups", () => {
+    const content = `tabs:
+  Family:
+    access:
+      groups: [family, kids]
+  Kitohome: {}
+`;
+    expect(parseTabAccess(content)).toEqual({ Family: ["family", "kids"], Kitohome: [] });
+  });
+
+  it("returns {} when tabs is missing, empty, or YAML is invalid", () => {
+    expect(parseTabAccess("title: x")).toEqual({});
+    expect(parseTabAccess("tabs: : :")).toEqual({});
+    expect(parseTabAccess("")).toEqual({});
+  });
+
+  it("treats a malformed access.groups as an empty list", () => {
+    const content = `tabs:
+  Family:
+    access:
+      groups: not-a-list
+  Other:
+    access: {}
+`;
+    expect(parseTabAccess(content)).toEqual({ Family: [], Other: [] });
   });
 });

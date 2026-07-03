@@ -37,6 +37,7 @@ import {
   filterServiceGroupForFavorites,
 } from "utils/services/quick-access";
 import { serviceKey } from "utils/services/service-key";
+import { isTabVisibleForUser } from "utils/services/tab-access";
 import { useFavorites } from "utils/services/use-favorites";
 import { useServiceStatusReport } from "utils/services/use-service-status";
 import themes from "utils/styles/themes";
@@ -236,7 +237,9 @@ function getAllServices(services) {
 const buildServiceStatusKey = serviceKey;
 
 function filterServiceGroupForProblematic(group, problematicServiceIds) {
-  const services = (group.services ?? []).filter((service) => problematicServiceIds.has(buildServiceStatusKey(group.name, service.name)));
+  const services = (group.services ?? []).filter((service) =>
+    problematicServiceIds.has(buildServiceStatusKey(group.name, service.name)),
+  );
   const groups = (group.groups ?? [])
     .map((subgroup) => filterServiceGroupForProblematic(subgroup, problematicServiceIds))
     .filter(Boolean);
@@ -269,12 +272,7 @@ function Home({ initialSettings }) {
   const { data: widgets } = useSWR("/api/widgets");
   const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
-  const {
-    enabled: quickAccessEnabled,
-    favorites,
-    usage,
-    setEnabled: setQuickAccessEnabled,
-  } = useFavorites();
+  const { enabled: quickAccessEnabled, favorites, usage, setEnabled: setQuickAccessEnabled } = useFavorites();
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
@@ -338,8 +336,7 @@ function Home({ initialSettings }) {
         return;
       }
 
-      const inEditable =
-        e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
+      const inEditable = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
 
       // "/" opens the palette in command mode when not typing in a field.
       if (e.key === "/" && !inEditable && !(e.altKey || e.ctrlKey || e.metaKey)) {
@@ -373,16 +370,21 @@ function Home({ initialSettings }) {
     };
   });
 
-  const tabs = useMemo(
-    () => [
+  const { data: authState } = useSWR("/api/auth/me");
+
+  const tabs = useMemo(() => {
+    const allTabs = [
       ...new Set(
         Object.keys(settings.layout ?? {})
           .map((groupName) => settings.layout[groupName]?.tab?.toString())
           .filter((group) => group),
       ),
-    ],
-    [settings.layout],
-  );
+    ];
+    // Tab buttons are filtered by the session user's groups (settings.tabs.*.access.groups);
+    // a tab with no assignment stays visible to everyone. The groups/bookmarks *within*
+    // a visible tab are still filtered separately, server-side, as before.
+    return allTabs.filter((tab) => isTabVisibleForUser(settings.tabs?.[tab]?.access?.groups, authState?.user));
+  }, [settings.layout, settings.tabs, authState]);
 
   useEffect(() => {
     if (!activeTab) {

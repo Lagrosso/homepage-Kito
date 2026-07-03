@@ -124,4 +124,26 @@ color: nope
     expect(ids).toContain("invalid-theme");
     expect(ids).toContain("invalid-color");
   });
+
+  it("flags unknown access groups assigned to a tab", () => {
+    const report = buildHealthReport(
+      {
+        ...EMPTY_FILES,
+        "settings.yaml": `
+tabs:
+  Family:
+    access:
+      groups:
+        - family
+        - unknown
+`,
+      },
+      { knownUserGroups: ["family"] },
+    );
+
+    const checks = allChecks(report).filter((check) => check.id.includes("unknown-access-group"));
+    expect(checks).toHaveLength(1);
+    expect(checks[0].path).toBe("tabs.Family.access.groups");
+    expect(checks[0].message).toContain('"unknown"');
+  });
 });

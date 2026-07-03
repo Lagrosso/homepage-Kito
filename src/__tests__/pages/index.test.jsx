@@ -33,6 +33,7 @@ const {
     widgetCalls: [],
     windowFocused: false,
     serviceStatusData: null,
+    authData: undefined,
   };
 
   const router = { asPath: "/" };
@@ -67,6 +68,7 @@ const {
     if (key === "/api/bookmarks") return { data: state.bookmarksData };
     if (key === "/api/widgets") return { data: state.widgetsData };
     if (key === "/api/services/status") return { data: state.serviceStatusData };
+    if (key === "/api/auth/me") return { data: state.authData };
     return { data: undefined };
   });
 
@@ -264,6 +266,7 @@ describe("pages/index Wrapper", () => {
     state.widgetsData = [];
     state.serviceStatusData = null;
     state.widgetCalls = [];
+    state.authData = undefined;
     document.documentElement.className = "dark theme-slate";
   });
 
@@ -514,6 +517,72 @@ describe("pages/index Home behavior", () => {
 
     expect(document.querySelector("#myTab")?.className).toContain("backdrop-blur-sm");
     expect(document.querySelector("#information-widgets")?.className).toContain("backdrop-blur-sm");
+  });
+
+  it("hides a tab restricted by settings.tabs access.groups from a user without a matching group", async () => {
+    state.servicesData = [{ name: "Services", services: [], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "kid", role: "viewer", groups: [] } };
+
+    await renderIndex({
+      initialSettings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+      settings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+    });
+
+    const tabLabels = (await screen.findAllByTestId("tab")).map((el) => el.textContent);
+    expect(tabLabels).toEqual(["Open"]); // "Family" is hidden; "Open" has no access.groups
+  });
+
+  it("shows an access-restricted tab to an admin regardless of their groups", async () => {
+    state.servicesData = [{ name: "Services", services: [], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "admin", role: "admin", groups: [] } };
+
+    await renderIndex({
+      initialSettings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+      settings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+    });
+
+    const tabLabels = (await screen.findAllByTestId("tab")).map((el) => el.textContent);
+    expect(tabLabels).toEqual(expect.arrayContaining(["Family", "Open"]));
+  });
+
+  it("shows an access-restricted tab to a viewer with a matching group", async () => {
+    state.servicesData = [{ name: "Services", services: [], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "parent", role: "viewer", groups: ["family"] } };
+
+    await renderIndex({
+      initialSettings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+      settings: {
+        title: "Homepage",
+        layout: { Services: { tab: "Family" }, Bookmarks: { tab: "Open" } },
+        tabs: { Family: { access: { groups: ["family"] } } },
+      },
+    });
+
+    const tabLabels = (await screen.findAllByTestId("tab")).map((el) => el.textContent);
+    expect(tabLabels).toEqual(expect.arrayContaining(["Family", "Open"]));
   });
 
   it("applies settings-driven language/theme/color updates and renders head tags", async () => {

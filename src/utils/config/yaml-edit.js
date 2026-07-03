@@ -163,6 +163,19 @@ function applyAccessGroups(doc, map, rawGroups) {
   }
 }
 
+// Read a map's `access.groups` as a plain string array (empty if absent/malformed).
+function getAccessGroupsFromMap(map) {
+  const accessMap = map.get("access", true);
+  if (!isMap(accessMap)) {
+    return [];
+  }
+  const groupsNode = accessMap.get("groups", true);
+  if (!isSeq(groupsNode)) {
+    return [];
+  }
+  return groupsNode.items.map((item) => String(isScalar(item) ? item.value : item));
+}
+
 // Multi-URL context keys (M14): per-service reachable URLs by network.
 export const SERVICE_URL_KEYS = ["lan", "tailscale", "public"];
 
@@ -747,7 +760,70 @@ export function assignGroupToTab(rawText, { group, tab }) {
   return setGroupLayoutField(rawText, { group, field: "tab" }, tab);
 }
 
-// Rename a tab: every layout group whose `tab` equals `from` is set to `to`.
+// --- top-level `tabs:` block — per-tab access.groups -----------------------
+// Independent of `layout[group].tab`: a tab with no entry here (or an empty
+// access.groups) stays visible to everyone, matching how services/bookmarks
+// behave without access.groups. Shape: `tabs: { <TabName>: { access: { groups } } }`.
+
+function findTabPair(tabsMap, tab) {
+  return isMap(tabsMap) ? tabsMap.items.find((p) => String(p.key) === tab) : undefined;
+}
+
+// Set/replace a tab's access.groups. Empty groups clears/removes the entry
+// (and the whole `tabs:` block if it becomes empty). Reuses the same generic
+// applyAccessGroups helper services/bookmarks use. Returns new raw text.
+export function setTabAccessGroups(rawText, { tab }, groupsRaw) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const groups = normalizeAccessGroups(groupsRaw);
+
+  let tabsMap = root.get("tabs", true);
+
+  if (groups.length === 0) {
+    // Nothing to clear if there's no tabs block or no entry for this tab.
+    const pair = findTabPair(tabsMap, tab);
+    if (!pair) {
+      return doc.toString();
+    }
+    if (isMap(pair.value)) {
+      pair.value.delete("access");
+    }
+    if (!isMap(pair.value) || pair.value.items.length === 0) {
+      tabsMap.items.splice(tabsMap.items.indexOf(pair), 1);
+    }
+    if (tabsMap.items.length === 0) {
+      root.delete("tabs");
+    }
+    return doc.toString();
+  }
+
+  if (!isMap(tabsMap)) {
+    if (isScalar(tabsMap) && tabsMap.value != null && tabsMap.value !== "") {
+      throw new Error("`tabs` is not a mapping — edit it in the raw editor.");
+    }
+    tabsMap = doc.createNode({});
+    tabsMap.flow = false;
+    root.set("tabs", tabsMap);
+    tabsMap = root.get("tabs", true);
+  }
+
+  let entry = tabsMap.get(tab, true);
+  if (!isMap(entry)) {
+    entry = doc.createNode({});
+    entry.flow = false;
+    tabsMap.set(tab, entry);
+    entry = tabsMap.get(tab, true);
+  }
+  applyAccessGroups(doc, entry, groups);
+  return doc.toString();
+}
+
+// Rename a tab: every layout group whose `tab` equals `from` is set to `to`,
+// and its `tabs.<from>` access-groups entry (if any) moves to `tabs.<to>`
+// (merging into an existing `tabs.<to>` entry rather than overwriting it).
 export function renameTab(rawText, { from, to }) {
   const doc = parseConfigDoc(rawText);
   const layout = doc.contents?.get("layout", true);
@@ -768,11 +844,36 @@ export function renameTab(rawText, { from, to }) {
   if (changed === 0) {
     throw new Error(`Tab "${from}" not found`);
   }
+
+  const tabsMap = doc.contents?.get("tabs", true);
+  const fromPair = findTabPair(tabsMap, from);
+  if (fromPair && target !== from) {
+    const fromGroups = isMap(fromPair.value) ? getAccessGroupsFromMap(fromPair.value) : [];
+    tabsMap.items.splice(tabsMap.items.indexOf(fromPair), 1);
+    if (fromGroups.length > 0) {
+      const toPair = findTabPair(tabsMap, target);
+      const existingGroups = toPair && isMap(toPair.value) ? getAccessGroupsFromMap(toPair.value) : [];
+      const mergedGroups = [...new Set([...existingGroups, ...fromGroups])];
+      let entry = tabsMap.get(target, true);
+      if (!isMap(entry)) {
+        entry = doc.createNode({});
+        entry.flow = false;
+        tabsMap.set(target, entry);
+        entry = tabsMap.get(target, true);
+      }
+      applyAccessGroups(doc, entry, mergedGroups);
+    }
+    if (tabsMap.items.length === 0) {
+      doc.contents.delete("tabs");
+    }
+  }
+
   return doc.toString();
 }
 
 // Delete a tab: remove the `tab` key from every group that used it (groups stay,
-// falling back to the default view). Empty group entries are pruned.
+// falling back to the default view), and drop its `tabs.<tab>` access entry.
+// Empty group entries and an emptied `tabs:` block are pruned.
 export function deleteTab(rawText, { tab }) {
   const doc = parseConfigDoc(rawText);
   const layout = doc.contents?.get("layout", true);
@@ -790,6 +891,16 @@ export function deleteTab(rawText, { tab }) {
     throw new Error(`Tab "${tab}" not found`);
   }
   pruneEmptyLayoutEntries(layout);
+
+  const tabsMap = doc.contents?.get("tabs", true);
+  const pair = findTabPair(tabsMap, tab);
+  if (pair) {
+    tabsMap.items.splice(tabsMap.items.indexOf(pair), 1);
+    if (tabsMap.items.length === 0) {
+      doc.contents.delete("tabs");
+    }
+  }
+
   return doc.toString();
 }
 

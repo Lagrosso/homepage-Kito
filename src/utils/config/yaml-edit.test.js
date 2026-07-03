@@ -25,6 +25,7 @@ import {
   renameTab,
   setBackgroundField,
   setGroupLayoutField,
+  setTabAccessGroups,
   updateBookmarkEntry,
   updateServiceEntry,
   updateServiceWidget,
@@ -802,6 +803,55 @@ describe("assignGroupToTab", () => {
   });
 });
 
+describe("setTabAccessGroups", () => {
+  it("creates the tabs: block for a fresh tab", () => {
+    const out = setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "family, kids, family");
+    const data = yaml.load(out);
+    expect(data.tabs.Ops.access.groups).toEqual(["family", "kids"]);
+    expect(out).toContain("# settings"); // comment preserved
+    // Untouched layout stays intact.
+    expect(data.layout.find((i) => i.Admin).Admin.tab).toBe("Ops");
+  });
+
+  it("updates an existing tab's groups without touching other tabs", () => {
+    const withA = setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "family");
+    const withB = setTabAccessGroups(withA, { tab: "Apps" }, "kids");
+    const data = yaml.load(withB);
+    expect(data.tabs.Ops.access.groups).toEqual(["family"]);
+    expect(data.tabs.Apps.access.groups).toEqual(["kids"]);
+
+    const changed = setTabAccessGroups(withB, { tab: "Ops" }, "family, admin");
+    const changedData = yaml.load(changed);
+    expect(changedData.tabs.Ops.access.groups).toEqual(["family", "admin"]);
+    expect(changedData.tabs.Apps.access.groups).toEqual(["kids"]); // unaffected
+  });
+
+  it("clearing groups removes the tab entry, and an emptied tabs: block", () => {
+    const withA = setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "family");
+    const cleared = setTabAccessGroups(withA, { tab: "Ops" }, "");
+    expect(yaml.load(cleared).tabs).toBeUndefined();
+    expect(cleared).not.toContain("tabs:");
+  });
+
+  it("clearing an already-absent tab is a byte-identical no-op", () => {
+    const out = setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "");
+    expect(out).toBe(SETTINGS_LIST);
+  });
+
+  it("leaves one tab's groups alone when clearing a different one", () => {
+    const withBoth = setTabAccessGroups(setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "family"), { tab: "Apps" }, "kids");
+    const out = setTabAccessGroups(withBoth, { tab: "Ops" }, "");
+    const data = yaml.load(out);
+    expect(data.tabs.Ops).toBeUndefined();
+    expect(data.tabs.Apps.access.groups).toEqual(["kids"]);
+  });
+
+  it("refuses when a bare placeholder is present", () => {
+    const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
+    expect(() => setTabAccessGroups(bare, { tab: "A" }, "family")).toThrow(/unquoted/i);
+  });
+});
+
 describe("renameTab", () => {
   it("renames the tab across all matching groups and keeps comments", () => {
     const src = `---
@@ -824,6 +874,22 @@ layout:
 
   it("throws for an unknown tab", () => {
     expect(() => renameTab(SETTINGS_LIST, { from: "Nope", to: "X" })).toThrow(/not found/i);
+  });
+
+  it("moves the tabs.<from> access-groups entry to tabs.<to>", () => {
+    const withAccess = setTabAccessGroups(SETTINGS_LIST, { tab: "Apps" }, "family");
+    const out = renameTab(withAccess, { from: "Apps", to: "Medien" });
+    const data = yaml.load(out);
+    expect(data.tabs.Apps).toBeUndefined();
+    expect(data.tabs.Medien.access.groups).toEqual(["family"]);
+  });
+
+  it("merges tabs.<from> groups into an existing tabs.<to> entry", () => {
+    const withBoth = setTabAccessGroups(setTabAccessGroups(SETTINGS_LIST, { tab: "Apps" }, "family"), { tab: "Ops" }, "kids");
+    const out = renameTab(withBoth, { from: "Apps", to: "Ops" });
+    const data = yaml.load(out);
+    expect(data.tabs.Apps).toBeUndefined();
+    expect(new Set(data.tabs.Ops.access.groups)).toEqual(new Set(["kids", "family"]));
   });
 });
 
@@ -849,6 +915,20 @@ describe("deleteTab", () => {
 
   it("throws for an unknown tab", () => {
     expect(() => deleteTab(SETTINGS_LIST, { tab: "Nope" })).toThrow(/not found/i);
+  });
+
+  it("also removes the tab's tabs.<tab> access-groups entry", () => {
+    const withAccess = setTabAccessGroups(SETTINGS_LIST, { tab: "Ops" }, "family");
+    const out = deleteTab(withAccess, { tab: "Ops" });
+    expect(yaml.load(out).tabs).toBeUndefined();
+  });
+
+  it("leaves other tabs' access-groups entries alone", () => {
+    const withBoth = setTabAccessGroups(setTabAccessGroups(SETTINGS_LIST, { tab: "Apps" }, "family"), { tab: "Ops" }, "kids");
+    const out = deleteTab(withBoth, { tab: "Ops" });
+    const data = yaml.load(out);
+    expect(data.tabs.Ops).toBeUndefined();
+    expect(data.tabs.Apps.access.groups).toEqual(["family"]);
   });
 });
 
