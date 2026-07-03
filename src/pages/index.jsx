@@ -30,6 +30,14 @@ import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
 import { buildGroupTargets } from "utils/quicklaunch/commands";
+import {
+  buildFavoritesGroup,
+  buildFrequentGroup,
+  buildRecentGroup,
+  filterServiceGroupForFavorites,
+} from "utils/services/quick-access";
+import { serviceKey } from "utils/services/service-key";
+import { useFavorites } from "utils/services/use-favorites";
 import { useServiceStatusReport } from "utils/services/use-service-status";
 import themes from "utils/styles/themes";
 
@@ -225,9 +233,7 @@ function getAllServices(services) {
   return [...services.map(getServices).flat()];
 }
 
-function buildServiceStatusKey(group, name) {
-  return `${group}::${name}`;
-}
+const buildServiceStatusKey = serviceKey;
 
 function filterServiceGroupForProblematic(group, problematicServiceIds) {
   const services = (group.services ?? []).filter((service) => problematicServiceIds.has(buildServiceStatusKey(group.name, service.name)));
@@ -263,6 +269,12 @@ function Home({ initialSettings }) {
   const { data: widgets } = useSWR("/api/widgets");
   const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
+  const {
+    enabled: quickAccessEnabled,
+    favorites,
+    usage,
+    setEnabled: setQuickAccessEnabled,
+  } = useFavorites();
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
@@ -282,6 +294,21 @@ function Home({ initialSettings }) {
       ),
     [serviceStatusReport],
   );
+
+  const favoriteKeySet = useMemo(() => new Set(favorites), [favorites]);
+
+  // Synthetic quick-access groups (★ favorites / recently / frequently used),
+  // shown above the tabs when the feature is enabled and non-empty.
+  const quickAccessGroups = useMemo(() => {
+    if (!quickAccessEnabled || !services) {
+      return [];
+    }
+    return [
+      buildFavoritesGroup(services, favorites, t("quickAccess.favorites")),
+      buildRecentGroup(services, usage, 6, t("quickAccess.recent")),
+      buildFrequentGroup(services, usage, 6, t("quickAccess.frequent")),
+    ].filter(Boolean);
+  }, [quickAccessEnabled, services, favorites, usage, t]);
 
   useEffect(() => {
     const language = normalizeLanguage(settings.language);
@@ -377,25 +404,45 @@ function Home({ initialSettings }) {
       return <div />;
     }
 
+    // Reduce a service group according to the active filter (all / problematic /
+    // favorites). Returns the group unchanged for "all".
+    const applyServiceFilter = (group) => {
+      if (serviceFilter === "problematic") {
+        return filterServiceGroupForProblematic(group, problematicServiceIds);
+      }
+      if (serviceFilter === "favorites") {
+        return filterServiceGroupForFavorites(group, favoriteKeySet);
+      }
+      return group;
+    };
+    const filteringServices = serviceFilter === "problematic" || serviceFilter === "favorites";
+
     const serviceGroups = services
       ?.filter(tabGroupFilter)
       .filter(undefinedGroupFilter)
-      .map((group) =>
-        serviceFilter === "problematic" ? filterServiceGroupForProblematic(group, problematicServiceIds) : group,
-      )
+      .map(applyServiceFilter)
       .filter(Boolean);
-    const bookmarkGroups = serviceFilter === "problematic" ? [] : bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
-    const filteredLayoutGroups =
-      serviceFilter === "problematic"
-        ? layoutGroups
-            .map((group) =>
-              group?.services ? filterServiceGroupForProblematic(group, problematicServiceIds) : null,
-            )
-            .filter(Boolean)
-        : layoutGroups;
+    const bookmarkGroups = filteringServices ? [] : bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
+    const filteredLayoutGroups = filteringServices
+      ? layoutGroups.map((group) => (group?.services ? applyServiceFilter(group) : null)).filter(Boolean)
+      : layoutGroups;
 
     return (
       <>
+        {quickAccessEnabled && quickAccessGroups.length > 0 && (
+          <div key="quick-access" id="quick-access" className="flex flex-wrap m-4 sm:m-8 sm:mb-0 items-start">
+            {quickAccessGroups.map((group) => (
+              <ServicesGroup
+                key={group.name}
+                group={group}
+                maxGroupColumns={settings.fiveColumns ? 5 : settings.maxGroupColumns}
+                disableCollapse={settings.disableCollapse}
+                useEqualHeights={settings.useEqualHeights}
+                groupsInitiallyCollapsed={settings.groupsInitiallyCollapsed}
+              />
+            ))}
+          </div>
+        )}
         {tabs.length > 0 && (
           <div key="tabs" id="tabs" className="m-5 sm:m-9 sm:mt-4 sm:mb-0">
             <ul
@@ -414,7 +461,7 @@ function Home({ initialSettings }) {
             </ul>
           </div>
         )}
-        {serviceStatusReport?.summary?.total > 0 && (
+        {(serviceStatusReport?.summary?.total > 0 || quickAccessEnabled) && (
           <div key="service-filter" className="mx-5 sm:mx-9 mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -427,23 +474,47 @@ function Home({ initialSettings }) {
             >
               {t("serviceStatus.allServices")}
             </button>
+            {serviceStatusReport?.summary?.total > 0 && (
+              <button
+                type="button"
+                onClick={() => setServiceFilter("problematic")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                  serviceFilter === "problematic"
+                    ? "bg-blue-600 text-white"
+                    : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
+                }`}
+              >
+                {t("serviceStatus.problematicOnly")}
+              </button>
+            )}
+            {quickAccessEnabled && favorites.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setServiceFilter("favorites")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                  serviceFilter === "favorites"
+                    ? "bg-blue-600 text-white"
+                    : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
+                }`}
+              >
+                {t("quickAccess.favoritesOnly")}
+              </button>
+            )}
+            {serviceStatusReport?.summary?.total > 0 && (
+              <span className="text-xs text-theme-500 dark:text-theme-400">
+                {t("serviceStatus.summary", {
+                  problematic: serviceStatusReport.summary.problematic,
+                  noCheck: serviceStatusReport.summary.noCheck,
+                })}
+              </span>
+            )}
             <button
               type="button"
-              onClick={() => setServiceFilter("problematic")}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                serviceFilter === "problematic"
-                  ? "bg-blue-600 text-white"
-                  : "bg-theme-200/70 dark:bg-theme-700 text-theme-700 dark:text-theme-200 hover:bg-theme-300 dark:hover:bg-theme-600"
-              }`}
+              onClick={() => setQuickAccessEnabled(!quickAccessEnabled)}
+              className="ml-auto rounded-md px-3 py-1.5 text-xs font-medium text-theme-500 dark:text-theme-400 hover:bg-theme-200/70 dark:hover:bg-theme-700"
             >
-              {t("serviceStatus.problematicOnly")}
+              {quickAccessEnabled ? t("quickAccess.hide") : t("quickAccess.show")}
             </button>
-            <span className="text-xs text-theme-500 dark:text-theme-400">
-              {t("serviceStatus.summary", {
-                problematic: serviceStatusReport.summary.problematic,
-                noCheck: serviceStatusReport.summary.noCheck,
-              })}
-            </span>
           </div>
         )}
         {filteredLayoutGroups.length > 0 && (
@@ -511,6 +582,12 @@ function Home({ initialSettings }) {
     serviceStatusReport,
     serviceFilter,
     problematicServiceIds,
+    favoriteKeySet,
+    favorites,
+    quickAccessEnabled,
+    quickAccessGroups,
+    setQuickAccessEnabled,
+    t,
     settings.layout,
     settings.fiveColumns,
     settings.maxGroupColumns,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
 
@@ -60,9 +60,25 @@ vi.mock("./widget", () => ({
   },
 }));
 
+const favoritesMock = vi.hoisted(() => ({
+  enabled: true,
+  isFavorite: vi.fn(() => false),
+  toggleFavorite: vi.fn(),
+  recordOpen: vi.fn(),
+  setEnabled: vi.fn(),
+}));
+vi.mock("utils/services/use-favorites", () => ({ useFavorites: () => favoritesMock }));
+
 import Item from "./item";
 
 describe("components/services/item", () => {
+  beforeEach(() => {
+    favoritesMock.enabled = true;
+    favoritesMock.isFavorite.mockReturnValue(false);
+    favoritesMock.toggleFavorite.mockClear();
+    favoritesMock.recordOpen.mockClear();
+  });
+
   it("renders the service title as a link when href is provided", () => {
     renderWithProviders(
       <Item
@@ -306,5 +322,61 @@ describe("components/services/item", () => {
     );
 
     expect(screen.queryByText("Public link (goes over the internet)")).not.toBeInTheDocument();
+  });
+
+  it("toggles a favorite with the group::name key when the pin star is clicked", () => {
+    renderWithProviders(
+      <Item
+        groupName="Media"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "Jellyfin", href: "http://jf", icon: "mdi:test", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    fireEvent.click(screen.getByLabelText("Pin Jellyfin"));
+    expect(favoritesMock.toggleFavorite).toHaveBeenCalledWith("Media::Jellyfin");
+  });
+
+  it("uses the original favoriteKey when shown in a quick-access section", () => {
+    renderWithProviders(
+      <Item
+        groupName="Favorites"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "Jellyfin", favoriteKey: "Media::Jellyfin", href: "http://jf", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    fireEvent.click(screen.getByLabelText("Pin Jellyfin"));
+    expect(favoritesMock.toggleFavorite).toHaveBeenCalledWith("Media::Jellyfin");
+  });
+
+  it("records an open when the service link is clicked", () => {
+    renderWithProviders(
+      <Item
+        groupName="Media"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "Jellyfin", href: "http://jf", icon: "mdi:test", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    fireEvent.click(screen.getByText("Jellyfin"));
+    expect(favoritesMock.recordOpen).toHaveBeenCalledWith("Media::Jellyfin");
+  });
+
+  it("hides the pin star when quick access is disabled", () => {
+    favoritesMock.enabled = false;
+    renderWithProviders(
+      <Item
+        groupName="Media"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "Jellyfin", href: "http://jf", icon: "mdi:test", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.queryByLabelText("Pin Jellyfin")).not.toBeInTheDocument();
   });
 });

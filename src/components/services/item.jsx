@@ -1,9 +1,11 @@
 import classNames from "classnames";
 import ResolvedIcon from "components/resolvedicon";
 import { useContext, useState } from "react";
-import { MdPublic } from "react-icons/md";
+import { MdPublic, MdStar, MdStarBorder } from "react-icons/md";
 import { SettingsContext } from "utils/contexts/settings";
+import { useFavorites } from "utils/services/use-favorites";
 import { isPublicUrl, resolveServiceUrl, useNetworkContext } from "utils/services/resolve-url";
+import { serviceKey } from "utils/services/service-key";
 import Docker from "widgets/docker/component";
 import Kubernetes from "widgets/kubernetes/component";
 import ProxmoxVM from "widgets/proxmoxvm/component";
@@ -21,6 +23,11 @@ export default function Item({ service, groupName, useEqualHeights }) {
   const { url: resolvedHref } = resolveServiceUrl(service, networkContext);
   const hasLink = resolvedHref && resolvedHref !== "#";
   const showPublicWarning = hasLink && isPublicUrl(resolvedHref);
+  const { enabled: quickAccessEnabled, isFavorite, toggleFavorite, recordOpen } = useFavorites();
+  // Use the original group::name key even when shown in a synthetic quick-access section.
+  const favKey = service.favoriteKey ?? serviceKey(groupName, service.name);
+  const favorited = isFavorite(favKey);
+  const onOpen = () => recordOpen(favKey);
   const showStats = service.showStats === false ? false : settings.showStats;
   const statusStyle = service.statusStyle !== undefined ? service.statusStyle : settings.statusStyle;
   const [statsOpen, setStatsOpen] = useState(service.showStats);
@@ -53,6 +60,8 @@ export default function Item({ service, groupName, useEqualHeights }) {
                 href={resolvedHref}
                 target={service.target ?? settings.target ?? "_blank"}
                 rel="noreferrer"
+                onClick={onOpen}
+                onAuxClick={onOpen}
                 className="shrink-0 flex items-center justify-center w-12 service-icon z-10"
                 aria-label={service.icon}
               >
@@ -69,6 +78,8 @@ export default function Item({ service, groupName, useEqualHeights }) {
               href={resolvedHref}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
+              onClick={onOpen}
+              onAuxClick={onOpen}
               className="flex-1 flex items-center justify-between rounded-r-md service-title-text"
             >
               <div className="flex-1 px-2 py-2 text-sm text-left z-10 service-name">
@@ -94,6 +105,23 @@ export default function Item({ service, groupName, useEqualHeights }) {
               statusStyle === "dot" ? "gap-0" : "gap-2 mt-2 mr-3"
             } z-10 service-tags`}
           >
+            {quickAccessEnabled && (
+              <button
+                type="button"
+                onClick={() => toggleFavorite(favKey)}
+                aria-label={favorited ? `Unpin ${service.name}` : `Pin ${service.name}`}
+                aria-pressed={favorited}
+                title={favorited ? "Remove from favorites" : "Add to favorites"}
+                className={classNames(
+                  "shrink-0 flex items-center justify-center service-tag service-favorite",
+                  favorited ? "text-amber-400" : "text-theme-400/50 hover:text-amber-400",
+                )}
+              >
+                {favorited ? <MdStar className="w-4 h-4" /> : <MdStarBorder className="w-4 h-4" />}
+                <span className="sr-only">{favorited ? "Favorited" : "Not favorited"}</span>
+              </button>
+            )}
+
             {showPublicWarning && (
               <div
                 className="shrink-0 flex items-center justify-center service-tag service-public-link"
