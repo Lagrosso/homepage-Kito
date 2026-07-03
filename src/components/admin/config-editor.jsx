@@ -909,7 +909,7 @@ export default function ConfigEditor({
 
         <AdminTabs tabs={CONFIG_TABS} activeHref={router.pathname} />
 
-        <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="mx-auto max-w-6xl xl:max-w-[100rem] px-4 py-6">
           <p className="text-sm text-theme-500 mb-4">Editing {configFile}</p>
 
           {(authState === "checking" || loadState === "loading") && <p className="text-sm text-theme-500">Loading…</p>}
