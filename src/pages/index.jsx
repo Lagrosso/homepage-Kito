@@ -30,6 +30,8 @@ import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
 import { buildGroupTargets } from "utils/quicklaunch/commands";
+import { ALL_TAB_LABEL_KEY } from "utils/services/all-tab";
+import { filterBookmarkGroupsForGroups, filterServiceGroupsForGroups, isTabVisibleForGroups } from "utils/services/preview-access";
 import {
   buildFavoritesGroup,
   buildFrequentGroup,
@@ -59,6 +61,10 @@ const ConfigEditorLink = dynamic(() => import("components/admin/config-editor-li
 });
 
 const AdminNavLink = dynamic(() => import("components/admin/admin-nav-link"), {
+  ssr: false,
+});
+
+const PreviewProfileSwitcher = dynamic(() => import("components/admin/preview-profile-switcher"), {
   ssr: false,
 });
 
@@ -273,6 +279,10 @@ function Home({ initialSettings }) {
   const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
   const { enabled: quickAccessEnabled, favorites, usage, setEnabled: setQuickAccessEnabled } = useFavorites();
+  // Admin-only "view as profile" preview (M10b): a client-side re-filter of the
+  // already-loaded, unfiltered (for admins) services/bookmarks/tabs — never
+  // persisted, resets on reload. See utils/services/preview-access.js.
+  const [previewProfile, setPreviewProfile] = useState(null);
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
@@ -383,8 +393,20 @@ function Home({ initialSettings }) {
     // Tab buttons are filtered by the session user's groups (settings.tabs.*.access.groups);
     // a tab with no assignment stays visible to everyone. The groups/bookmarks *within*
     // a visible tab are still filtered separately, server-side, as before.
-    return allTabs.filter((tab) => isTabVisibleForUser(settings.tabs?.[tab]?.access?.groups, authState?.user));
-  }, [settings.layout, settings.tabs, authState]);
+    const visibleTabs = allTabs.filter((tab) => isTabVisibleForUser(settings.tabs?.[tab]?.access?.groups, authState?.user));
+    // Admin-only synthetic "all groups" tab (M10a) — not backed by settings.yaml,
+    // appended last so real tabs keep their configured order. It's filtered by
+    // role here in `tabs`, and by role again where it's consumed below (defense
+    // in depth against hash-based access from a non-admin session).
+    const withAllTab = authState?.user?.role === "admin" ? [...visibleTabs, t(ALL_TAB_LABEL_KEY)] : visibleTabs;
+    // Active preview (M10b) applies an additional client-side filter, on top of
+    // the real session filter above — it can only ever hide tabs, never reveal
+    // ones the real session couldn't already see.
+    if (!previewProfile) {
+      return withAllTab;
+    }
+    return withAllTab.filter((tab) => isTabVisibleForGroups(settings.tabs?.[tab]?.access?.groups, previewProfile.groups));
+  }, [settings.layout, settings.tabs, authState, previewProfile, t]);
 
   useEffect(() => {
     if (!activeTab) {
@@ -394,7 +416,18 @@ function Home({ initialSettings }) {
   });
 
   const servicesAndBookmarksGroups = useMemo(() => {
-    const tabGroupFilter = (g) => g && [activeTab, ""].includes(slugifyAndEncode(settings.layout?.[g.name]?.tab));
+    // The admin-only "all groups" tab (M10a) bypasses the normal tab/group
+    // assignment entirely — every group matches, regardless of `layout[g].tab`.
+    // Re-checking the admin role here (not just relying on `tabs` already being
+    // filtered) means a non-admin session can't get the same effect through
+    // URL-hash manipulation; server-side /api/services|bookmarks stay filtered
+    // for them either way, so this is defense in depth, not the real boundary.
+    const isAllGroupsTab = authState?.user?.role === "admin" && activeTab === slugifyAndEncode(t(ALL_TAB_LABEL_KEY));
+    // `g` is transiently undefined for a layout entry whose group hasn't loaded
+    // via SWR yet (or no longer exists) — keep that guard first so isAllGroupsTab
+    // only ever widens which *defined* groups match, never lets undefined through.
+    const tabGroupFilter = (g) =>
+      g && (isAllGroupsTab || [activeTab, ""].includes(slugifyAndEncode(settings.layout?.[g.name]?.tab)));
     const undefinedGroupFilter = (g) => settings.layout?.[g.name] === undefined;
 
     const layoutGroups = Object.keys(settings.layout ?? {})
@@ -419,15 +452,34 @@ function Home({ initialSettings }) {
     };
     const filteringServices = serviceFilter === "problematic" || serviceFilter === "favorites";
 
-    const serviceGroups = services
+    const serviceGroupsFiltered = services
       ?.filter(tabGroupFilter)
       .filter(undefinedGroupFilter)
       .map(applyServiceFilter)
       .filter(Boolean);
-    const bookmarkGroups = filteringServices ? [] : bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
-    const filteredLayoutGroups = filteringServices
+    const bookmarkGroupsFiltered = filteringServices ? [] : bookmarks.filter(tabGroupFilter).filter(undefinedGroupFilter);
+    const filteredLayoutGroupsBase = filteringServices
       ? layoutGroups.map((group) => (group?.services ? applyServiceFilter(group) : null)).filter(Boolean)
       : layoutGroups;
+
+    // Active preview (M10b) re-filters by the chosen profile's groups, on top of
+    // everything above — it only ever narrows further, never reveals more than
+    // the real session already received from the server.
+    const serviceGroups = previewProfile
+      ? filterServiceGroupsForGroups(serviceGroupsFiltered ?? [], previewProfile.groups)
+      : serviceGroupsFiltered;
+    const bookmarkGroups = previewProfile
+      ? filterBookmarkGroupsForGroups(bookmarkGroupsFiltered, previewProfile.groups)
+      : bookmarkGroupsFiltered;
+    const filteredLayoutGroups = previewProfile
+      ? filteredLayoutGroupsBase
+          .map((group) =>
+            group?.services
+              ? filterServiceGroupsForGroups([group], previewProfile.groups)[0]
+              : filterBookmarkGroupsForGroups([group], previewProfile.groups)[0],
+          )
+          .filter(Boolean)
+      : filteredLayoutGroupsBase;
 
     return (
       <>
@@ -579,6 +631,7 @@ function Home({ initialSettings }) {
   }, [
     tabs,
     activeTab,
+    authState,
     services,
     bookmarks,
     serviceStatusReport,
@@ -586,6 +639,7 @@ function Home({ initialSettings }) {
     problematicServiceIds,
     favoriteKeySet,
     favorites,
+    previewProfile,
     quickAccessEnabled,
     quickAccessGroups,
     setQuickAccessEnabled,
@@ -662,11 +716,31 @@ function Home({ initialSettings }) {
             <span className="hidden sm:inline">Home</span>
           </Link>
           <div className="flex items-center gap-1">
+            <PreviewProfileSwitcher
+              profiles={settings.profiles}
+              previewProfile={previewProfile}
+              setPreviewProfile={setPreviewProfile}
+            />
             <QrButton />
             <AdminNavLink />
             <LogoutButton />
           </div>
         </div>
+        {previewProfile && (
+          <div
+            id="preview-banner"
+            className="w-full mb-2 rounded-md bg-amber-500/90 text-white text-sm text-center py-1.5 flex items-center justify-center gap-2 z-20"
+          >
+            <span>Vorschau: Ansicht als &quot;{previewProfile.name}&quot;</span>
+            <button
+              type="button"
+              onClick={() => setPreviewProfile(null)}
+              className="underline underline-offset-2 hover:no-underline font-medium"
+            >
+              Beenden
+            </button>
+          </div>
+        )}
         <div
           id="information-widgets"
           className={classNames(

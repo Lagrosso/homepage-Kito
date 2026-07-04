@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { MdHome } from "react-icons/md";
+import { parseProfiles } from "utils/config/layout-preview";
 
 const ROLE_OPTIONS = ["admin", "viewer"];
 
@@ -47,6 +48,7 @@ export default function AdminUsers() {
   const [passwords, setPasswords] = useState({});
   const [groups, setGroups] = useState({});
   const [newUser, setNewUser] = useState({ username: "", role: "viewer", password: "", groups: "" });
+  const [profiles, setProfiles] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +111,26 @@ export default function AdminUsers() {
       loadUsers();
     }
   }, [authState, loadUsers]);
+
+  // Named group-set presets (/admin/profiles) — read-only here, just to prefill
+  // the free-text Groups field below. Doesn't couple users to profiles.
+  useEffect(() => {
+    if (authState !== "admin") return undefined;
+    let cancelled = false;
+    fetch("/api/config/raw/settings.yaml")
+      .then((r) => (r.ok ? r.json() : { content: "" }))
+      .then((d) => {
+        if (!cancelled) setProfiles(parseProfiles(d?.content ?? ""));
+      })
+      .catch(() => {
+        if (!cancelled) setProfiles({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
+  const profileNames = Object.keys(profiles);
 
   const requestUsers = async (message, options) => {
     setStatus(null);
@@ -272,22 +294,44 @@ export default function AdminUsers() {
                             </select>
                           </td>
                           <td className="px-3 py-3">
-                            <div className="flex min-w-[14rem] gap-2">
-                              <input
-                                aria-label={`Groups for ${user.username}`}
-                                value={groups[user.username] ?? ""}
-                                onChange={(e) => setGroups((prev) => ({ ...prev, [user.username]: e.target.value }))}
-                                placeholder="family, media"
-                                className={inputClass}
-                              />
-                              <button
-                                type="button"
-                                disabled={savingUser === user.username}
-                                onClick={() => updateGroups(user.username)}
-                                className={BTN_SECONDARY}
-                              >
-                                Save
-                              </button>
+                            <div className="flex min-w-[14rem] flex-col gap-1">
+                              {profileNames.length > 0 && (
+                                <select
+                                  aria-label={`Apply profile to ${user.username}`}
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    const name = e.target.value;
+                                    if (!name) return;
+                                    setGroups((prev) => ({ ...prev, [user.username]: (profiles[name] ?? []).join(", ") }));
+                                    e.target.value = "";
+                                  }}
+                                  className={`${inputClass} text-xs py-1`}
+                                >
+                                  <option value="">Profil übernehmen…</option>
+                                  {profileNames.map((name) => (
+                                    <option key={name} value={name}>
+                                      {name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <div className="flex gap-2">
+                                <input
+                                  aria-label={`Groups for ${user.username}`}
+                                  value={groups[user.username] ?? ""}
+                                  onChange={(e) => setGroups((prev) => ({ ...prev, [user.username]: e.target.value }))}
+                                  placeholder="family, media"
+                                  className={inputClass}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={savingUser === user.username}
+                                  onClick={() => updateGroups(user.username)}
+                                  className={BTN_SECONDARY}
+                                >
+                                  Save
+                                </button>
+                              </div>
                             </div>
                           </td>
                           <td className="px-3 py-3">
@@ -365,15 +409,40 @@ export default function AdminUsers() {
                       className={inputClass}
                     />
                   </label>
-                  <label className="block text-sm">
-                    <span className="block font-medium mb-1">Groups</span>
-                    <input
-                      value={newUser.groups}
-                      onChange={(e) => setNewUser((prev) => ({ ...prev, groups: e.target.value }))}
-                      placeholder="family, media"
-                      className={inputClass}
-                    />
-                  </label>
+                  <div className="flex flex-col gap-1">
+                    {profileNames.length > 0 && (
+                      <select
+                        aria-label="Apply profile to new user"
+                        defaultValue=""
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          if (!name) return;
+                          setNewUser((prev) => ({ ...prev, groups: (profiles[name] ?? []).join(", ") }));
+                          e.target.value = "";
+                        }}
+                        className={`${inputClass} text-xs py-1`}
+                      >
+                        <option value="">Profil übernehmen…</option>
+                        {profileNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {/* Own <label> wrapping only the input — a label wrapping two form
+                        controls resolves .control (and thus getByLabelText) to the first
+                        one, which would silently point "Groups" at the select above. */}
+                    <label className="block text-sm">
+                      <span className="block font-medium mb-1">Groups</span>
+                      <input
+                        value={newUser.groups}
+                        onChange={(e) => setNewUser((prev) => ({ ...prev, groups: e.target.value }))}
+                        placeholder="family, media"
+                        className={inputClass}
+                      />
+                    </label>
+                  </div>
                   <button type="submit" disabled={savingUser === "__new__"} className={BTN_PRIMARY}>
                     Add
                   </button>

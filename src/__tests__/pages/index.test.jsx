@@ -585,6 +585,86 @@ describe("pages/index Home behavior", () => {
     expect(tabLabels).toEqual(expect.arrayContaining(["Family", "Open"]));
   });
 
+  // --- M10a: admin-only "all services & bookmarks" synthetic tab -----------
+
+  it("shows the admin-only synthetic tab alongside real tabs, for admins only", async () => {
+    state.servicesData = [{ name: "Services", services: [], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "admin", role: "admin", groups: [] } };
+
+    await renderIndex({
+      initialSettings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      settings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+    });
+
+    const tabLabels = (await screen.findAllByTestId("tab")).map((el) => el.textContent);
+    expect(tabLabels).toEqual(["Main", "dashboard.allServicesTab"]);
+  });
+
+  it("does not show the synthetic tab to a viewer", async () => {
+    state.servicesData = [{ name: "Services", services: [], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "viewer", role: "viewer", groups: [] } };
+
+    await renderIndex({
+      initialSettings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      settings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+    });
+
+    const tabLabels = (await screen.findAllByTestId("tab")).map((el) => el.textContent);
+    expect(tabLabels).toEqual(["Main"]);
+  });
+
+  it("aggregates every group, regardless of tab assignment, when an admin activates the synthetic tab", async () => {
+    state.servicesData = [{ name: "Services", services: [{ name: "svc", href: "http://svc" }], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [{ name: "bm", href: "http://bm" }] }];
+    state.authData = { authenticated: true, user: { username: "admin", role: "admin", groups: [] } };
+
+    await renderIndex({
+      initialSettings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      settings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      // "Services" is assigned to "Main", not this tab — only the admin-only
+      // bypass can make it show up here.
+      activeTab: "dashboard.allservicestab",
+    });
+
+    expect(await screen.findByTestId("services-group")).toHaveTextContent("Services");
+    expect(screen.getByTestId("bookmarks-group")).toHaveTextContent("Bookmarks");
+  });
+
+  it("does not aggregate groups for a viewer, even if their hash matches the synthetic tab slug", async () => {
+    state.servicesData = [{ name: "Services", services: [{ name: "svc", href: "http://svc" }], groups: [] }];
+    state.bookmarksData = [{ name: "Bookmarks", bookmarks: [] }];
+    state.authData = { authenticated: true, user: { username: "viewer", role: "viewer", groups: [] } };
+
+    await renderIndex({
+      initialSettings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      settings: { title: "Homepage", layout: { Services: { tab: "Main" } } },
+      activeTab: "dashboard.allservicestab",
+    });
+
+    await screen.findByTestId("bookmarks-group"); // wait for the render pass to settle
+    expect(screen.queryByTestId("services-group")).not.toBeInTheDocument();
+  });
+
+  it("does not crash on the synthetic tab when a layout entry has no matching group yet (SWR still loading)", async () => {
+    // Regression: a settings.layout entry whose group isn't in services/bookmarks
+    // (e.g. stale config, or services/bookmarks still on their SWR fallback [])
+    // must stay filtered out, even while the admin-only bypass is active.
+    state.servicesData = [];
+    state.bookmarksData = [];
+    state.authData = { authenticated: true, user: { username: "admin", role: "admin", groups: [] } };
+
+    await renderIndex({
+      initialSettings: { title: "Homepage", layout: { Missing: { tab: "Main" } } },
+      settings: { title: "Homepage", layout: { Missing: { tab: "Main" } } },
+      activeTab: "dashboard.allservicestab",
+    });
+
+    expect(screen.queryByTestId("services-group")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("bookmarks-group")).not.toBeInTheDocument();
+  });
+
   it("applies settings-driven language/theme/color updates and renders head tags", async () => {
     state.servicesData = [];
     state.bookmarksData = [];

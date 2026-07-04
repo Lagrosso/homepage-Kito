@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupNamesFromRaw, parseGlobalLayout, parseLayout, parseTabAccess } from "./layout-preview";
+import { groupNamesFromRaw, parseGlobalLayout, parseLayout, parseProfiles, parseTabAccess } from "./layout-preview";
 
 describe("parseLayout", () => {
   it("parses list-form layout in order", () => {
@@ -123,5 +123,32 @@ describe("parseTabAccess", () => {
     access: {}
 `;
     expect(parseTabAccess(content)).toEqual({ Family: [], Other: [] });
+  });
+});
+
+describe("parseProfiles", () => {
+  it("reads named profiles and their groups", () => {
+    const content = `profiles:
+  Familie:
+    groups: [family, kids]
+  Gast:
+    groups: [guest]
+`;
+    expect(parseProfiles(content)).toEqual({ Familie: ["family", "kids"], Gast: ["guest"] });
+  });
+
+  it("returns {} when profiles is missing, empty, or YAML is invalid", () => {
+    expect(parseProfiles("title: x")).toEqual({});
+    expect(parseProfiles("profiles: : :")).toEqual({});
+    expect(parseProfiles("")).toEqual({});
+  });
+
+  it("treats malformed/missing groups as an empty list", () => {
+    const content = `profiles:
+  Familie:
+    groups: not-a-list
+  Gast: {}
+`;
+    expect(parseProfiles(content)).toEqual({ Familie: [], Gast: [] });
   });
 });

@@ -85,6 +85,26 @@ export function parseTabAccess(content) {
   );
 }
 
+// Read the top-level `profiles:` block (named reusable group-set presets, e.g.
+// `profiles: { Familie: { groups: [family, kids] } }`). Returns
+// { [profileName]: string[] }; a profile with malformed/missing `groups` maps
+// to []. [] / {} / parse errors are safe.
+export function parseProfiles(content) {
+  let data;
+  try {
+    data = yaml.load(content);
+  } catch {
+    return {};
+  }
+  const profiles = data?.profiles;
+  if (!profiles || typeof profiles !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(profiles).map(([name, opts]) => [name, Array.isArray(opts?.groups) ? opts.groups.map(String) : []]),
+  );
+}
+
 // Extract the top-level group names from a raw services.yaml / bookmarks.yaml
 // string (list of single-key maps). Returns [] on parse errors.
 export function groupNamesFromRaw(content) {

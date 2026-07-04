@@ -9,6 +9,7 @@ export const CONFIG_TABS = [
   { label: "Docker", href: "/admin/docker" },
   { label: "Import", href: "/admin/import" },
   { label: "Layout", href: "/admin/layout" },
+  { label: "Profiles", href: "/admin/profiles" },
   { label: "Theme", href: "/admin/theme" },
   { label: "Health", href: "/admin/health" },
   { label: "History", href: "/admin/history" },

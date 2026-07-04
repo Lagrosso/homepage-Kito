@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { router } = vi.hoisted(() => ({
@@ -59,21 +59,44 @@ describe("/admin/users", () => {
   it("shows the user list and add form to admins", async () => {
     global.fetch
       .mockResolvedValueOnce(fetchResponse({ authenticated: true, user: { role: "admin", username: "admin" } }))
-      .mockResolvedValueOnce(usersResponse());
+      .mockResolvedValueOnce(usersResponse())
+      .mockResolvedValueOnce(fetchResponse({ content: "" })); // settings.yaml (profiles prefill)
 
     render(<AdminUsers />);
 
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 10000 });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3), { timeout: 10000 });
     expect(await screen.findByRole("heading", { name: "Add User" }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
     expect(screen.getAllByText("viewer").length).toBeGreaterThan(0);
+  });
+
+  it("prefills the groups field from a named profile", async () => {
+    global.fetch
+      .mockResolvedValueOnce(fetchResponse({ authenticated: true, user: { role: "admin", username: "admin" } }))
+      .mockResolvedValueOnce(usersResponse())
+      .mockResolvedValueOnce(fetchResponse({ content: "profiles:\n  Familie:\n    groups: [family, kids]\n" }));
+
+    render(<AdminUsers />);
+    await screen.findByRole("heading", { name: "Add User" });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+
+    const newUserSelect = screen.getByLabelText("Apply profile to new user");
+    await within(newUserSelect).findByRole("option", { name: "Familie" });
+    fireEvent.change(newUserSelect, { target: { value: "Familie" } });
+    expect(screen.getByLabelText("Groups")).toHaveValue("family, kids");
+
+    const viewerSelect = screen.getByLabelText("Apply profile to viewer");
+    await within(viewerSelect).findByRole("option", { name: "Familie" });
+    fireEvent.change(viewerSelect, { target: { value: "Familie" } });
+    expect(screen.getByLabelText("Groups for viewer")).toHaveValue("family, kids");
   });
 
   it("creates, changes roles, resets passwords and deletes through the API", async () => {
     global.fetch
       .mockResolvedValueOnce(fetchResponse({ authenticated: true, user: { role: "admin", username: "admin" } }))
       .mockResolvedValueOnce(usersResponse())
+      .mockResolvedValueOnce(fetchResponse({ content: "" })) // settings.yaml (profiles prefill)
       .mockResolvedValueOnce(fetchResponse({ user: { groups: [], role: "viewer", username: "bob" } }, 201))
       .mockResolvedValueOnce(usersResponse())
       .mockResolvedValueOnce(fetchResponse({ user: { groups: ["family", "media"], role: "viewer", username: "viewer" } }))

@@ -109,6 +109,9 @@
         "problematicOnly": "Problematic only",
         "summary": "{{problematic}} problematic, {{noCheck}} without checks"
     },
+    "dashboard": {
+        "allServicesTab": "All services & bookmarks"
+    },
     "quickAccess": {
         "favorites": "Favorites",
         "recent": "Recently used",

@@ -146,4 +146,25 @@ tabs:
     expect(checks[0].path).toBe("tabs.Family.access.groups");
     expect(checks[0].message).toContain('"unknown"');
   });
+
+  it("flags unknown groups assigned to a profile", () => {
+    const report = buildHealthReport(
+      {
+        ...EMPTY_FILES,
+        "settings.yaml": `
+profiles:
+  Familie:
+    groups:
+      - family
+      - unknown
+`,
+      },
+      { knownUserGroups: ["family"] },
+    );
+
+    const checks = allChecks(report).filter((check) => check.id.includes("unknown-access-group"));
+    expect(checks).toHaveLength(1);
+    expect(checks[0].path).toBe("profiles.Familie.groups");
+    expect(checks[0].message).toContain('"unknown"');
+  });
 });

@@ -173,6 +173,29 @@ function warnUnknownGroups(file, checks, path, accessGroups, knownUserGroups) {
   });
 }
 
+// Profiles (M10c) store their groups directly (`profiles.<name>.groups`), not
+// nested under `access` like services/bookmarks/tabs do, so they get their own
+// collector + warning path instead of reusing collectAccessGroups/warnUnknownGroups.
+function collectProfileGroups(entry) {
+  return Array.isArray(entry?.groups) ? entry.groups.map(String) : [];
+}
+
+function warnUnknownProfileGroups(file, checks, profileName, groups, knownUserGroups) {
+  groups.forEach((group) => {
+    if (!knownUserGroups.has(group)) {
+      addCheck(
+        checks,
+        file,
+        "warning",
+        "unknown-access-group",
+        `profiles.${profileName}.groups`,
+        `Access group "${group}" is not assigned to any user.`,
+        "Create or assign this group in /admin/users, or remove it from the entry.",
+      );
+    }
+  });
+}
+
 function rememberHref(hrefs, file, path, href) {
   if (!href) return;
   const key = href.trim();
@@ -348,6 +371,12 @@ function checkSettings(data, map, file, checks, context) {
   if (isObject(data.tabs)) {
     Object.entries(data.tabs).forEach(([tabName, options]) => {
       warnUnknownGroups(file, checks, `tabs.${tabName}`, collectAccessGroups(options), context.knownUserGroups);
+    });
+  }
+
+  if (isObject(data.profiles)) {
+    Object.entries(data.profiles).forEach(([profileName, options]) => {
+      warnUnknownProfileGroups(file, checks, profileName, collectProfileGroups(options), context.knownUserGroups);
     });
   }
 

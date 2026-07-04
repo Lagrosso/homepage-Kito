@@ -5,6 +5,7 @@ import {
   addInfoWidget,
   assignGroupToTab,
   deleteBookmarkEntry,
+  deleteProfile,
   deleteServiceEntry,
   deleteServiceWidget,
   deleteSetting,
@@ -22,9 +23,11 @@ import {
   moveWidget,
   moveWidgetToIndex,
   removeBackground,
+  renameProfile,
   renameTab,
   setBackgroundField,
   setGroupLayoutField,
+  setProfileGroups,
   setTabAccessGroups,
   updateBookmarkEntry,
   updateServiceEntry,
@@ -929,6 +932,107 @@ describe("deleteTab", () => {
     const data = yaml.load(out);
     expect(data.tabs.Ops).toBeUndefined();
     expect(data.tabs.Apps.access.groups).toEqual(["family"]);
+  });
+});
+
+// --- settings.yaml profiles (M10c) ----------------------------------------
+
+describe("setProfileGroups", () => {
+  it("creates the profiles: block for a fresh profile", () => {
+    const out = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family, kids, family");
+    const data = yaml.load(out);
+    expect(data.profiles.Familie.groups).toEqual(["family", "kids"]);
+    expect(out).toContain("# settings"); // comment preserved
+    // Untouched layout stays intact.
+    expect(data.layout.find((i) => i.Admin).Admin.tab).toBe("Ops");
+  });
+
+  it("updates an existing profile's groups without touching other profiles", () => {
+    const withA = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family");
+    const withB = setProfileGroups(withA, { profile: "Gast" }, "guest");
+    const data = yaml.load(withB);
+    expect(data.profiles.Familie.groups).toEqual(["family"]);
+    expect(data.profiles.Gast.groups).toEqual(["guest"]);
+
+    const changed = setProfileGroups(withB, { profile: "Familie" }, "family, kids");
+    const changedData = yaml.load(changed);
+    expect(changedData.profiles.Familie.groups).toEqual(["family", "kids"]);
+    expect(changedData.profiles.Gast.groups).toEqual(["guest"]); // unaffected
+  });
+
+  it("clearing groups removes the profile entry, and an emptied profiles: block", () => {
+    const withA = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family");
+    const cleared = setProfileGroups(withA, { profile: "Familie" }, "");
+    expect(yaml.load(cleared).profiles).toBeUndefined();
+    expect(cleared).not.toContain("profiles:");
+  });
+
+  it("clearing an already-absent profile is a byte-identical no-op", () => {
+    const out = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "");
+    expect(out).toBe(SETTINGS_LIST);
+  });
+
+  it("leaves one profile's groups alone when clearing a different one", () => {
+    const withBoth = setProfileGroups(setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family"), { profile: "Gast" }, "guest");
+    const out = setProfileGroups(withBoth, { profile: "Familie" }, "");
+    const data = yaml.load(out);
+    expect(data.profiles.Familie).toBeUndefined();
+    expect(data.profiles.Gast.groups).toEqual(["guest"]);
+  });
+
+  it("refuses when a bare placeholder is present", () => {
+    const bare = "title: x\nlayout:\n  - A:\n      tab: {{HOMEPAGE_VAR_X}}\n";
+    expect(() => setProfileGroups(bare, { profile: "A" }, "family")).toThrow(/unquoted/i);
+  });
+});
+
+describe("renameProfile", () => {
+  it("renames the profile and keeps comments", () => {
+    const withA = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family");
+    const out = renameProfile(withA, { from: "Familie", to: "Zuhause" });
+    const data = yaml.load(out);
+    expect(data.profiles.Familie).toBeUndefined();
+    expect(data.profiles.Zuhause.groups).toEqual(["family"]);
+    expect(out).toContain("# settings");
+  });
+
+  it("throws for an unknown profile", () => {
+    expect(() => renameProfile(SETTINGS_LIST, { from: "Nope", to: "X" })).toThrow(/not found/i);
+  });
+
+  it("merges groups into an existing target profile (union)", () => {
+    const withBoth = setProfileGroups(setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family"), { profile: "Gast" }, "guest");
+    const out = renameProfile(withBoth, { from: "Familie", to: "Gast" });
+    const data = yaml.load(out);
+    expect(data.profiles.Familie).toBeUndefined();
+    expect(new Set(data.profiles.Gast.groups)).toEqual(new Set(["guest", "family"]));
+  });
+
+  it("is a no-op when renaming to the same name", () => {
+    const withA = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family");
+    const out = renameProfile(withA, { from: "Familie", to: "Familie" });
+    expect(out).toBe(withA);
+  });
+});
+
+describe("deleteProfile", () => {
+  it("removes the profile entry and prunes an emptied profiles: block", () => {
+    const withA = setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family");
+    const out = deleteProfile(withA, { profile: "Familie" });
+    expect(yaml.load(out).profiles).toBeUndefined();
+    expect(out).not.toContain("profiles:");
+  });
+
+  it("throws for an unknown profile", () => {
+    expect(() => deleteProfile(SETTINGS_LIST, { profile: "Nope" })).toThrow(/not found/i);
+  });
+
+  it("leaves other profiles alone", () => {
+    const withBoth = setProfileGroups(setProfileGroups(SETTINGS_LIST, { profile: "Familie" }, "family"), { profile: "Gast" }, "guest");
+    const out = deleteProfile(withBoth, { profile: "Familie" });
+    const data = yaml.load(out);
+    expect(data.profiles.Familie).toBeUndefined();
+    expect(data.profiles.Gast.groups).toEqual(["guest"]);
   });
 });
 

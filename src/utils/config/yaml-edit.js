@@ -1004,3 +1004,137 @@ export function moveLayoutTab(rawText, { tab }, direction) {
   items.splice(insertAt, 0, ...block);
   return doc.toString();
 }
+
+// --- top-level `profiles:` block — named reusable group-set presets --------
+// Shape: `profiles: { <Name>: { groups: [...] } }`. Independent of tabs/layout;
+// used as presets for the admin "view as" preview switcher (M10b) and to
+// prefill the group textfield when creating/editing users (/admin/users). No
+// `access` wrapper here: a profile itself *is* a set of groups, not a thing
+// that has access, so it doesn't reuse applyAccessGroups' nested shape.
+
+function findProfilePair(profilesMap, name) {
+  return isMap(profilesMap) ? profilesMap.items.find((p) => String(p.key) === name) : undefined;
+}
+
+// Read a map's `groups` (direct, not nested under `access`) as a plain string
+// array (empty if absent/malformed).
+function getGroupsFromMap(map) {
+  const groupsNode = map.get("groups", true);
+  if (!isSeq(groupsNode)) {
+    return [];
+  }
+  return groupsNode.items.map((item) => String(isScalar(item) ? item.value : item));
+}
+
+// Set a map's `groups` field directly. Empty groups clears the field.
+function applyGroupsField(map, rawGroups) {
+  const groups = normalizeAccessGroups(rawGroups);
+  if (groups.length === 0) {
+    map.delete("groups");
+    return;
+  }
+  map.set("groups", groups);
+}
+
+// Set/replace a profile's groups. Empty groups clears/removes the entry (and
+// the whole `profiles:` block if it becomes empty). Returns new raw text.
+export function setProfileGroups(rawText, { profile }, groupsRaw) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const groups = normalizeAccessGroups(groupsRaw);
+
+  let profilesMap = root.get("profiles", true);
+
+  if (groups.length === 0) {
+    const pair = findProfilePair(profilesMap, profile);
+    if (!pair) {
+      return doc.toString(); // nothing to clear
+    }
+    profilesMap.items.splice(profilesMap.items.indexOf(pair), 1);
+    if (profilesMap.items.length === 0) {
+      root.delete("profiles");
+    }
+    return doc.toString();
+  }
+
+  if (!isMap(profilesMap)) {
+    if (isScalar(profilesMap) && profilesMap.value != null && profilesMap.value !== "") {
+      throw new Error("`profiles` is not a mapping — edit it in the raw editor.");
+    }
+    profilesMap = doc.createNode({});
+    profilesMap.flow = false;
+    root.set("profiles", profilesMap);
+    profilesMap = root.get("profiles", true);
+  }
+
+  let entry = profilesMap.get(profile, true);
+  if (!isMap(entry)) {
+    entry = doc.createNode({});
+    entry.flow = false;
+    profilesMap.set(profile, entry);
+    entry = profilesMap.get(profile, true);
+  }
+  applyGroupsField(entry, groups);
+  return doc.toString();
+}
+
+// Rename a profile. Merges into an existing `to` entry's groups (union) rather
+// than overwriting it, matching renameTab's merge behaviour.
+export function renameProfile(rawText, { from, to }) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const target = typeof to === "string" ? to.trim() : "";
+  if (!target) {
+    throw new Error("New profile name is required");
+  }
+  const profilesMap = root.get("profiles", true);
+  const fromPair = findProfilePair(profilesMap, from);
+  if (!fromPair) {
+    throw new Error(`Profile "${from}" not found`);
+  }
+  if (target === from) {
+    return doc.toString();
+  }
+
+  const fromGroups = isMap(fromPair.value) ? getGroupsFromMap(fromPair.value) : [];
+  profilesMap.items.splice(profilesMap.items.indexOf(fromPair), 1);
+
+  const toPair = findProfilePair(profilesMap, target);
+  const existingGroups = toPair && isMap(toPair.value) ? getGroupsFromMap(toPair.value) : [];
+  const mergedGroups = [...new Set([...existingGroups, ...fromGroups])];
+
+  let entry = profilesMap.get(target, true);
+  if (!isMap(entry)) {
+    entry = doc.createNode({});
+    entry.flow = false;
+    profilesMap.set(target, entry);
+    entry = profilesMap.get(target, true);
+  }
+  applyGroupsField(entry, mergedGroups);
+  return doc.toString();
+}
+
+// Delete a profile. Prunes an emptied `profiles:` block.
+export function deleteProfile(rawText, { profile }) {
+  const doc = parseConfigDoc(rawText);
+  const root = doc.contents;
+  if (!isMap(root)) {
+    throw new Error("settings.yaml is not a mapping");
+  }
+  const profilesMap = root.get("profiles", true);
+  const pair = findProfilePair(profilesMap, profile);
+  if (!pair) {
+    throw new Error(`Profile "${profile}" not found`);
+  }
+  profilesMap.items.splice(profilesMap.items.indexOf(pair), 1);
+  if (profilesMap.items.length === 0) {
+    root.delete("profiles");
+  }
+  return doc.toString();
+}
