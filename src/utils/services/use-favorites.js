@@ -1,12 +1,12 @@
 import useSWR from "swr";
 
 // Client access to the per-user preferences (M12). Backed by the session-bound
-// /api/user/preferences endpoint (NOT localStorage), so favorites and usage follow
-// the logged-in account across devices/browsers. SWR dedupes the single request
-// shared by all service tiles and the dashboard sections.
+// /api/user/preferences endpoint (NOT localStorage), so favorites follow the
+// logged-in account across devices/browsers. SWR dedupes the single request
+// shared by all service tiles and the dashboard favorites section.
 
 const PREFERENCES_URL = "/api/user/preferences";
-const EMPTY = { favorites: [], usage: {}, enabled: true };
+const EMPTY = { favorites: [], enabled: true };
 
 async function patchPreferences(body) {
   const res = await fetch(PREFERENCES_URL, {
@@ -25,7 +25,6 @@ export function useFavorites() {
   const prefs = data?.preferences ?? EMPTY;
   const enabled = prefs.enabled !== false;
   const favorites = Array.isArray(prefs.favorites) ? prefs.favorites : [];
-  const usage = prefs.usage && typeof prefs.usage === "object" ? prefs.usage : {};
 
   const optimistic = (nextPrefs) => ({ preferences: { ...prefs, ...nextPrefs } });
 
@@ -47,24 +46,12 @@ export function useFavorites() {
       populateCache: true,
     });
 
-  // Fire-and-forget: never blocks navigation. Revalidate so recent/frequent update.
-  const recordOpen = (key) => {
-    if (!enabled || !key) {
-      return;
-    }
-    patchPreferences({ recordOpen: key })
-      .then(() => mutate())
-      .catch(() => {});
-  };
-
   return {
     loaded: Boolean(data),
     enabled,
     favorites,
-    usage,
     isFavorite: (key) => favorites.includes(key),
     toggleFavorite,
-    recordOpen,
     setEnabled,
   };
 }

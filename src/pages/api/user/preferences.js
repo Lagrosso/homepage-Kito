@@ -1,15 +1,9 @@
-import {
-  getUserPreferences,
-  isValidPreferenceKey,
-  recordOpen,
-  setEnabled,
-  toggleFavorite,
-} from "utils/config/user-preferences";
+import { getUserPreferences, isValidPreferenceKey, setEnabled, toggleFavorite } from "utils/config/user-preferences";
 import { getSession, isAuthenticatedSession } from "utils/config/session";
 
 // Per-user dashboard preferences API (M12). Always operates on the *session*
 // user's own data — never another user's — so both admins and viewers may manage
-// their own favorites / usage history.
+// their own favorites.
 export default async function handler(req, res) {
   const session = await getSession(req, res);
   if (!isAuthenticatedSession(session)) {
@@ -30,11 +24,6 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "Invalid key" });
         }
         preferences = toggleFavorite(username, body.toggleFavorite);
-      } else if (typeof body.recordOpen === "string") {
-        if (!isValidPreferenceKey(body.recordOpen)) {
-          return res.status(400).json({ error: "Invalid key" });
-        }
-        preferences = recordOpen(username, body.recordOpen);
       } else if (typeof body.enabled === "boolean") {
         preferences = setEnabled(username, body.enabled);
       } else {

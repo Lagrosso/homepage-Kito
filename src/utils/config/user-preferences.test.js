@@ -21,8 +21,8 @@ afterEach(() => {
 
 describe("user-preferences store", () => {
   it("returns safe defaults when nothing is stored", () => {
-    expect(mod.getUserPreferences("alice")).toEqual({ favorites: [], usage: {}, enabled: true });
-    expect(mod.getUserPreferences("")).toEqual({ favorites: [], usage: {}, enabled: true });
+    expect(mod.getUserPreferences("alice")).toEqual({ favorites: [], enabled: true });
+    expect(mod.getUserPreferences("")).toEqual({ favorites: [], enabled: true });
   });
 
   it("toggles a favorite on and off and persists to disk per user", () => {
@@ -37,12 +37,16 @@ describe("user-preferences store", () => {
     expect(off.favorites).toEqual([]);
   });
 
-  it("records opens with a count and timestamp", () => {
-    mod.recordOpen("alice", "Media::Jellyfin");
-    const after = mod.recordOpen("alice", "Media::Jellyfin");
-    expect(after.usage["Media::Jellyfin"].count).toBe(2);
-    expect(typeof after.usage["Media::Jellyfin"].lastOpenedAt).toBe("string");
-    expect(after.usage["Media::Jellyfin"].lastOpenedAt.length).toBeGreaterThan(0);
+  it("drops a legacy usage key from an existing store on next write", () => {
+    // Simulate a pre-existing file written by the old recently/frequently-used
+    // feature; getUserPreferences must ignore `usage` and only surface favorites.
+    const file = join(confDir, "user-preferences.json");
+    const { writeFileSync } = require("node:fs");
+    writeFileSync(
+      file,
+      JSON.stringify({ alice: { favorites: ["Media::Jellyfin"], usage: { "Media::Plex": { count: 3 } }, enabled: true } }),
+    );
+    expect(mod.getUserPreferences("alice")).toEqual({ favorites: ["Media::Jellyfin"], enabled: true });
   });
 
   it("stores the enabled flag", () => {
@@ -53,7 +57,6 @@ describe("user-preferences store", () => {
 
   it("rejects invalid keys", () => {
     expect(() => mod.toggleFavorite("alice", "")).toThrow(/invalid/i);
-    expect(() => mod.recordOpen("alice", 123)).toThrow(/invalid/i);
     expect(mod.isValidPreferenceKey("a".repeat(600))).toBe(false);
     expect(mod.isValidPreferenceKey("Media::Jellyfin")).toBe(true);
   });

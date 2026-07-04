@@ -69,7 +69,6 @@ const favoritesMock = vi.hoisted(() => ({
   enabled: true,
   isFavorite: vi.fn(() => false),
   toggleFavorite: vi.fn(),
-  recordOpen: vi.fn(),
   setEnabled: vi.fn(),
 }));
 vi.mock("utils/services/use-favorites", () => ({ useFavorites: () => favoritesMock }));
@@ -81,7 +80,6 @@ describe("components/services/item", () => {
     favoritesMock.enabled = true;
     favoritesMock.isFavorite.mockReturnValue(false);
     favoritesMock.toggleFavorite.mockClear();
-    favoritesMock.recordOpen.mockClear();
   });
 
   it("renders the service title as a link when href is provided", () => {
@@ -387,20 +385,6 @@ describe("components/services/item", () => {
 
     fireEvent.click(screen.getByLabelText("Pin Jellyfin"));
     expect(favoritesMock.toggleFavorite).toHaveBeenCalledWith("Media::Jellyfin");
-  });
-
-  it("records an open when the service link is clicked", () => {
-    renderWithProviders(
-      <Item
-        groupName="Media"
-        useEqualHeights={false}
-        service={{ id: "svc1", name: "Jellyfin", href: "http://jf", icon: "mdi:test", widgets: [] }}
-      />,
-      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
-    );
-
-    fireEvent.click(screen.getByText("Jellyfin"));
-    expect(favoritesMock.recordOpen).toHaveBeenCalledWith("Media::Jellyfin");
   });
 
   it("hides the pin star when quick access is disabled", () => {

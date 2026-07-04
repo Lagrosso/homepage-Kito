@@ -114,8 +114,6 @@
     },
     "quickAccess": {
         "favorites": "Favorites",
-        "recent": "Recently used",
-        "frequent": "Frequently used",
         "favoritesOnly": "Favorites only",
         "hide": "Hide quick access",
         "show": "Show quick access"

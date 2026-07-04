@@ -7,7 +7,6 @@ const { getSession, store } = vi.hoisted(() => ({
   store: {
     getUserPreferences: vi.fn(),
     toggleFavorite: vi.fn(),
-    recordOpen: vi.fn(),
     setEnabled: vi.fn(),
     isValidPreferenceKey: vi.fn(() => true),
   },
@@ -36,7 +35,7 @@ describe("pages/api/user/preferences", () => {
   });
 
   it("GET returns the session user's preferences", async () => {
-    store.getUserPreferences.mockReturnValue({ favorites: ["a"], usage: {}, enabled: true });
+    store.getUserPreferences.mockReturnValue({ favorites: ["a"], enabled: true });
     const res = createMockRes();
     await handler({ method: "GET" }, res);
     expect(store.getUserPreferences).toHaveBeenCalledWith("alice");
@@ -45,23 +44,15 @@ describe("pages/api/user/preferences", () => {
   });
 
   it("PATCH toggleFavorite acts only on the session user", async () => {
-    store.toggleFavorite.mockReturnValue({ favorites: ["Media::Jellyfin"], usage: {}, enabled: true });
+    store.toggleFavorite.mockReturnValue({ favorites: ["Media::Jellyfin"], enabled: true });
     const res = createMockRes();
     await handler({ method: "PATCH", body: { toggleFavorite: "Media::Jellyfin" } }, res);
     expect(store.toggleFavorite).toHaveBeenCalledWith("alice", "Media::Jellyfin");
     expect(res.statusCode).toBe(200);
   });
 
-  it("PATCH recordOpen records for the session user", async () => {
-    store.recordOpen.mockReturnValue({ favorites: [], usage: { "Media::Jellyfin": { count: 1 } }, enabled: true });
-    const res = createMockRes();
-    await handler({ method: "PATCH", body: { recordOpen: "Media::Jellyfin" } }, res);
-    expect(store.recordOpen).toHaveBeenCalledWith("alice", "Media::Jellyfin");
-    expect(res.statusCode).toBe(200);
-  });
-
   it("PATCH enabled toggles the flag", async () => {
-    store.setEnabled.mockReturnValue({ favorites: [], usage: {}, enabled: false });
+    store.setEnabled.mockReturnValue({ favorites: [], enabled: false });
     const res = createMockRes();
     await handler({ method: "PATCH", body: { enabled: false } }, res);
     expect(store.setEnabled).toHaveBeenCalledWith("alice", false);

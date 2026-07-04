@@ -1,10 +1,10 @@
 import { serviceKey } from "./service-key";
 
-// Pure helpers that turn favorites / usage data (M12) into synthetic service
-// groups the dashboard can render with the normal <ServicesGroup>. Each collected
-// service is cloned with `favoriteKey` = its original group::name so the pin star
-// and click tracking keep acting on the original service, not the synthetic
-// "Favorites"/"Recently used" section it is shown in.
+// Pure helpers that turn favorites data (M12) into a synthetic service group the
+// dashboard can render with the normal <ServicesGroup>. Each collected service is
+// cloned with `favoriteKey` = its original group::name so the pin star keeps
+// acting on the original service, not the synthetic "Favorites" section it is
+// shown in.
 
 // Flatten all services (recursing subgroups), keyed by serviceKey. First
 // occurrence wins if a name somehow repeats.
@@ -34,28 +34,6 @@ function synthGroup(name, services) {
 export function buildFavoritesGroup(groups, favoriteKeys, name = "Favorites") {
   const index = indexServices(groups);
   const services = (favoriteKeys ?? []).map((key) => index.get(key)).filter(Boolean);
-  return synthGroup(name, services);
-}
-
-// Most recently opened services (top `limit` by lastOpenedAt).
-export function buildRecentGroup(groups, usage, limit = 6, name = "Recently used") {
-  const index = indexServices(groups);
-  const services = Object.entries(usage ?? {})
-    .filter(([key]) => index.has(key))
-    .sort(([, a], [, b]) => String(b?.lastOpenedAt ?? "").localeCompare(String(a?.lastOpenedAt ?? "")))
-    .slice(0, limit)
-    .map(([key]) => index.get(key));
-  return synthGroup(name, services);
-}
-
-// Most frequently opened services (top `limit` by count).
-export function buildFrequentGroup(groups, usage, limit = 6, name = "Frequently used") {
-  const index = indexServices(groups);
-  const services = Object.entries(usage ?? {})
-    .filter(([key]) => index.has(key) && (usage[key]?.count ?? 0) > 0)
-    .sort(([, a], [, b]) => (b?.count ?? 0) - (a?.count ?? 0))
-    .slice(0, limit)
-    .map(([key]) => index.get(key));
   return synthGroup(name, services);
 }
 

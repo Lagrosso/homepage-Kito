@@ -32,12 +32,7 @@ import createLogger from "utils/logger";
 import { buildGroupTargets } from "utils/quicklaunch/commands";
 import { ALL_TAB_LABEL_KEY } from "utils/services/all-tab";
 import { filterBookmarkGroupsForGroups, filterServiceGroupsForGroups, isTabVisibleForGroups } from "utils/services/preview-access";
-import {
-  buildFavoritesGroup,
-  buildFrequentGroup,
-  buildRecentGroup,
-  filterServiceGroupForFavorites,
-} from "utils/services/quick-access";
+import { buildFavoritesGroup, filterServiceGroupForFavorites } from "utils/services/quick-access";
 import { serviceKey } from "utils/services/service-key";
 import { isTabVisibleForUser } from "utils/services/tab-access";
 import { useFavorites } from "utils/services/use-favorites";
@@ -278,7 +273,7 @@ function Home({ initialSettings }) {
   const { data: widgets } = useSWR("/api/widgets");
   const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
-  const { enabled: quickAccessEnabled, favorites, usage, setEnabled: setQuickAccessEnabled } = useFavorites();
+  const { enabled: quickAccessEnabled, favorites, setEnabled: setQuickAccessEnabled } = useFavorites();
   // Admin-only "view as profile" preview (M10b): a client-side re-filter of the
   // already-loaded, unfiltered (for admins) services/bookmarks/tabs — never
   // persisted, resets on reload. See utils/services/preview-access.js.
@@ -305,18 +300,14 @@ function Home({ initialSettings }) {
 
   const favoriteKeySet = useMemo(() => new Set(favorites), [favorites]);
 
-  // Synthetic quick-access groups (★ favorites / recently / frequently used),
-  // shown above the tabs when the feature is enabled and non-empty.
+  // Synthetic quick-access group (★ favorites), shown above the tabs when the
+  // feature is enabled and there is at least one favorite.
   const quickAccessGroups = useMemo(() => {
     if (!quickAccessEnabled || !services) {
       return [];
     }
-    return [
-      buildFavoritesGroup(services, favorites, t("quickAccess.favorites")),
-      buildRecentGroup(services, usage, 6, t("quickAccess.recent")),
-      buildFrequentGroup(services, usage, 6, t("quickAccess.frequent")),
-    ].filter(Boolean);
-  }, [quickAccessEnabled, services, favorites, usage, t]);
+    return [buildFavoritesGroup(services, favorites, t("quickAccess.favorites"))].filter(Boolean);
+  }, [quickAccessEnabled, services, favorites, t]);
 
   useEffect(() => {
     const language = normalizeLanguage(settings.language);

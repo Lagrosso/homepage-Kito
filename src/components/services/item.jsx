@@ -24,11 +24,10 @@ export default function Item({ service, groupName, useEqualHeights }) {
   const { url: resolvedHref } = resolveServiceUrl(service, networkContext);
   const hasLink = resolvedHref && resolvedHref !== "#";
   const showPublicWarning = hasLink && isPublicUrl(resolvedHref);
-  const { enabled: quickAccessEnabled, isFavorite, toggleFavorite, recordOpen } = useFavorites();
+  const { enabled: quickAccessEnabled, isFavorite, toggleFavorite } = useFavorites();
   // Use the original group::name key even when shown in a synthetic quick-access section.
   const favKey = service.favoriteKey ?? serviceKey(groupName, service.name);
   const favorited = isFavorite(favKey);
-  const onOpen = () => recordOpen(favKey);
   const showStats = service.showStats === false ? false : settings.showStats;
   const statusStyle = service.statusStyle !== undefined ? service.statusStyle : settings.statusStyle;
   const [statsOpen, setStatsOpen] = useState(service.showStats);
@@ -61,8 +60,6 @@ export default function Item({ service, groupName, useEqualHeights }) {
                 href={resolvedHref}
                 target={service.target ?? settings.target ?? "_blank"}
                 rel="noreferrer"
-                onClick={onOpen}
-                onAuxClick={onOpen}
                 className="shrink-0 flex items-center justify-center w-12 service-icon z-10"
                 aria-label={service.icon}
               >
@@ -79,8 +76,6 @@ export default function Item({ service, groupName, useEqualHeights }) {
               href={resolvedHref}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
-              onClick={onOpen}
-              onAuxClick={onOpen}
               className="flex-1 flex items-center justify-between rounded-r-md service-title-text"
             >
               <div className="flex-1 px-2 py-2 text-sm text-left z-10 service-name">
