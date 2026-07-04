@@ -3,7 +3,7 @@ import ConfigEditor, { Field, inputClass, shortenUrl } from "components/admin/co
 import ResolvedIcon from "components/resolvedicon";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
-import { MdDelete, MdEdit, MdSearch } from "react-icons/md";
+import { MdDelete, MdEdit, MdInfoOutline, MdSearch } from "react-icons/md";
 
 import { useLayoutGoverns } from "components/admin/use-layout-governs";
 import { isPlaceholder, maskValue } from "utils/config/secret-mask";
@@ -82,6 +82,7 @@ function parseServices(content) {
             widget: maskWidget(value?.widget),
             accessGroups: Array.isArray(value?.access?.groups) ? value.access.groups : [],
             urls: value?.urls && typeof value.urls === "object" ? value.urls : undefined,
+            docs: value?.docs && typeof value.docs === "object" ? value.docs : undefined,
           };
         });
       return { name, entries };
@@ -167,6 +168,11 @@ function ServiceCard({ entry, onEdit, onDelete }) {
             </span>
           </div>
         )}
+        {entry.docs && Object.values(entry.docs).some((value) => value?.trim()) && (
+          <div className="shrink-0 self-start m-1" title="Hat Service-Doku">
+            <MdInfoOutline className="w-4 h-4 text-theme-400" />
+          </div>
+        )}
         {(onEdit || onDelete) && (
           <div className="shrink-0 self-start flex gap-1 m-1">
             {onEdit && (
@@ -210,6 +216,12 @@ const EMPTY_FORM = {
   urlLan: "",
   urlTailscale: "",
   urlPublic: "",
+  docPurpose: "",
+  docLocation: "",
+  docBackup: "",
+  docAdmin: "",
+  docNote: "",
+  docTroubleshooting: "",
   widgetEnabled: false,
   widgetType: SERVICE_WIDGET_TEMPLATES[0].type,
   widgetOptions: {},
@@ -220,6 +232,18 @@ const URL_FORM_FIELDS = [
   ["urlLan", "lan", "LAN URL"],
   ["urlTailscale", "tailscale", "Tailscale URL"],
   ["urlPublic", "public", "Public URL"],
+];
+
+// Maps form field keys (docPurpose/…) to the YAML docs.* keys and back.
+// The fourth entry picks the form control: "textarea" for potentially
+// multi-line fields, "input" for short ones.
+const DOCS_FORM_FIELDS = [
+  ["docPurpose", "purpose", "Zweck", "input"],
+  ["docLocation", "location", "Standort (wo läuft er)", "input"],
+  ["docBackup", "backup", "Backup", "input"],
+  ["docAdmin", "admin", "Admin-Kontakt", "input"],
+  ["docNote", "note", "Notiz", "textarea"],
+  ["docTroubleshooting", "troubleshooting", "Was tun bei Fehler", "textarea"],
 ];
 
 function uniqueFields(fields) {
@@ -503,6 +527,12 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             urlLan: initial?.urls?.lan ?? "",
             urlTailscale: initial?.urls?.tailscale ?? "",
             urlPublic: initial?.urls?.public ?? "",
+            docPurpose: initial?.docs?.purpose ?? "",
+            docLocation: initial?.docs?.location ?? "",
+            docBackup: initial?.docs?.backup ?? "",
+            docAdmin: initial?.docs?.admin ?? "",
+            docNote: initial?.docs?.note ?? "",
+            docTroubleshooting: initial?.docs?.troubleshooting ?? "",
             widgetEnabled: Boolean(initial?.widget?.type && initial?.widget?.supported),
             widgetType:
               initial?.widget?.type && initial?.widget?.supported
@@ -581,6 +611,15 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
       if (Object.keys(urls).length > 0) {
         addValues.urls = urls;
       }
+      const docs = {};
+      DOCS_FORM_FIELDS.forEach(([formKey, docKey]) => {
+        if (form[formKey].trim()) {
+          docs[docKey] = form[formKey].trim();
+        }
+      });
+      if (Object.keys(docs).length > 0) {
+        addValues.docs = docs;
+      }
       onSubmit(addValues);
       return;
     }
@@ -607,6 +646,18 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     });
     if (Object.keys(urlChanges).length > 0) {
       values.urls = urlChanges;
+    }
+    // Only send the docs keys that actually changed (empty = remove that field).
+    const docChanges = {};
+    DOCS_FORM_FIELDS.forEach(([formKey, docKey]) => {
+      const current = form[formKey].trim();
+      const original = String(initial?.docs?.[docKey] ?? "");
+      if (current !== original) {
+        docChanges[docKey] = current;
+      }
+    });
+    if (Object.keys(docChanges).length > 0) {
+      values.docs = docChanges;
     }
     if (!form.widgetEnabled && initial?.widget?.type && initial?.widget?.supported) {
       values.__widget = { delete: true };
@@ -698,6 +749,27 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                         placeholder={formKey === "urlPublic" ? "https://service.example.com" : "http://192.168.1.2:8080"}
                         className={inputClass}
                       />
+                    </Field>
+                  ))}
+                </div>
+              </details>
+              <details className="block text-sm rounded-md border border-theme-200 dark:border-theme-700 px-3 py-2">
+                <summary className="cursor-pointer font-medium">Service docs (optional)</summary>
+                <p className="mt-1 mb-2 text-xs text-theme-400">
+                  Strukturierte Doku, im Dashboard über ein Info-Icon auf der Kachel abrufbar.
+                </p>
+                <div className="space-y-2">
+                  {DOCS_FORM_FIELDS.map(([formKey, , label, kind]) => (
+                    <Field key={formKey} label={label}>
+                      {kind === "textarea" ? (
+                        <textarea
+                          value={form[formKey]}
+                          onChange={setField(formKey)}
+                          className={`${inputClass} min-h-16`}
+                        />
+                      ) : (
+                        <input value={form[formKey]} onChange={setField(formKey)} className={inputClass} />
+                      )}
                     </Field>
                   ))}
                 </div>

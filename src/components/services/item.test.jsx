@@ -54,6 +54,11 @@ vi.mock("./proxmox-status", () => ({
     return <div data-testid="proxmox-status" />;
   },
 }));
+vi.mock("./service-docs-button", () => ({
+  default: function ServiceDocsButtonMock({ docs, serviceName }) {
+    return <div data-testid="service-docs-button">{serviceName}:{Object.keys(docs ?? {}).join(",")}</div>;
+  },
+}));
 vi.mock("./widget", () => ({
   default: function ServiceWidgetMock({ widget }) {
     return <div data-testid="service-widget">idx:{widget.index}</div>;
@@ -322,6 +327,38 @@ describe("components/services/item", () => {
     );
 
     expect(screen.queryByText("Public link (goes over the internet)")).not.toBeInTheDocument();
+  });
+
+  it("does not render the docs button when the service has no docs", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "My Service", href: "http://localhost/", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.queryByTestId("service-docs-button")).not.toBeInTheDocument();
+  });
+
+  it("renders the docs button with the service's docs when present", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{
+          id: "svc1",
+          name: "My Service",
+          href: "http://localhost/",
+          widgets: [],
+          docs: { purpose: "Media server" },
+        }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.getByTestId("service-docs-button")).toHaveTextContent("My Service:purpose");
   });
 
   it("toggles a favorite with the group::name key when the pin star is clicked", () => {

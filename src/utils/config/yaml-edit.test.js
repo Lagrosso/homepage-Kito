@@ -221,6 +221,73 @@ describe("updateServiceEntry", () => {
     );
     expect(yaml.load(out)[0]["My First Group"][0]["My First Service"].urls).toBeUndefined();
   });
+
+  it("adds nested docs and keeps other fields + comments", () => {
+    const out = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "Media server", location: "Proxmox host X" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.docs).toEqual({ purpose: "Media server", location: "Proxmox host X" });
+    // Untouched fields + inline comment preserved.
+    expect(out).toContain("href: http://localhost/ # inline note");
+    expect(out).toContain("ping: 8.8.8.8");
+  });
+
+  it("updates one docs key without touching the others", () => {
+    const withDocs = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "old purpose", admin: "tob" } },
+    );
+    const out = updateServiceEntry(
+      withDocs,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "new purpose" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.docs).toEqual({ purpose: "new purpose", admin: "tob" });
+  });
+
+  it("removes a single docs key with an empty string", () => {
+    const withDocs = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "a", backup: "b" } },
+    );
+    const out = updateServiceEntry(
+      withDocs,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { backup: "" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.docs).toEqual({ purpose: "a" });
+  });
+
+  it("removes the whole docs map when the last key is cleared", () => {
+    const withDocs = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "a" } },
+    );
+    const out = updateServiceEntry(
+      withDocs,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { purpose: "" } },
+    );
+    expect(yaml.load(out)[0]["My First Group"][0]["My First Service"].docs).toBeUndefined();
+  });
+
+  it("round-trips a multi-line troubleshooting value", () => {
+    const out = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { docs: { troubleshooting: "Step 1: restart\nStep 2: check logs" } },
+    );
+    const svc = yaml.load(out)[0]["My First Group"][0]["My First Service"];
+    expect(svc.docs.troubleshooting).toBe("Step 1: restart\nStep 2: check logs");
+  });
 });
 
 describe("hasBarePlaceholder", () => {

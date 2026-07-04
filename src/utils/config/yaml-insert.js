@@ -18,17 +18,21 @@ function needsQuoting(value) {
     value === "" ||
     /^\s|\s$/.test(value) || // leading/trailing whitespace
     /[:#[\]{}&*!|>'"%@`,]/.test(value) || // YAML-significant characters
-    /^[-?]/.test(value) // could be read as a list item / complex key
+    /^[-?]/.test(value) || // could be read as a list item / complex key
+    /[\r\n]/.test(value) // embedded line breaks (e.g. multi-line docs fields)
   );
 }
 
 // Quote + escape a scalar only when necessary, keeping simple values clean.
+// Embedded line breaks become the two-character `\n` escape (a raw line break
+// inside a double-quoted plain-line scalar would otherwise fold into a space
+// or break the document, since this module splices single text lines).
 export function quoteScalar(value) {
   const s = String(value ?? "");
   if (!needsQuoting(s)) {
     return s;
   }
-  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, "\\n")}"`;
 }
 
 function normalizeGroups(groups) {
@@ -65,14 +69,30 @@ function appendUrls(lines, urls, indent = "        ") {
   present.forEach((key) => lines.push(`${indent}  ${key}: ${quoteScalar(urls[key].trim())}`));
 }
 
+// Structured service docs (M15): free-text documentation fields.
+const DOCS_CONTEXT_KEYS = ["purpose", "location", "backup", "admin", "note", "troubleshooting"];
+
+function appendDocs(lines, docs, indent = "        ") {
+  if (!docs || typeof docs !== "object") {
+    return;
+  }
+  const present = DOCS_CONTEXT_KEYS.filter((key) => typeof docs[key] === "string" && docs[key].trim());
+  if (present.length === 0) {
+    return;
+  }
+  lines.push(`${indent}docs:`);
+  present.forEach((key) => lines.push(`${indent}  ${key}: ${quoteScalar(docs[key].trim())}`));
+}
+
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls }) {
+export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls, docs }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
   }
   appendUrls(lines, urls);
+  appendDocs(lines, docs);
   if (description) {
     lines.push(`        description: ${quoteScalar(description)}`);
   }
@@ -168,12 +188,12 @@ export function insertEntry(rawText, group, entry) {
 // Insert a service into a raw services.yaml string.
 export function insertService(
   rawText,
-  { group, name, href, description, icon, server, container, accessGroups, urls },
+  { group, name, href, description, icon, server, container, accessGroups, urls, docs },
 ) {
   return insertEntry(
     rawText,
     group,
-    buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls }),
+    buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls, docs }),
   );
 }
 

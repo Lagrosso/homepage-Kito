@@ -220,6 +220,51 @@ function applyUrls(doc, map, rawUrls) {
   }
 }
 
+// Structured service docs (M15): free-text documentation fields shown via an
+// info dialog on the dashboard card. Same shape/semantics as applyUrls.
+export const SERVICE_DOCS_KEYS = ["purpose", "location", "backup", "admin", "note", "troubleshooting"];
+
+// Set/clear the nested `docs` map on a service. Only the keys present in
+// `rawDocs` are touched; an empty string removes that key; when `docs` ends up
+// empty it is removed entirely. `undefined` leaves `docs` untouched.
+function applyDocs(doc, map, rawDocs) {
+  if (rawDocs === undefined) {
+    return;
+  }
+  const docs = rawDocs && typeof rawDocs === "object" ? rawDocs : {};
+  let docsMap = map.get("docs", true);
+
+  SERVICE_DOCS_KEYS.forEach((key) => {
+    const raw = docs[key];
+    if (raw === undefined) {
+      return;
+    }
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (value === "" || value === null) {
+      if (isMap(docsMap)) {
+        docsMap.delete(key);
+      }
+      return;
+    }
+    if (!isMap(docsMap)) {
+      docsMap = doc.createNode({});
+      docsMap.flow = false;
+      map.set("docs", docsMap);
+      docsMap = map.get("docs", true);
+    }
+    const existing = docsMap.get(key, true);
+    if (isScalar(existing)) {
+      existing.value = value;
+    } else {
+      docsMap.set(key, value);
+    }
+  });
+
+  if (isMap(docsMap) && docsMap.items.length === 0) {
+    map.delete("docs");
+  }
+}
+
 // Edit an existing service's fields and/or rename it. Only the keys present in
 // `values` are touched; an empty string removes that field; unknown/nested
 // fields (widget:, ping:, …) on the entry are left untouched. Returns new raw text.
@@ -237,6 +282,7 @@ export function updateServiceEntry(rawText, { group, name }, values) {
   EDITABLE_SERVICE_FIELDS.forEach((field) => applyScalarField(propsMap, field, values[field]));
   applyAccessGroups(doc, propsMap, values.accessGroups);
   applyUrls(doc, propsMap, values.urls);
+  applyDocs(doc, propsMap, values.docs);
 
   return doc.toString();
 }

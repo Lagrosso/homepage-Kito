@@ -21,6 +21,11 @@ describe("quoteScalar", () => {
   it("quotes empty strings", () => {
     expect(quoteScalar("")).toBe('""');
   });
+
+  it("escapes embedded line breaks so multi-line values stay valid single-line YAML", () => {
+    expect(quoteScalar("Step 1\nStep 2")).toBe('"Step 1\\nStep 2"');
+    expect(yaml.load(`key: ${quoteScalar("Step 1\nStep 2")}`)).toEqual({ key: "Step 1\nStep 2" });
+  });
 });
 
 describe("buildServiceEntry", () => {
@@ -63,6 +68,22 @@ describe("buildServiceEntry", () => {
     expect(entry).toContain("access:");
     expect(entry).toContain("groups: [family, media]");
   });
+
+  it("includes only the docs fields that are set", () => {
+    const entry = buildServiceEntry({
+      name: "Jellyfin",
+      href: "http://jellyfin/",
+      docs: { purpose: "Media server", admin: "" },
+    });
+    expect(entry).toContain("docs:");
+    expect(entry).toContain("purpose: Media server");
+    expect(entry).not.toContain("admin:");
+  });
+
+  it("omits the docs block entirely when no field is set", () => {
+    const entry = buildServiceEntry({ name: "Jellyfin", href: "http://jellyfin/", docs: { purpose: "" } });
+    expect(entry).not.toContain("docs:");
+  });
 });
 
 describe("insertService", () => {
@@ -97,6 +118,22 @@ describe("insertService", () => {
       href: "http://localhost:8096/web/#/home",
     });
     expect(() => yaml.load(result)).not.toThrow();
+  });
+
+  it("produces valid, round-trippable YAML with docs fields, including special characters", () => {
+    const result = insertService(base, {
+      group: "Media",
+      name: "Jellyfin",
+      href: "http://jellyfin/",
+      docs: { purpose: "Media: streaming", note: 'quotes "here"', troubleshooting: "Step 1\nStep 2" },
+    });
+    const parsed = yaml.load(result);
+    const jellyfin = parsed.find((g) => g.Media).Media.find((s) => s.Jellyfin).Jellyfin;
+    expect(jellyfin.docs).toEqual({
+      purpose: "Media: streaming",
+      note: 'quotes "here"',
+      troubleshooting: "Step 1\nStep 2",
+    });
   });
 
   it("handles empty input by creating the first group", () => {
