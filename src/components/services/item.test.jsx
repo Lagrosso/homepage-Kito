@@ -66,10 +66,8 @@ vi.mock("./widget", () => ({
 }));
 
 const favoritesMock = vi.hoisted(() => ({
-  enabled: true,
   isFavorite: vi.fn(() => false),
   toggleFavorite: vi.fn(),
-  setEnabled: vi.fn(),
 }));
 vi.mock("utils/services/use-favorites", () => ({ useFavorites: () => favoritesMock }));
 
@@ -77,7 +75,6 @@ import Item from "./item";
 
 describe("components/services/item", () => {
   beforeEach(() => {
-    favoritesMock.enabled = true;
     favoritesMock.isFavorite.mockReturnValue(false);
     favoritesMock.toggleFavorite.mockClear();
   });
@@ -387,8 +384,7 @@ describe("components/services/item", () => {
     expect(favoritesMock.toggleFavorite).toHaveBeenCalledWith("Media::Jellyfin");
   });
 
-  it("hides the pin star when quick access is disabled", () => {
-    favoritesMock.enabled = false;
+  it("always shows the pin star", () => {
     renderWithProviders(
       <Item
         groupName="Media"
@@ -398,6 +394,6 @@ describe("components/services/item", () => {
       { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
     );
 
-    expect(screen.queryByLabelText("Pin Jellyfin")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Pin Jellyfin")).toBeInTheDocument();
   });
 });

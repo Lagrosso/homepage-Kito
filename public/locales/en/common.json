@@ -114,9 +114,7 @@
     },
     "quickAccess": {
         "favorites": "Favorites",
-        "favoritesOnly": "Favorites only",
-        "hide": "Hide quick access",
-        "show": "Show quick access"
+        "favoritesOnly": "Favorites only"
     },
     "emby": {
         "playing": "Playing",

@@ -21,8 +21,8 @@ afterEach(() => {
 
 describe("user-preferences store", () => {
   it("returns safe defaults when nothing is stored", () => {
-    expect(mod.getUserPreferences("alice")).toEqual({ favorites: [], enabled: true });
-    expect(mod.getUserPreferences("")).toEqual({ favorites: [], enabled: true });
+    expect(mod.getUserPreferences("alice")).toEqual({ favorites: [] });
+    expect(mod.getUserPreferences("")).toEqual({ favorites: [] });
   });
 
   it("toggles a favorite on and off and persists to disk per user", () => {
@@ -37,22 +37,19 @@ describe("user-preferences store", () => {
     expect(off.favorites).toEqual([]);
   });
 
-  it("drops a legacy usage key from an existing store on next write", () => {
+  it("drops legacy usage/enabled keys from an existing store", () => {
     // Simulate a pre-existing file written by the old recently/frequently-used
-    // feature; getUserPreferences must ignore `usage` and only surface favorites.
+    // and quick-access on/off features; getUserPreferences must ignore `usage`
+    // and `enabled` and only surface favorites.
     const file = join(confDir, "user-preferences.json");
     const { writeFileSync } = require("node:fs");
     writeFileSync(
       file,
-      JSON.stringify({ alice: { favorites: ["Media::Jellyfin"], usage: { "Media::Plex": { count: 3 } }, enabled: true } }),
+      JSON.stringify({
+        alice: { favorites: ["Media::Jellyfin"], usage: { "Media::Plex": { count: 3 } }, enabled: false },
+      }),
     );
-    expect(mod.getUserPreferences("alice")).toEqual({ favorites: ["Media::Jellyfin"], enabled: true });
-  });
-
-  it("stores the enabled flag", () => {
-    expect(mod.setEnabled("alice", false).enabled).toBe(false);
-    expect(mod.getUserPreferences("alice").enabled).toBe(false);
-    expect(mod.setEnabled("alice", true).enabled).toBe(true);
+    expect(mod.getUserPreferences("alice")).toEqual({ favorites: ["Media::Jellyfin"] });
   });
 
   it("rejects invalid keys", () => {

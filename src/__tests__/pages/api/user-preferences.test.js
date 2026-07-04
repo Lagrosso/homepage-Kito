@@ -7,7 +7,6 @@ const { getSession, store } = vi.hoisted(() => ({
   store: {
     getUserPreferences: vi.fn(),
     toggleFavorite: vi.fn(),
-    setEnabled: vi.fn(),
     isValidPreferenceKey: vi.fn(() => true),
   },
 }));
@@ -35,7 +34,7 @@ describe("pages/api/user/preferences", () => {
   });
 
   it("GET returns the session user's preferences", async () => {
-    store.getUserPreferences.mockReturnValue({ favorites: ["a"], enabled: true });
+    store.getUserPreferences.mockReturnValue({ favorites: ["a"] });
     const res = createMockRes();
     await handler({ method: "GET" }, res);
     expect(store.getUserPreferences).toHaveBeenCalledWith("alice");
@@ -44,19 +43,11 @@ describe("pages/api/user/preferences", () => {
   });
 
   it("PATCH toggleFavorite acts only on the session user", async () => {
-    store.toggleFavorite.mockReturnValue({ favorites: ["Media::Jellyfin"], enabled: true });
+    store.toggleFavorite.mockReturnValue({ favorites: ["Media::Jellyfin"] });
     const res = createMockRes();
     await handler({ method: "PATCH", body: { toggleFavorite: "Media::Jellyfin" } }, res);
     expect(store.toggleFavorite).toHaveBeenCalledWith("alice", "Media::Jellyfin");
     expect(res.statusCode).toBe(200);
-  });
-
-  it("PATCH enabled toggles the flag", async () => {
-    store.setEnabled.mockReturnValue({ favorites: [], enabled: false });
-    const res = createMockRes();
-    await handler({ method: "PATCH", body: { enabled: false } }, res);
-    expect(store.setEnabled).toHaveBeenCalledWith("alice", false);
-    expect(res.body.preferences.enabled).toBe(false);
   });
 
   it("PATCH rejects an invalid key", async () => {

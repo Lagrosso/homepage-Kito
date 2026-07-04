@@ -273,7 +273,7 @@ function Home({ initialSettings }) {
   const { data: widgets } = useSWR("/api/widgets");
   const { data: serviceStatusReport } = useServiceStatusReport();
   const [serviceFilter, setServiceFilter] = useState("all");
-  const { enabled: quickAccessEnabled, favorites, setEnabled: setQuickAccessEnabled } = useFavorites();
+  const { favorites } = useFavorites();
   // Admin-only "view as profile" preview (M10b): a client-side re-filter of the
   // already-loaded, unfiltered (for admins) services/bookmarks/tabs — never
   // persisted, resets on reload. See utils/services/preview-access.js.
@@ -300,14 +300,14 @@ function Home({ initialSettings }) {
 
   const favoriteKeySet = useMemo(() => new Set(favorites), [favorites]);
 
-  // Synthetic quick-access group (★ favorites), shown above the tabs when the
-  // feature is enabled and there is at least one favorite.
+  // Synthetic quick-access group (★ favorites), shown above the tabs when there
+  // is at least one favorite.
   const quickAccessGroups = useMemo(() => {
-    if (!quickAccessEnabled || !services) {
+    if (!services) {
       return [];
     }
     return [buildFavoritesGroup(services, favorites, t("quickAccess.favorites"))].filter(Boolean);
-  }, [quickAccessEnabled, services, favorites, t]);
+  }, [services, favorites, t]);
 
   useEffect(() => {
     const language = normalizeLanguage(settings.language);
@@ -474,7 +474,7 @@ function Home({ initialSettings }) {
 
     return (
       <>
-        {quickAccessEnabled && quickAccessGroups.length > 0 && (
+        {quickAccessGroups.length > 0 && (
           <div key="quick-access" id="quick-access" className="flex flex-wrap m-4 sm:m-8 sm:mb-0 items-start">
             {quickAccessGroups.map((group) => (
               <ServicesGroup
@@ -506,7 +506,7 @@ function Home({ initialSettings }) {
             </ul>
           </div>
         )}
-        {(serviceStatusReport?.summary?.total > 0 || quickAccessEnabled) && (
+        {(serviceStatusReport?.summary?.total > 0 || favorites.length > 0) && (
           <div key="service-filter" className="mx-5 sm:mx-9 mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -532,7 +532,7 @@ function Home({ initialSettings }) {
                 {t("serviceStatus.problematicOnly")}
               </button>
             )}
-            {quickAccessEnabled && favorites.length > 0 && (
+            {favorites.length > 0 && (
               <button
                 type="button"
                 onClick={() => setServiceFilter("favorites")}
@@ -553,13 +553,6 @@ function Home({ initialSettings }) {
                 })}
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => setQuickAccessEnabled(!quickAccessEnabled)}
-              className="ml-auto rounded-md px-3 py-1.5 text-xs font-medium text-theme-500 dark:text-theme-400 hover:bg-theme-200/70 dark:hover:bg-theme-700"
-            >
-              {quickAccessEnabled ? t("quickAccess.hide") : t("quickAccess.show")}
-            </button>
           </div>
         )}
         {filteredLayoutGroups.length > 0 && (
@@ -631,9 +624,7 @@ function Home({ initialSettings }) {
     favoriteKeySet,
     favorites,
     previewProfile,
-    quickAccessEnabled,
     quickAccessGroups,
-    setQuickAccessEnabled,
     t,
     settings.layout,
     settings.fiveColumns,

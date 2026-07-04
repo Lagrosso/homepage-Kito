@@ -75,6 +75,7 @@ function parseServices(content) {
           return {
             name: serviceName,
             href: value?.href,
+            siteMonitor: value?.siteMonitor,
             description: value?.description,
             icon: value?.icon,
             server: value?.server ?? value?.widget?.server,
@@ -208,6 +209,7 @@ const EMPTY_FORM = {
   group: "",
   name: "",
   href: "",
+  siteMonitor: "",
   icon: "",
   description: "",
   server: "",
@@ -519,6 +521,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             group: group ?? "",
             name: initial?.name ?? "",
             href: initial?.href ?? "",
+            siteMonitor: initial?.siteMonitor ?? "",
             icon: initial?.icon ?? "",
             description: initial?.description ?? "",
             server: initial?.server ?? "",
@@ -596,6 +599,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         group: form.group.trim(),
         name: form.name.trim(),
         href: form.href.trim(),
+        siteMonitor: form.siteMonitor.trim(),
         description: form.description.trim(),
         icon: form.icon.trim(),
         server: form.server.trim(),
@@ -627,7 +631,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     // untouched fields stay byte-identical and no derived value (e.g. a service's
     // widget.server/container shown here) is written back as a new top-level field.
     const values = { name: form.name.trim() };
-    ["href", "icon", "description", "server", "container"].forEach((field) => {
+    ["href", "siteMonitor", "icon", "description", "server", "container"].forEach((field) => {
       if (form[field].trim() !== String(initial?.[field] ?? "")) {
         values[field] = form[field].trim();
       }
@@ -730,6 +734,14 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                 <input
                   value={form.href}
                   onChange={setField("href")}
+                  placeholder="http://localhost:8989"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Site monitor URL (optional)">
+                <input
+                  value={form.siteMonitor}
+                  onChange={setField("siteMonitor")}
                   placeholder="http://localhost:8989"
                   className={inputClass}
                 />

@@ -6,7 +6,7 @@ import useSWR from "swr";
 // shared by all service tiles and the dashboard favorites section.
 
 const PREFERENCES_URL = "/api/user/preferences";
-const EMPTY = { favorites: [], enabled: true };
+const EMPTY = { favorites: [] };
 
 async function patchPreferences(body) {
   const res = await fetch(PREFERENCES_URL, {
@@ -23,7 +23,6 @@ async function patchPreferences(body) {
 export function useFavorites() {
   const { data, mutate } = useSWR(PREFERENCES_URL);
   const prefs = data?.preferences ?? EMPTY;
-  const enabled = prefs.enabled !== false;
   const favorites = Array.isArray(prefs.favorites) ? prefs.favorites : [];
 
   const optimistic = (nextPrefs) => ({ preferences: { ...prefs, ...nextPrefs } });
@@ -38,20 +37,10 @@ export function useFavorites() {
     });
   };
 
-  const setEnabled = (value) =>
-    mutate(patchPreferences({ enabled: value }), {
-      optimisticData: optimistic({ enabled: value }),
-      revalidate: false,
-      rollbackOnError: true,
-      populateCache: true,
-    });
-
   return {
     loaded: Boolean(data),
-    enabled,
     favorites,
     isFavorite: (key) => favorites.includes(key),
     toggleFavorite,
-    setEnabled,
   };
 }

@@ -24,7 +24,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
   const { url: resolvedHref } = resolveServiceUrl(service, networkContext);
   const hasLink = resolvedHref && resolvedHref !== "#";
   const showPublicWarning = hasLink && isPublicUrl(resolvedHref);
-  const { enabled: quickAccessEnabled, isFavorite, toggleFavorite } = useFavorites();
+  const { isFavorite, toggleFavorite } = useFavorites();
   // Use the original group::name key even when shown in a synthetic quick-access section.
   const favKey = service.favoriteKey ?? serviceKey(groupName, service.name);
   const favorited = isFavorite(favKey);
@@ -101,22 +101,20 @@ export default function Item({ service, groupName, useEqualHeights }) {
               statusStyle === "dot" ? "gap-0" : "gap-2 mt-2 mr-3"
             } z-10 service-tags`}
           >
-            {quickAccessEnabled && (
-              <button
-                type="button"
-                onClick={() => toggleFavorite(favKey)}
-                aria-label={favorited ? `Unpin ${service.name}` : `Pin ${service.name}`}
-                aria-pressed={favorited}
-                title={favorited ? "Remove from favorites" : "Add to favorites"}
-                className={classNames(
-                  "shrink-0 flex items-center justify-center service-tag service-favorite",
-                  favorited ? "text-amber-400" : "text-theme-400/50 hover:text-amber-400",
-                )}
-              >
-                {favorited ? <MdStar className="w-4 h-4" /> : <MdStarBorder className="w-4 h-4" />}
-                <span className="sr-only">{favorited ? "Favorited" : "Not favorited"}</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => toggleFavorite(favKey)}
+              aria-label={favorited ? `Unpin ${service.name}` : `Pin ${service.name}`}
+              aria-pressed={favorited}
+              title={favorited ? "Remove from favorites" : "Add to favorites"}
+              className={classNames(
+                "shrink-0 flex items-center justify-center service-tag service-favorite",
+                favorited ? "text-amber-400" : "text-theme-400/50 hover:text-amber-400",
+              )}
+            >
+              {favorited ? <MdStar className="w-4 h-4" /> : <MdStarBorder className="w-4 h-4" />}
+              <span className="sr-only">{favorited ? "Favorited" : "Not favorited"}</span>
+            </button>
 
             {showPublicWarning && (
               <div

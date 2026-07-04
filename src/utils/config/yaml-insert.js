@@ -86,10 +86,24 @@ function appendDocs(lines, docs, indent = "        ") {
 
 // Build the indented YAML for one service entry (under a group). Mirrors the
 // skeleton indentation: service at 4 spaces, properties at 8 spaces.
-export function buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls, docs }) {
+export function buildServiceEntry({
+  name,
+  href,
+  siteMonitor,
+  description,
+  icon,
+  server,
+  container,
+  accessGroups,
+  urls,
+  docs,
+}) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
     lines.push(`        href: ${quoteScalar(href)}`);
+  }
+  if (siteMonitor) {
+    lines.push(`        siteMonitor: ${quoteScalar(siteMonitor)}`);
   }
   appendUrls(lines, urls);
   appendDocs(lines, docs);
@@ -188,12 +202,12 @@ export function insertEntry(rawText, group, entry) {
 // Insert a service into a raw services.yaml string.
 export function insertService(
   rawText,
-  { group, name, href, description, icon, server, container, accessGroups, urls, docs },
+  { group, name, href, siteMonitor, description, icon, server, container, accessGroups, urls, docs },
 ) {
   return insertEntry(
     rawText,
     group,
-    buildServiceEntry({ name, href, description, icon, server, container, accessGroups, urls, docs }),
+    buildServiceEntry({ name, href, siteMonitor, description, icon, server, container, accessGroups, urls, docs }),
   );
 }
 

@@ -146,6 +146,24 @@ describe("updateServiceEntry", () => {
     expect(service.container).toBe("sonarr");
   });
 
+  it("adds and removes a siteMonitor field", () => {
+    const withMonitor = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { siteMonitor: "http://localhost/health" },
+    );
+    expect(yaml.load(withMonitor)[0]["My First Group"][0]["My First Service"].siteMonitor).toBe(
+      "http://localhost/health",
+    );
+
+    const removed = updateServiceEntry(
+      withMonitor,
+      { group: "My First Group", name: "My First Service" },
+      { siteMonitor: "" },
+    );
+    expect(yaml.load(removed)[0]["My First Group"][0]["My First Service"].siteMonitor).toBeUndefined();
+  });
+
   it("adds and removes access groups", () => {
     const withGroups = updateServiceEntry(
       SRC,

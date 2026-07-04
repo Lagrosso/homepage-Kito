@@ -23,12 +23,12 @@ export function isValidPreferenceKey(key) {
 }
 
 function defaultPrefs() {
-  return { favorites: [], enabled: true };
+  return { favorites: [] };
 }
 
 // Coerce an arbitrary (possibly hand-edited) entry into a safe, capped shape.
-// A legacy `usage` key (from the removed recently/frequently-used feature) is
-// simply ignored and dropped on the next write.
+// Legacy `usage` / `enabled` keys (from the removed recently/frequently-used
+// and quick-access on/off features) are ignored and dropped on the next write.
 function normalizePrefs(raw) {
   const prefs = defaultPrefs();
   if (!raw || typeof raw !== "object") {
@@ -39,7 +39,6 @@ function normalizePrefs(raw) {
     prefs.favorites = [...new Set(raw.favorites.filter(isValidPreferenceKey))].slice(0, MAX_FAVORITES);
   }
 
-  prefs.enabled = raw.enabled !== false;
   return prefs;
 }
 
@@ -91,11 +90,5 @@ export function toggleFavorite(username, key) {
     } else {
       prefs.favorites = [key, ...prefs.favorites].slice(0, MAX_FAVORITES);
     }
-  });
-}
-
-export function setEnabled(username, enabled) {
-  return updateUserPrefs(username, (prefs) => {
-    prefs.enabled = enabled !== false;
   });
 }

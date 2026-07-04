@@ -113,6 +113,21 @@ describe("/admin/config service docs form", () => {
     expect(onAdd).toHaveBeenCalledWith(expect.not.objectContaining({ docs: expect.anything() }));
   });
 
+  it("passes the siteMonitor URL when adding a service", () => {
+    render(<AdminServicesConfig />);
+    const onAdd = vi.fn();
+    render(<AddDialog.Component open onClose={vi.fn()} onAdd={onAdd} existingGroups={["Media"]} />);
+
+    fireEvent.change(screen.getByLabelText("Group*"), { target: { value: "Media" } });
+    fireEvent.change(screen.getByLabelText("Service Name*"), { target: { value: "Jellyfin" } });
+    fireEvent.change(screen.getByLabelText("Site monitor URL (optional)"), {
+      target: { value: "http://jellyfin/health" },
+    });
+    fireEvent.submit(screen.getByLabelText("Service Name*").closest("form"));
+
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ siteMonitor: "http://jellyfin/health" }));
+  });
+
   it("prefills existing docs values and sends only changed fields when editing", () => {
     render(<AdminServicesConfig />);
     const onSubmit = vi.fn();

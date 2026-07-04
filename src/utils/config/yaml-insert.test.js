@@ -69,6 +69,17 @@ describe("buildServiceEntry", () => {
     expect(entry).toContain("groups: [family, media]");
   });
 
+  it("includes siteMonitor after href when present", () => {
+    const entry = buildServiceEntry({ name: "Sonarr", href: "http://sonarr/", siteMonitor: "http://sonarr/health" });
+    expect(entry).toContain('siteMonitor: "http://sonarr/health"');
+    expect(entry.indexOf("href:")).toBeLessThan(entry.indexOf("siteMonitor:"));
+  });
+
+  it("omits siteMonitor when not provided", () => {
+    const entry = buildServiceEntry({ name: "Sonarr", href: "http://sonarr/" });
+    expect(entry).not.toContain("siteMonitor:");
+  });
+
   it("includes only the docs fields that are set", () => {
     const entry = buildServiceEntry({
       name: "Jellyfin",
