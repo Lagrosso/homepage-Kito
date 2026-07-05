@@ -265,6 +265,22 @@ function applyDocs(doc, map, rawDocs) {
   }
 }
 
+// Set/clear the flat `badges` list on a service (M13). Same normalization as
+// access groups (split/trim/dedupe). Empty list removes the key entirely.
+// `undefined` leaves `badges` untouched. Written as a top-level list (not nested
+// under `access`).
+function applyBadges(doc, map, rawBadges) {
+  if (rawBadges === undefined) {
+    return;
+  }
+  const badges = normalizeAccessGroups(rawBadges);
+  if (badges.length === 0) {
+    map.delete("badges");
+    return;
+  }
+  map.set("badges", badges);
+}
+
 // Edit an existing service's fields and/or rename it. Only the keys present in
 // `values` are touched; an empty string removes that field; unknown/nested
 // fields (widget:, ping:, …) on the entry are left untouched. Returns new raw text.
@@ -283,6 +299,7 @@ export function updateServiceEntry(rawText, { group, name }, values) {
   applyAccessGroups(doc, propsMap, values.accessGroups);
   applyUrls(doc, propsMap, values.urls);
   applyDocs(doc, propsMap, values.docs);
+  applyBadges(doc, propsMap, values.badges);
 
   return doc.toString();
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { MdDelete, MdEdit, MdInfoOutline, MdSearch } from "react-icons/md";
 
 import { useLayoutGoverns } from "components/admin/use-layout-governs";
+import { BADGE_BY_ID, BADGE_TYPES, NEUTRAL_BADGE_CLASS } from "utils/config/badge-registry";
 import { isPlaceholder, maskValue } from "utils/config/secret-mask";
 import {
   SERVICE_WIDGET_TEMPLATES,
@@ -84,6 +85,7 @@ function parseServices(content) {
             accessGroups: Array.isArray(value?.access?.groups) ? value.access.groups : [],
             urls: value?.urls && typeof value.urls === "object" ? value.urls : undefined,
             docs: value?.docs && typeof value.docs === "object" ? value.docs : undefined,
+            badges: Array.isArray(value?.badges) ? value.badges.map(String) : undefined,
           };
         });
       return { name, entries };
@@ -174,6 +176,21 @@ function ServiceCard({ entry, onEdit, onDelete }) {
             <MdInfoOutline className="w-4 h-4 text-theme-400" />
           </div>
         )}
+        {entry.badges?.length > 0 && (
+          <div className="shrink-0 self-start m-1 flex flex-wrap gap-1 max-w-[10rem] justify-end">
+            {entry.badges.map((id) => {
+              const badge = BADGE_BY_ID[id];
+              return (
+                <span
+                  key={id}
+                  className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${badge ? badge.className : NEUTRAL_BADGE_CLASS}`}
+                >
+                  {badge ? badge.label : id}
+                </span>
+              );
+            })}
+          </div>
+        )}
         {(onEdit || onDelete) && (
           <div className="shrink-0 self-start flex gap-1 m-1">
             {onEdit && (
@@ -215,6 +232,7 @@ const EMPTY_FORM = {
   server: "",
   container: "",
   accessGroups: "",
+  badges: "",
   urlLan: "",
   urlTailscale: "",
   urlPublic: "",
@@ -527,6 +545,7 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
             server: initial?.server ?? "",
             container: initial?.container ?? "",
             accessGroups: Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "",
+            badges: Array.isArray(initial?.badges) ? initial.badges.join(", ") : "",
             urlLan: initial?.urls?.lan ?? "",
             urlTailscale: initial?.urls?.tailscale ?? "",
             urlPublic: initial?.urls?.public ?? "",
@@ -548,6 +567,16 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
   }, [open, isEdit, initial, group]);
 
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  // Badges live in the single comma-string `form.badges`; the checkbox grid
+  // reflects/toggles curated ids within it, custom ones stay in the text field.
+  const badgeList = form.badges
+    .split(",")
+    .map((b) => b.trim())
+    .filter(Boolean);
+  const toggleBadge = (id) => {
+    const next = badgeList.includes(id) ? badgeList.filter((b) => b !== id) : [...badgeList, id];
+    setForm((f) => ({ ...f, badges: next.join(", ") }));
+  };
   const setIconField = (value) => {
     setIconSuggestionError(null);
     setForm((f) => ({ ...f, icon: value }));
@@ -606,6 +635,9 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
         container: form.container.trim(),
         accessGroups: form.accessGroups.trim(),
       };
+      if (form.badges.trim()) {
+        addValues.badges = form.badges.trim();
+      }
       const urls = {};
       URL_FORM_FIELDS.forEach(([formKey, urlKey]) => {
         if (form[formKey].trim()) {
@@ -638,6 +670,9 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     });
     if (form.accessGroups.trim() !== (Array.isArray(initial?.accessGroups) ? initial.accessGroups.join(", ") : "")) {
       values.accessGroups = form.accessGroups.trim();
+    }
+    if (form.badges.trim() !== (Array.isArray(initial?.badges) ? initial.badges.join(", ") : "")) {
+      values.badges = form.badges.trim();
     }
     // Only send the url keys that actually changed (empty = remove that variant).
     const urlChanges = {};
@@ -846,6 +881,32 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                   className={inputClass}
                 />
               </Field>
+              <div className="block text-sm">
+                <span className="block font-medium mb-1">Service badges (optional)</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-900 p-2 mb-2">
+                  {BADGE_TYPES.map((badge) => (
+                    <label key={badge.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={badgeList.includes(badge.id)}
+                        onChange={() => toggleBadge(badge.id)}
+                        className="rounded border-theme-300 dark:border-theme-700"
+                      />
+                      <span>{badge.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <input
+                  aria-label="Service badges"
+                  value={form.badges}
+                  onChange={setField("badges")}
+                  placeholder="lan, critical, mein-eigenes-badge"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-[11px] text-theme-400">
+                  Kuratierte Badges per Häkchen; eigene kommagetrennt ergänzen.
+                </p>
+              </div>
               {isEdit && (
                 <div className="space-y-3 border-t border-theme-200 dark:border-theme-700 pt-3">
                   <label className="flex items-center gap-2 text-sm font-medium">

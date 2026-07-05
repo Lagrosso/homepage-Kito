@@ -13,6 +13,7 @@ import ProxmoxVM from "widgets/proxmoxvm/component";
 import KubernetesStatus from "./kubernetes-status";
 import Ping from "./ping";
 import ProxmoxStatus from "./proxmox-status";
+import ServiceBadges from "./service-badges";
 import ServiceDocsButton from "./service-docs-button";
 import SiteMonitor from "./site-monitor";
 import Status from "./status";
@@ -174,6 +175,8 @@ export default function Item({ service, groupName, useEqualHeights }) {
             )}
           </div>
         </div>
+
+        {service.badges?.length > 0 && <ServiceBadges badges={service.badges} />}
 
         {service.container && service.server && (
           <div

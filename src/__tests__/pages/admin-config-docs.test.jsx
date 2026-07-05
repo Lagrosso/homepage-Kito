@@ -157,4 +157,43 @@ describe("/admin/config service docs form", () => {
       expect.objectContaining({ docs: { purpose: "Media & photo server" } }),
     );
   });
+
+  it("toggles a curated badge via checkbox and passes badges when adding", () => {
+    render(<AdminServicesConfig />);
+    const onAdd = vi.fn();
+    render(<AddDialog.Component open onClose={vi.fn()} onAdd={onAdd} existingGroups={["Media"]} />);
+
+    fireEvent.change(screen.getByLabelText("Group*"), { target: { value: "Media" } });
+    fireEvent.change(screen.getByLabelText("Service Name*"), { target: { value: "Jellyfin" } });
+
+    // Checking "Kritisch" writes "critical" into the comma text field.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Kritisch" }));
+    const badgesInput = screen.getByPlaceholderText("lan, critical, mein-eigenes-badge");
+    expect(badgesInput).toHaveValue("critical");
+    // Custom values coexist via the text field.
+    fireEvent.change(badgesInput, { target: { value: "critical, mein-eigenes" } });
+
+    fireEvent.submit(screen.getByLabelText("Service Name*").closest("form"));
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ badges: "critical, mein-eigenes" }));
+  });
+
+  it("prefills badges and reflects them in the checkbox grid when editing", () => {
+    render(<AdminServicesConfig />);
+    const onSubmit = vi.fn();
+    render(
+      <EditDialog.Component
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        group="Media"
+        initial={{ name: "Jellyfin", href: "http://jellyfin/", badges: ["lan", "backup"] }}
+        existingGroups={["Media"]}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("lan, critical, mein-eigenes-badge")).toHaveValue("lan, backup");
+    expect(screen.getByRole("checkbox", { name: "LAN" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Backup" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Kritisch" })).not.toBeChecked();
+  });
 });

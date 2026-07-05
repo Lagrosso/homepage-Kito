@@ -54,6 +54,15 @@ function appendAccessGroups(lines, groups, indent = "        ") {
   lines.push(`${indent}  groups: [${normalizedGroups.map(quoteScalar).join(", ")}]`);
 }
 
+// Context badges (M13): a flat inline list on the service, e.g. `badges: [lan, critical]`.
+function appendBadges(lines, badges, indent = "        ") {
+  const normalized = normalizeGroups(badges);
+  if (normalized.length === 0) {
+    return;
+  }
+  lines.push(`${indent}badges: [${normalized.map(quoteScalar).join(", ")}]`);
+}
+
 // Multi-URL context keys (M14): per-service reachable URLs by network.
 const URL_CONTEXT_KEYS = ["lan", "tailscale", "public"];
 
@@ -97,6 +106,7 @@ export function buildServiceEntry({
   accessGroups,
   urls,
   docs,
+  badges,
 }) {
   const lines = [`    - ${quoteScalar(name)}:`];
   if (href) {
@@ -119,6 +129,7 @@ export function buildServiceEntry({
   if (container) {
     lines.push(`        container: ${quoteScalar(container)}`);
   }
+  appendBadges(lines, badges);
   appendAccessGroups(lines, accessGroups);
   return lines.join("\n");
 }
@@ -202,12 +213,24 @@ export function insertEntry(rawText, group, entry) {
 // Insert a service into a raw services.yaml string.
 export function insertService(
   rawText,
-  { group, name, href, siteMonitor, description, icon, server, container, accessGroups, urls, docs },
+  { group, name, href, siteMonitor, description, icon, server, container, accessGroups, urls, docs, badges },
 ) {
   return insertEntry(
     rawText,
     group,
-    buildServiceEntry({ name, href, siteMonitor, description, icon, server, container, accessGroups, urls, docs }),
+    buildServiceEntry({
+      name,
+      href,
+      siteMonitor,
+      description,
+      icon,
+      server,
+      container,
+      accessGroups,
+      urls,
+      docs,
+      badges,
+    }),
   );
 }
 

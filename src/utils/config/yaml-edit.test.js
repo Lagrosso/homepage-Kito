@@ -146,6 +146,31 @@ describe("updateServiceEntry", () => {
     expect(service.container).toBe("sonarr");
   });
 
+  it("adds, updates and removes the badges list", () => {
+    const withBadges = updateServiceEntry(
+      SRC,
+      { group: "My First Group", name: "My First Service" },
+      { badges: "lan, critical, lan" },
+    );
+    expect(yaml.load(withBadges)[0]["My First Group"][0]["My First Service"].badges).toEqual(["lan", "critical"]);
+    // Untouched fields + inline comment preserved.
+    expect(withBadges).toContain("href: http://localhost/ # inline note");
+
+    const changed = updateServiceEntry(
+      withBadges,
+      { group: "My First Group", name: "My First Service" },
+      { badges: "backup" },
+    );
+    expect(yaml.load(changed)[0]["My First Group"][0]["My First Service"].badges).toEqual(["backup"]);
+
+    const removed = updateServiceEntry(
+      changed,
+      { group: "My First Group", name: "My First Service" },
+      { badges: "" },
+    );
+    expect(yaml.load(removed)[0]["My First Group"][0]["My First Service"].badges).toBeUndefined();
+  });
+
   it("adds and removes a siteMonitor field", () => {
     const withMonitor = updateServiceEntry(
       SRC,

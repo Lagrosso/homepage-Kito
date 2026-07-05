@@ -69,6 +69,16 @@ describe("buildServiceEntry", () => {
     expect(entry).toContain("groups: [family, media]");
   });
 
+  it("includes a badges inline list when present, deduped", () => {
+    const entry = buildServiceEntry({ name: "Sonarr", href: "http://sonarr/", badges: ["lan", "critical", "lan"] });
+    expect(entry).toContain("badges: [lan, critical]");
+  });
+
+  it("omits badges when the list is empty", () => {
+    const entry = buildServiceEntry({ name: "Sonarr", href: "http://sonarr/", badges: [] });
+    expect(entry).not.toContain("badges:");
+  });
+
   it("includes siteMonitor after href when present", () => {
     const entry = buildServiceEntry({ name: "Sonarr", href: "http://sonarr/", siteMonitor: "http://sonarr/health" });
     expect(entry).toContain('siteMonitor: "http://sonarr/health"');

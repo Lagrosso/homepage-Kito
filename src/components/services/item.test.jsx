@@ -59,6 +59,11 @@ vi.mock("./service-docs-button", () => ({
     return <div data-testid="service-docs-button">{serviceName}:{Object.keys(docs ?? {}).join(",")}</div>;
   },
 }));
+vi.mock("./service-badges", () => ({
+  default: function ServiceBadgesMock({ badges }) {
+    return <div data-testid="service-badges">{(badges ?? []).join(",")}</div>;
+  },
+}));
 vi.mock("./widget", () => ({
   default: function ServiceWidgetMock({ widget }) {
     return <div data-testid="service-widget">idx:{widget.index}</div>;
@@ -354,6 +359,32 @@ describe("components/services/item", () => {
     );
 
     expect(screen.getByTestId("service-docs-button")).toHaveTextContent("My Service:purpose");
+  });
+
+  it("does not render the badges row when the service has no badges", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "My Service", href: "http://localhost/", widgets: [] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.queryByTestId("service-badges")).not.toBeInTheDocument();
+  });
+
+  it("renders the badges row with the service's badges when present", () => {
+    renderWithProviders(
+      <Item
+        groupName="G"
+        useEqualHeights={false}
+        service={{ id: "svc1", name: "My Service", href: "http://localhost/", widgets: [], badges: ["lan", "critical"] }}
+      />,
+      { settings: { target: "_self", showStats: false, statusStyle: "basic" } },
+    );
+
+    expect(screen.getByTestId("service-badges")).toHaveTextContent("lan,critical");
   });
 
   it("toggles a favorite with the group::name key when the pin star is clicked", () => {
