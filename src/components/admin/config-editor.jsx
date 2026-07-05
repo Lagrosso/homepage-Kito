@@ -26,6 +26,7 @@ import AdminTabs from "components/admin/admin-tabs";
 import LogoutButton from "components/admin/logout-button";
 
 import { CONFIG_TABS } from "utils/admin/config-tabs";
+import { filterPreviewGroups } from "utils/admin/preview-search";
 import { clearEditorDraft, getEditorDraft } from "utils/config/import-drafts";
 import { hasBarePlaceholder } from "utils/config/yaml-edit";
 
@@ -151,20 +152,33 @@ function MoveBtn({ dir, disabled, onClick, label }) {
   );
 }
 
-function Preview({ content, parse, Card, gridClassName, onEdit, onDelete, onMoveEntry, onMoveGroup, onMoveToGroup }) {
+function Preview({
+  content,
+  parse,
+  Card,
+  gridClassName,
+  query = "",
+  onEdit,
+  onDelete,
+  onMoveEntry,
+  onMoveGroup,
+  onMoveToGroup,
+}) {
   const result = useMemo(() => {
     try {
-      return { groups: parse(content), error: null };
+      return { groups: filterPreviewGroups(parse(content), query), error: null };
     } catch (e) {
       return { groups: [], error: describeYamlError(e) };
     }
-  }, [content, parse]);
+  }, [content, parse, query]);
 
   if (result.error) {
     return <p className="text-sm text-red-500">Preview unavailable: {result.error}</p>;
   }
   if (result.groups.length === 0) {
-    return <p className="text-sm text-theme-500">No groups found.</p>;
+    return (
+      <p className="text-sm text-theme-500">{query.trim() ? "No matches." : "No groups found."}</p>
+    );
   }
 
   const groupNames = result.groups.map((g) => g.name);
@@ -570,6 +584,13 @@ export default function ConfigEditor({
   const [healthOpen, setHealthOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null); // { group, entry } | null
+  // Read-only card-preview filter (never mutates the YAML). While a query is
+  // active we fall back to the non-DnD Preview and hide reorder controls, since
+  // those operate on file positions that no longer match the filtered view.
+  const [previewQuery, setPreviewQuery] = useState("");
+  // Mobile only: toggle between the raw YAML and the preview (they sit side by
+  // side from lg: up). Preview is shown first so small screens surface it.
+  const [mobilePane, setMobilePane] = useState("preview"); // "preview" | "yaml"
 
   useEffect(() => {
     let cancelled = false;
@@ -662,11 +683,13 @@ export default function ConfigEditor({
   // Structured edit/delete can't round-trip a file with bare unquoted
   // {{HOMEPAGE_*}} placeholders, so disable those actions and explain why.
   const placeholderBlocked = useMemo(() => hasBarePlaceholder(content), [content]);
+  // A non-empty filter disables reorder/DnD (see previewQuery note above).
+  const searching = previewQuery.trim().length > 0;
   const showEdit = canEdit && !placeholderBlocked;
   const showDelete = canDelete && !placeholderBlocked;
-  const showMove = canMove && !placeholderBlocked;
-  const showMoveGroup = canMoveGroup && !placeholderBlocked;
-  const showMoveToGroup = canMoveToGroup && !placeholderBlocked;
+  const showMove = canMove && !placeholderBlocked && !searching;
+  const showMoveGroup = canMoveGroup && !placeholderBlocked && !searching;
+  const showMoveToGroup = canMoveToGroup && !placeholderBlocked && !searching;
 
   const onValidate = useCallback(() => {
     try {
@@ -1013,8 +1036,32 @@ export default function ConfigEditor({
                 </div>
               )}
 
+              {/* Mobile-only pane switch: raw YAML and preview stack on small
+                  screens, so offer tabs instead of a long scroll. Both are shown
+                  side by side from lg: up (the bar is hidden there). */}
+              <div className="mb-3 flex gap-1 rounded-md bg-theme-200/60 dark:bg-theme-800 p-1 lg:hidden">
+                {[
+                  { id: "preview", label: "Preview" },
+                  { id: "yaml", label: "YAML" },
+                ].map((pane) => (
+                  <button
+                    key={pane.id}
+                    type="button"
+                    onClick={() => setMobilePane(pane.id)}
+                    aria-pressed={mobilePane === pane.id}
+                    className={`flex-1 rounded px-3 py-2 text-sm font-medium ${
+                      mobilePane === pane.id
+                        ? "bg-white dark:bg-theme-700 text-theme-900 dark:text-theme-100 shadow-sm"
+                        : "text-theme-500 hover:text-theme-700 dark:hover:text-theme-200"
+                    }`}
+                  >
+                    {pane.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
+                <div className={`${mobilePane === "yaml" ? "block" : "hidden"} lg:block`}>
                   <div className="flex items-center justify-between mb-1">
                     <label htmlFor="yaml-editor" className="block text-sm font-medium">
                       YAML
@@ -1037,10 +1084,34 @@ export default function ConfigEditor({
                     className="w-full h-[60vh] font-mono text-sm rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-800 p-3 resize-y"
                   />
                 </div>
-                <div>
-                  <span className="block text-sm font-medium mb-1">
-                    {PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}
-                  </span>
+                <div className={`${mobilePane === "preview" ? "block" : "hidden"} lg:block`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="block text-sm font-medium">
+                      {PreviewPanel ? "Tabs & Layout" : "Preview (read-only)"}
+                    </span>
+                    {!PreviewPanel && (
+                      <div className="relative">
+                        <input
+                          type="search"
+                          value={previewQuery}
+                          onChange={(e) => setPreviewQuery(e.target.value)}
+                          placeholder="Filter preview…"
+                          aria-label="Filter preview"
+                          className="w-40 sm:w-56 rounded-md border border-theme-300 dark:border-theme-700 bg-white dark:bg-theme-900 px-2 py-1 text-xs"
+                        />
+                        {searching && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewQuery("")}
+                            aria-label="Clear filter"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-theme-400 hover:text-theme-600 dark:hover:text-theme-200 text-sm leading-none"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {groupReorderHint && (
                     <p className="mb-1 text-xs text-theme-400">
                       <Link href="/admin/layout" className="underline hover:text-theme-600 dark:hover:text-theme-200">
@@ -1048,10 +1119,13 @@ export default function ConfigEditor({
                       </Link>
                     </p>
                   )}
+                  {searching && (canMove || canMoveGroup || canDnd) && (
+                    <p className="mb-1 text-xs text-theme-400">Reordering is paused while filtering.</p>
+                  )}
                   <div className="h-[60vh] overflow-auto rounded-md border border-theme-300 dark:border-theme-700 bg-theme-100/40 dark:bg-theme-800 p-3">
                     {PreviewPanel ? (
                       <PreviewPanel content={content} setContent={setContent} setStatus={setStatus} />
-                    ) : canDnd && !placeholderBlocked ? (
+                    ) : canDnd && !placeholderBlocked && !searching ? (
                       <DndPreview
                         content={content}
                         parse={parse}
@@ -1071,6 +1145,7 @@ export default function ConfigEditor({
                         parse={parse}
                         Card={Card}
                         gridClassName={gridClassName}
+                        query={previewQuery}
                         onEdit={showEdit ? onEditEntry : undefined}
                         onDelete={showDelete ? onDeleteEntry : undefined}
                         onMoveEntry={showMove ? onMoveEntry : undefined}
