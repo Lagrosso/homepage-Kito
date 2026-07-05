@@ -413,7 +413,8 @@ function Home({ initialSettings }) {
     // filtered) means a non-admin session can't get the same effect through
     // URL-hash manipulation; server-side /api/services|bookmarks stay filtered
     // for them either way, so this is defense in depth, not the real boundary.
-    const isAllGroupsTab = authState?.user?.role === "admin" && activeTab === slugifyAndEncode(t(ALL_TAB_LABEL_KEY));
+    const isAdmin = authState?.user?.role === "admin";
+    const isAllGroupsTab = isAdmin && activeTab === slugifyAndEncode(t(ALL_TAB_LABEL_KEY));
     // `g` is transiently undefined for a layout entry whose group hasn't loaded
     // via SWR yet (or no longer exists) — keep that guard first so isAllGroupsTab
     // only ever widens which *defined* groups match, never lets undefined through.
@@ -489,7 +490,7 @@ function Home({ initialSettings }) {
           </div>
         )}
         {tabs.length > 0 && (
-          <div key="tabs" id="tabs" className="m-5 sm:m-9 sm:mt-4 sm:mb-0">
+          <div key="tabs" id="tabs" className="hidden sm:block m-5 sm:m-9 sm:mt-4 sm:mb-0">
             <ul
               className={classNames(
                 "sm:flex gap-1 overflow-hidden rounded-md bg-theme-100/20 dark:bg-white/5 p-1",
@@ -506,7 +507,7 @@ function Home({ initialSettings }) {
             </ul>
           </div>
         )}
-        {(serviceStatusReport?.summary?.total > 0 || favorites.length > 0) && (
+        {((isAdmin && serviceStatusReport?.summary?.total > 0) || favorites.length > 0) && (
           <div key="service-filter" className="mx-5 sm:mx-9 mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -519,7 +520,7 @@ function Home({ initialSettings }) {
             >
               {t("serviceStatus.allServices")}
             </button>
-            {serviceStatusReport?.summary?.total > 0 && (
+            {isAdmin && serviceStatusReport?.summary?.total > 0 && (
               <button
                 type="button"
                 onClick={() => setServiceFilter("problematic")}
@@ -545,7 +546,7 @@ function Home({ initialSettings }) {
                 {t("quickAccess.favoritesOnly")}
               </button>
             )}
-            {serviceStatusReport?.summary?.total > 0 && (
+            {isAdmin && serviceStatusReport?.summary?.total > 0 && (
               <span className="text-xs text-theme-500 dark:text-theme-400">
                 {t("serviceStatus.summary", {
                   problematic: serviceStatusReport.summary.problematic,

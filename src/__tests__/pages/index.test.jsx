@@ -348,6 +348,7 @@ describe("pages/index Index routing + SWR branches", () => {
         { id: "Media::Jellyfin", group: "Media", name: "Jellyfin", severity: "ok", state: "up" },
       ],
     };
+    state.authData = { authenticated: true, user: { username: "admin", role: "admin", groups: [] } };
 
     await renderIndex({ initialSettings: { title: "Homepage", layout: {} }, settings: { layout: {} } });
 
@@ -356,6 +357,29 @@ describe("pages/index Index routing + SWR branches", () => {
 
     expect(screen.getByText("Media")).toBeInTheDocument();
     expect(screen.queryByTestId("bookmarks-group")).not.toBeInTheDocument();
+  });
+
+  it("hides the service-status filter and summary from non-admins", async () => {
+    state.validateData = [];
+    state.servicesData = [
+      {
+        name: "Media",
+        services: [{ name: "Jellyfin", href: "http://jellyfin.local" }],
+        groups: [],
+      },
+    ];
+    state.serviceStatusData = {
+      summary: { total: 2, problematic: 1, slow: 0, noCheck: 1, ok: 1, neutral: 0 },
+      services: [{ id: "Media::Jellyfin", group: "Media", name: "Jellyfin", severity: "critical", state: "down" }],
+    };
+    state.authData = { authenticated: true, user: { username: "viewer", role: "viewer", groups: [] } };
+
+    await renderIndex({ initialSettings: { title: "Homepage", layout: {} }, settings: { layout: {} } });
+
+    expect(await screen.findByText("Media")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "serviceStatus.problematicOnly" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "serviceStatus.allServices" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/serviceStatus\.summary/)).not.toBeInTheDocument();
   });
 
   it("renders config errors when /api/validate returns a list of errors", async () => {
