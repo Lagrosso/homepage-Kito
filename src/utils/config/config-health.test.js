@@ -167,4 +167,44 @@ profiles:
     expect(checks[0].path).toBe("profiles.Familie.groups");
     expect(checks[0].message).toContain('"unknown"');
   });
+
+  it("warns when a service references a missing local icon", () => {
+    const report = buildHealthReport(
+      {
+        ...EMPTY_FILES,
+        "services.yaml": `
+- Media:
+    - Jellyfin:
+        href: http://jellyfin.local
+        icon: /api/config/icon?file=jelly.png
+`,
+      },
+      { localIcons: ["other.png"] },
+    );
+
+    const checks = allChecks(report).filter((check) => check.id.includes("missing-local-icon"));
+    expect(checks).toHaveLength(1);
+    expect(checks[0]).toMatchObject({ severity: "warning", path: "Media > Jellyfin.icon" });
+    expect(checks[0].message).toContain("jelly.png");
+  });
+
+  it("does not warn for a present local icon or a bare remote icon", () => {
+    const report = buildHealthReport(
+      {
+        ...EMPTY_FILES,
+        "services.yaml": `
+- Media:
+    - Jellyfin:
+        href: http://jellyfin.local
+        icon: /api/config/icon?file=jelly.png
+    - Sonarr:
+        href: http://sonarr.local
+        icon: sonarr.svg
+`,
+      },
+      { localIcons: ["jelly.png"] },
+    );
+
+    expect(allChecks(report).filter((check) => check.id.includes("missing-local-icon"))).toHaveLength(0);
+  });
 });

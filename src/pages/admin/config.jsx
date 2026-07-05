@@ -477,35 +477,50 @@ function WidgetOptionsForm({ type, options, onChange, existingWidget }) {
   );
 }
 
-function IconSuggestionList({ suggestions, onSelect }) {
+function IconSuggestionList({ suggestions, onSelect, onCache, cachingUrl, title = "Icon suggestions" }) {
   if (!suggestions.length) {
     return null;
   }
 
   return (
     <div className="mt-2 rounded-md border border-theme-200 dark:border-theme-700 bg-theme-50/40 dark:bg-white/5 p-2">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-theme-500">Icon suggestions</p>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-theme-500">{title}</p>
       <div className="grid gap-2">
         {suggestions.map((suggestion) => (
-          <button
+          <div
             key={`${suggestion.source}:${suggestion.icon}`}
-            type="button"
-            onClick={() => onSelect(suggestion.icon)}
-            className="flex items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-theme-200/60 dark:hover:bg-white/10"
+            className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-theme-200/60 dark:hover:bg-white/10"
           >
-            <span className="shrink-0 flex h-9 w-9 items-center justify-center rounded bg-white/60 dark:bg-black/20">
-              <ResolvedIcon icon={suggestion.icon} width={28} height={28} alt={suggestion.label} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{suggestion.label || suggestion.icon}</span>
-              <span className="block truncate text-[11px] text-theme-500">
-                {suggestion.source} · {suggestion.reason}
+            <button
+              type="button"
+              onClick={() => onSelect(suggestion.icon)}
+              className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
+            >
+              <span className="shrink-0 flex h-9 w-9 items-center justify-center rounded bg-white/60 dark:bg-black/20">
+                <ResolvedIcon icon={suggestion.icon} width={28} height={28} alt={suggestion.label} />
               </span>
-            </span>
-            <code className="hidden sm:block shrink-0 max-w-48 truncate rounded bg-theme-200/70 dark:bg-theme-900/60 px-1.5 py-0.5 text-[10px]">
-              {suggestion.icon}
-            </code>
-          </button>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{suggestion.label || suggestion.icon}</span>
+                <span className="block truncate text-[11px] text-theme-500">
+                  {suggestion.source} · {suggestion.reason}
+                </span>
+              </span>
+              <code className="hidden sm:block shrink-0 max-w-40 truncate rounded bg-theme-200/70 dark:bg-theme-900/60 px-1.5 py-0.5 text-[10px]">
+                {suggestion.icon}
+              </code>
+            </button>
+            {onCache && suggestion.previewUrl && (
+              <button
+                type="button"
+                onClick={() => onCache(suggestion.previewUrl)}
+                disabled={cachingUrl === suggestion.previewUrl}
+                title="Download this icon into your config so it no longer depends on the CDN"
+                className="shrink-0 rounded-md bg-theme-200 dark:bg-theme-700 px-2 py-1 text-[11px] font-medium hover:bg-theme-300 dark:hover:bg-theme-600 disabled:opacity-50"
+              >
+                {cachingUrl === suggestion.previewUrl ? "Saving…" : "Cache locally"}
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -524,6 +539,13 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
   const [iconSuggestions, setIconSuggestions] = useState([]);
   const [iconSuggestionState, setIconSuggestionState] = useState("idle");
   const [iconSuggestionError, setIconSuggestionError] = useState(null);
+  // M21b: interactive dashboard-icons search, local upload gallery, cache action.
+  const [iconSearchQuery, setIconSearchQuery] = useState("");
+  const [iconSearchResults, setIconSearchResults] = useState([]);
+  const [iconSearchState, setIconSearchState] = useState("idle"); // idle | loading | done | error
+  const [localIcons, setLocalIcons] = useState([]);
+  const [iconUploadError, setIconUploadError] = useState(null);
+  const [cachingUrl, setCachingUrl] = useState(null);
 
   useEffect(() => {
     if (!open) {
@@ -533,6 +555,18 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
     setIconSuggestions([]);
     setIconSuggestionState("idle");
     setIconSuggestionError(null);
+    setIconSearchQuery("");
+    setIconSearchResults([]);
+    setIconSearchState("idle");
+    setIconUploadError(null);
+    setCachingUrl(null);
+    // Load the reuse gallery of already-uploaded/cached local icons. Wrapped in
+    // Promise.resolve so a stubbed fetch that returns undefined can't throw.
+    Promise.resolve()
+      .then(() => fetch("/api/config/icon"))
+      .then((res) => (res && res.ok ? res.json() : { files: [] }))
+      .then((data) => setLocalIcons(Array.isArray(data?.files) ? data.files : []))
+      .catch(() => setLocalIcons([]));
     setForm(
       isEdit
         ? {
@@ -615,6 +649,75 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
       setIconSuggestions([]);
       setIconSuggestionError(error.message);
       setIconSuggestionState("error");
+    }
+  };
+
+  // M21b: free-text search over the dashboard-icons catalog.
+  const searchIcons = async () => {
+    const query = iconSearchQuery.trim();
+    if (query.length < 2) {
+      return;
+    }
+    setIconSearchState("loading");
+    try {
+      const response = await fetch(`/api/config/icon-search?q=${encodeURIComponent(query)}`);
+      const payload = await response.json().catch(() => ({}));
+      setIconSearchResults(Array.isArray(payload.results) ? payload.results : []);
+      setIconSearchState("done");
+    } catch {
+      setIconSearchResults([]);
+      setIconSearchState("error");
+    }
+  };
+
+  // M21b: upload a local image → stored under CONF_DIR/icons/, referenced locally.
+  const uploadIcon = (file) => {
+    if (!file) {
+      return;
+    }
+    setIconUploadError(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const response = await fetch("/api/config/icon", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, dataUrl: reader.result }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Upload failed");
+        }
+        setIconField(payload.path);
+        setLocalIcons((prev) => (prev.includes(payload.filename) ? prev : [...prev, payload.filename].sort()));
+      } catch (error) {
+        setIconUploadError(error.message);
+      }
+    };
+    reader.onerror = () => setIconUploadError("Could not read the selected file");
+    reader.readAsDataURL(file);
+  };
+
+  // M21b: download a remote icon (dashboard-icon/favicon) into the local config.
+  const cacheIcon = async (sourceUrl) => {
+    setCachingUrl(sourceUrl);
+    setIconUploadError(null);
+    try {
+      const response = await fetch("/api/config/icon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceUrl }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not cache the icon");
+      }
+      setIconField(payload.path);
+      setLocalIcons((prev) => (prev.includes(payload.filename) ? prev : [...prev, payload.filename].sort()));
+    } catch (error) {
+      setIconUploadError(error.message);
+    } finally {
+      setCachingUrl(null);
     }
   };
 
@@ -847,7 +950,89 @@ function ServiceFormDialog({ mode = "add", open, onClose, onSubmit, initial, gro
                 {iconSuggestionState === "done" && iconSuggestions.length === 0 && (
                   <p className="mt-1 text-xs text-theme-400">No matching icon found in curated sources.</p>
                 )}
-                <IconSuggestionList suggestions={iconSuggestions} onSelect={setIconField} />
+                <IconSuggestionList
+                  suggestions={iconSuggestions}
+                  onSelect={setIconField}
+                  onCache={cacheIcon}
+                  cachingUrl={cachingUrl}
+                />
+
+                {/* M21b: interactive dashboard-icons search */}
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={iconSearchQuery}
+                    onChange={(e) => setIconSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchIcons();
+                      }
+                    }}
+                    placeholder="Search dashboard icons…"
+                    aria-label="Search dashboard icons"
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    onClick={searchIcons}
+                    disabled={iconSearchState === "loading" || iconSearchQuery.trim().length < 2}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-2 text-sm font-medium hover:bg-theme-300 dark:hover:bg-theme-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <MdSearch className="h-4 w-4" />
+                    {iconSearchState === "loading" ? "Searching" : "Search"}
+                  </button>
+                </div>
+                {iconSearchState === "done" && iconSearchResults.length === 0 && (
+                  <p className="mt-1 text-xs text-theme-400">No dashboard icons matched that search.</p>
+                )}
+                <IconSuggestionList
+                  suggestions={iconSearchResults}
+                  onSelect={setIconField}
+                  onCache={cacheIcon}
+                  cachingUrl={cachingUrl}
+                  title="Search results"
+                />
+
+                {/* M21b: upload a local icon + reuse gallery */}
+                <div className="mt-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-theme-200 dark:bg-theme-700 px-3 py-2 text-sm font-medium hover:bg-theme-300 dark:hover:bg-theme-600">
+                    Upload icon
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      aria-label="Upload icon"
+                      onChange={(e) => {
+                        uploadIcon(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {iconUploadError && <p className="mt-1 text-xs text-red-500">{iconUploadError}</p>}
+                  {localIcons.length > 0 && (
+                    <div className="mt-2">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-theme-500">
+                        Your uploaded icons
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {localIcons.map((file) => {
+                          const iconRef = `/api/config/icon?file=${encodeURIComponent(file)}`;
+                          return (
+                            <button
+                              key={file}
+                              type="button"
+                              onClick={() => setIconField(iconRef)}
+                              title={file}
+                              className="flex h-10 w-10 items-center justify-center rounded border border-theme-200 dark:border-theme-700 bg-white/60 dark:bg-black/20 hover:border-blue-500"
+                            >
+                              <ResolvedIcon icon={iconRef} width={28} height={28} alt={file} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <Field label="Description">
                 <input

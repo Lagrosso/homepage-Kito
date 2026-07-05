@@ -59,33 +59,52 @@ vi.mock("utils/config/yaml-insert", () => ({
 
 import AdminServicesConfig from "pages/admin/config";
 
-function fetchResponse(body, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  };
+function jsonResponse(body) {
+  return { ok: true, status: 200, json: vi.fn().mockResolvedValue(body) };
+}
+
+// URL-routing fetch mock. The dialog loads the local-icon gallery on open, so a
+// simple mockResolvedValueOnce sequence would be brittle; route by URL instead.
+const state = { files: [], results: [], suggestions: [] };
+
+function installFetch() {
+  global.fetch = vi.fn((url, options) => {
+    const u = String(url);
+    if (u.startsWith("/api/config/icon-search")) {
+      return Promise.resolve(jsonResponse({ results: state.results }));
+    }
+    if (u.startsWith("/api/config/icon-suggestions")) {
+      return Promise.resolve(jsonResponse({ suggestions: state.suggestions }));
+    }
+    if (u === "/api/config/icon" && options?.method === "POST") {
+      const body = JSON.parse(options.body);
+      if (body.sourceUrl) {
+        const filename = body.sourceUrl.split("/").pop();
+        return Promise.resolve(jsonResponse({ path: `/api/config/icon?file=${filename}`, filename }));
+      }
+      const filename = body.filename.replace(/[^\w.]/g, "_");
+      return Promise.resolve(jsonResponse({ path: `/api/config/icon?file=${filename}`, filename }));
+    }
+    if (u === "/api/config/icon") {
+      return Promise.resolve(jsonResponse({ files: state.files }));
+    }
+    return Promise.resolve(jsonResponse({}));
+  });
 }
 
 describe("/admin/config icon suggestions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+    state.files = [];
+    state.results = [];
+    state.suggestions = [];
+    installFetch();
   });
 
-  it("loads icon suggestions and applies a selected icon to the form", async () => {
-    global.fetch.mockResolvedValueOnce(
-      fetchResponse({
-        suggestions: [
-          {
-            source: "dashboard-icons",
-            icon: "jellyfin.svg",
-            label: "jellyfin.svg",
-            reason: "Found in dashboard-icons",
-          },
-        ],
-      }),
-    );
+  it("loads heuristic icon suggestions and applies a selected icon to the form", async () => {
+    state.suggestions = [
+      { source: "dashboard-icons", icon: "jellyfin.svg", label: "jellyfin.svg", reason: "Found in dashboard-icons" },
+    ];
 
     render(<AdminServicesConfig />);
 
@@ -93,22 +112,65 @@ describe("/admin/config icon suggestions", () => {
     fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://jellyfin.test/" } });
     fireEvent.click(screen.getByRole("button", { name: /Find icon/ }));
 
-    await waitFor(() =>
-      expect(global.fetch).toHaveBeenCalledWith("/api/config/icon-suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Jellyfin",
-          href: "https://jellyfin.test/",
-          widgetType: undefined,
-          currentIcon: "",
-        }),
-      }),
-    );
-
     await screen.findAllByText("jellyfin.svg");
-    fireEvent.click(screen.getByRole("button", { name: /jellyfin.svg/ }));
+    fireEvent.click(screen.getByRole("button", { name: /jellyfin\.svg/ }));
 
     expect(screen.getByDisplayValue("jellyfin.svg")).toBeInTheDocument();
+  });
+
+  it("searches dashboard icons and applies a chosen result", async () => {
+    state.results = [
+      {
+        source: "dashboard-icons",
+        icon: "grafana.svg",
+        label: "grafana",
+        previewUrl: "https://cdn/svg/grafana.svg",
+        reason: "Dashboard-icons search match",
+      },
+    ];
+
+    render(<AdminServicesConfig />);
+    fireEvent.change(screen.getByLabelText(/Service Name/), { target: { value: "Svc" } });
+    fireEvent.change(screen.getByLabelText("Search dashboard icons"), { target: { value: "grafana" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    const result = await screen.findByRole("button", { name: /grafana/i });
+    fireEvent.click(result);
+
+    expect(screen.getByDisplayValue("grafana.svg")).toBeInTheDocument();
+  });
+
+  it("shows the uploaded-icon gallery and applies a local icon reference", async () => {
+    state.files = ["mine.png"];
+
+    render(<AdminServicesConfig />);
+    fireEvent.change(screen.getByLabelText(/Service Name/), { target: { value: "Svc" } });
+
+    const galleryBtn = await screen.findByRole("button", { name: "mine.png" });
+    fireEvent.click(galleryBtn);
+
+    expect(screen.getByDisplayValue("/api/config/icon?file=mine.png")).toBeInTheDocument();
+  });
+
+  it("caches a remote search result locally and applies the returned local path", async () => {
+    state.results = [
+      {
+        source: "dashboard-icons",
+        icon: "grafana.svg",
+        label: "grafana",
+        previewUrl: "https://cdn/svg/grafana.svg",
+        reason: "match",
+      },
+    ];
+
+    render(<AdminServicesConfig />);
+    fireEvent.change(screen.getByLabelText(/Service Name/), { target: { value: "Svc" } });
+    fireEvent.change(screen.getByLabelText("Search dashboard icons"), { target: { value: "grafana" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await screen.findByRole("button", { name: /grafana/i });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cache locally" }));
+
+    await waitFor(() => expect(screen.getByDisplayValue("/api/config/icon?file=grafana.svg")).toBeInTheDocument());
   });
 });

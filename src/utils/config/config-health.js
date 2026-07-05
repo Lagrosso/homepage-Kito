@@ -1,6 +1,7 @@
 import yaml from "js-yaml";
 
 import { EDITABLE_CONFIGS } from "utils/config/editable-files";
+import { parseLocalIconRef } from "utils/config/local-icons";
 import { isPlaceholder, isSensitiveKey, SECRET_VALUE_CONTAINERS, tokenizePlaceholders } from "utils/config/secret-mask";
 import themes from "utils/styles/themes";
 
@@ -114,6 +115,24 @@ function isBadIcon(icon, map) {
   if (typeof icon !== "string") return true;
   const value = restoreString(icon, map).trim();
   return value.length === 0 || value.includes("..") || value.startsWith("file:") || value.startsWith("\\");
+}
+
+// If `icon` references a local uploaded/cached icon (/api/config/icon?file=X)
+// whose file is not present, return the missing filename; otherwise null. Bare
+// `name.svg` stays a remote dashboard-icon reference and is not flagged.
+function missingLocalIcon(icon, map, localIcons) {
+  if (typeof icon !== "string" || isPlaceholderValue(icon, map)) return null;
+  const filename = parseLocalIconRef(restoreString(icon, map).trim());
+  return filename && !localIcons.has(filename) ? filename : null;
+}
+
+// Emits a warning when an icon points at a missing local file. Shared by the
+// services and bookmarks passes; runs in addition to the existing icon checks.
+function warnMissingLocalIcon(file, checks, path, icon, map, context) {
+  const missing = missingLocalIcon(icon, map, context.localIcons);
+  if (missing) {
+    addCheck(checks, file, "warning", "missing-local-icon", `${path}.icon`, `The referenced local icon "${missing}" was not found.`, "Upload the icon again in the service dialog, or fix the reference.");
+  }
 }
 
 function collectSecrets(file, value, map, checks, path, inSecretContainer = false) {
@@ -251,6 +270,7 @@ function checkServices(data, map, file, checks, context) {
       } else if (isBadIcon(options.icon, map)) {
         addCheck(checks, file, "warning", "bad-service-icon", `${path}.icon`, "This service icon value looks unsafe or unsupported.", "Use a known icon name, relative path, or http(s) URL; avoid path traversal.");
       }
+      warnMissingLocalIcon(file, checks, path, options.icon, map, context);
 
       warnUnknownGroups(file, checks, path, collectAccessGroups(options), context.knownUserGroups);
       collectSecrets(file, options, map, checks, path);
@@ -308,6 +328,7 @@ function checkBookmarks(data, map, file, checks, context) {
       } else if (isBadIcon(options.icon, map)) {
         addCheck(checks, file, "warning", "bad-bookmark-icon", `${path}.icon`, "This bookmark icon value looks unsafe or unsupported.", "Use a known icon name, relative path, or http(s) URL; avoid path traversal.");
       }
+      warnMissingLocalIcon(file, checks, path, options.icon, map, context);
       if (options.abbr === undefined) {
         addCheck(checks, file, "info", "missing-bookmark-abbr", `${path}.abbr`, "This bookmark has no abbreviation.", "Add an abbr for a compact fallback label.");
       }
@@ -440,6 +461,7 @@ export function buildHealthReport(rawFiles = {}, options = {}) {
   const context = {
     knownUserGroups: new Set(options.knownUserGroups ?? []),
     configGroups: collectConfigGroups(rawFiles),
+    localIcons: new Set(options.localIcons ?? []),
     hrefs: [],
   };
   const result = { summary: emptySummary(), files: {} };

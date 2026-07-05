@@ -1,5 +1,7 @@
+import { CONF_DIR } from "utils/config/config";
 import { EDITABLE_CONFIGS, isEditableConfig, readRawConfig } from "utils/config/config-writer";
 import { buildHealthReport, buildSingleFileHealthReport } from "utils/config/config-health";
+import { listLocalIcons } from "utils/config/local-icons";
 import { getSession, isAdminSession, isAuthenticatedSession } from "utils/config/session";
 import { loadUsers } from "utils/config/users";
 import createLogger from "utils/logger";
@@ -12,6 +14,10 @@ function knownUserGroups() {
   } catch {
     return [];
   }
+}
+
+function healthOptions() {
+  return { knownUserGroups: knownUserGroups(), localIcons: listLocalIcons(CONF_DIR) };
 }
 
 function readAllRawConfigs() {
@@ -41,7 +47,7 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
-      const report = buildHealthReport(readAllRawConfigs(), { knownUserGroups: knownUserGroups() });
+      const report = buildHealthReport(readAllRawConfigs(), healthOptions());
       return res.status(200).json(report);
     } catch (e) {
       logger.error("Failed to build config health report: %s", e.message);
@@ -59,9 +65,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      const report = buildSingleFileHealthReport(file, content, readAllRawConfigs(), {
-        knownUserGroups: knownUserGroups(),
-      });
+      const report = buildSingleFileHealthReport(file, content, readAllRawConfigs(), healthOptions());
       return res.status(200).json(report);
     } catch (e) {
       logger.error("Failed to build config health report for %s: %s", file, e.message);
