@@ -23,11 +23,11 @@ export default defineConfig({
     // Use forked processes (not worker threads) so each test file's heap is
     // reclaimed per process. Under vitest 4 the shared-heap thread pool
     // accumulated memory across the large jsdom suite and OOM-killed a worker;
-    // forks with a bounded worker count keep peak memory stable.
+    // forks with a bounded worker count keep peak memory stable. `poolOptions`
+    // was removed in vitest 4's pool rework — the equivalent is the top-level
+    // `maxWorkers` option (applies to whichever pool is active).
     pool: "forks",
-    poolOptions: {
-      forks: { minForks: 1, maxForks: 4 },
-    },
+    maxWorkers: 4,
     setupFiles: ["./vitest.setup.js"],
     include: ["src/**/*.test.{js,jsx}", "src/**/*.spec.{js,jsx}"],
     coverage: {

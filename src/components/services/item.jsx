@@ -54,7 +54,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
           "transition-all mb-2 p-1 rounded-md font-medium text-theme-700 dark:text-theme-200 dark:hover:text-theme-300 shadow-md shadow-theme-900/10 dark:shadow-theme-900/20 bg-theme-100/20 hover:bg-theme-300/20 dark:bg-white/5 dark:hover:bg-white/10 relative overflow-clip service-card",
         )}
       >
-        <div className="flex select-none z-0 service-title">
+        <div className="flex items-center select-none z-0 service-title">
           {service.icon &&
             (hasLink ? (
               <a
@@ -77,9 +77,9 @@ export default function Item({ service, groupName, useEqualHeights }) {
               href={resolvedHref}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
-              className="flex-1 flex items-center justify-between rounded-r-md service-title-text"
+              className="flex-1 min-w-0 flex items-center rounded-r-md service-title-text"
             >
-              <div className="flex-1 px-2 py-2 text-sm text-left z-10 service-name">
+              <div className="flex-1 min-w-0 px-2 py-2 text-sm text-left z-10 service-name">
                 {service.name}
                 <p className="text-theme-500 dark:text-theme-300 text-xs font-light service-description">
                   {service.description}
@@ -87,8 +87,8 @@ export default function Item({ service, groupName, useEqualHeights }) {
               </div>
             </a>
           ) : (
-            <div className="flex-1 flex items-center justify-between rounded-r-md service-title-text">
-              <div className="flex-1 px-2 py-2 text-sm text-left z-10 service-name">
+            <div className="flex-1 min-w-0 flex items-center rounded-r-md service-title-text">
+              <div className="flex-1 min-w-0 px-2 py-2 text-sm text-left z-10 service-name">
                 {service.name}
                 <p className="text-theme-500 dark:text-theme-300 text-xs font-light service-description">
                   {service.description}
@@ -98,9 +98,9 @@ export default function Item({ service, groupName, useEqualHeights }) {
           )}
 
           <div
-            className={`absolute top-0 right-0 flex flex-row justify-end ${
-              statusStyle === "dot" ? "gap-0" : "gap-2 mt-2 mr-3"
-            } z-10 service-tags`}
+            className={`shrink-0 flex flex-row items-center ${
+              statusStyle === "dot" ? "gap-1" : "gap-2"
+            } py-2 pl-1 pr-3 z-10 service-tags`}
           >
             <button
               type="button"
@@ -117,6 +117,8 @@ export default function Item({ service, groupName, useEqualHeights }) {
               <span className="sr-only">{favorited ? "Favorited" : "Not favorited"}</span>
             </button>
 
+            {service.docs && <ServiceDocsButton docs={service.docs} serviceName={service.name} />}
+
             {showPublicWarning && (
               <div
                 className="shrink-0 flex items-center justify-center service-tag service-public-link"
@@ -126,8 +128,6 @@ export default function Item({ service, groupName, useEqualHeights }) {
                 <span className="sr-only">Public link (goes over the internet)</span>
               </div>
             )}
-
-            {service.docs && <ServiceDocsButton docs={service.docs} serviceName={service.name} />}
 
             {service.ping && (
               <div className="shrink-0 flex items-center justify-center service-tag service-ping">
