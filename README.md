@@ -113,7 +113,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the curren
 project expectations.
 
 If you are working mainly on the dashboard configuration and admin UI, also review the project notes in
-`CLAUDE.md` / `AGENTS.md` before making broader architectural changes.
+`CLAUDE.md` before making broader architectural changes.
 
 ## Upstream docs
 

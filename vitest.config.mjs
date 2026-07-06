@@ -20,8 +20,14 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    // Use worker threads instead of forked processes to reduce overhead and avoid noisy per-process Node warnings.
-    pool: "threads",
+    // Use forked processes (not worker threads) so each test file's heap is
+    // reclaimed per process. Under vitest 4 the shared-heap thread pool
+    // accumulated memory across the large jsdom suite and OOM-killed a worker;
+    // forks with a bounded worker count keep peak memory stable.
+    pool: "forks",
+    poolOptions: {
+      forks: { minForks: 1, maxForks: 4 },
+    },
     setupFiles: ["./vitest.setup.js"],
     include: ["src/**/*.test.{js,jsx}", "src/**/*.spec.{js,jsx}"],
     coverage: {
